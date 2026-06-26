@@ -3,6 +3,16 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 1.18.1
+
+- **Logs & Debug: „Alle Informationen".** Neuer Button für einen 360°-Diagnose-
+  Export: bündelt alle Status- und Diagnose-Endpunkte (`/api/state`, `config`,
+  `diagnostics`, `metrics`, `decisions`, `trends`, `connect/log`, `messages`,
+  `notifications`, Quellen-Discovery, GARDENA-Test, synthetischer Probelauf)
+  zusammen mit Browser- und System-Informationen (User-Agent, Sprache,
+  Viewport/Screen, Zeitzone, Speicher, localStorage-Schlüssel) in **einer
+  einzigen `.txt`-Datei** — ideal für Bug-Reports.
+
 ## 1.18.0
 
 - **Premium-UI-Politur (Audit-getrieben).** Eine zentrale Normalisierungs-Schicht

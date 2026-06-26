@@ -21,6 +21,15 @@ interface ChangelogEntry {
 function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '1.18.1',
+    items: [
+      t(
+        'Logs & Debug: neuer Button „Alle Informationen" — ein 360°-Diagnose-Export, der alle Status-/Diagnose-Endpunkte, API-Werkzeuge und das Connect-Protokoll plus Browser- und System-Infos in einer einzigen .txt-Datei bündelt (ideal für Bug-Reports).',
+        'Logs & Debug: new "All information" button — a 360° diagnostics export bundling all status/diagnostic endpoints, API tools and the Connect log plus browser and system info into a single .txt file (ideal for bug reports).',
+      ),
+    ],
+  },
+  {
     version: '1.18.0',
     items: [
       t(
