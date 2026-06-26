@@ -6,4 +6,4 @@
  * (rather than read from the snapshot) so the version is visible immediately
  * on load, before any `/api/state` round-trip.
  */
-export const APP_VERSION = '1.18.1';
+export const APP_VERSION = '1.18.2';

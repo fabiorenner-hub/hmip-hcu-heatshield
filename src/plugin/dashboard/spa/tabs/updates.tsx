@@ -21,6 +21,15 @@ interface ChangelogEntry {
 function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '1.18.2',
+    items: [
+      t(
+        'Regenradar: die Bedien-Elemente der Karte (Zoom-Buttons, Quellenangabe) waren hell und passen sich jetzt dem dunklen UI an.',
+        'Rain radar: the map controls (zoom buttons, attribution) were light and now match the dark UI.',
+      ),
+    ],
+  },
+  {
     version: '1.18.1',
     items: [
       t(

@@ -3,6 +3,12 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 1.18.2
+
+- **Regenradar: dunkle Bedien-Elemente.** Die Karten-Steuerung (Zoom-Buttons und
+  Quellenangabe von Leaflet) wurde standardmäßig hell dargestellt und passt sich
+  jetzt dem dunklen Dashboard-Look an.
+
 ## 1.18.1
 
 - **Logs & Debug: „Alle Informationen".** Neuer Button für einen 360°-Diagnose-
