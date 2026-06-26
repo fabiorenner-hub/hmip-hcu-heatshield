@@ -39,6 +39,7 @@ import {
 } from '../hooks/useDiscovery.js';
 import { DiscoveryStatus } from '../components/discoveryStatus.js';
 import { deviceLabel, formatValue } from '../format.js';
+import { t } from '../i18n.js';
 
 interface GlobalSignalKey {
   key:
@@ -49,30 +50,37 @@ interface GlobalSignalKey {
     | 'windSpeed'
     | 'forecastMaxTemp'
     | 'forecastCloudCover';
-  label: string;
+  labelDe: string;
+  labelEn: string;
   /** Encourages the right candidate group in the dropdown. */
   group: 'temperature' | 'pv' | 'radiation' | 'wind' | 'cloud';
 }
 
 const GLOBAL_SIGNALS: GlobalSignalKey[] = [
-  { key: 'outdoorTemp', label: 'Außentemperatur', group: 'temperature' },
-  { key: 'frontOutdoorTemp', label: 'Außentemp. vorne (NO)', group: 'temperature' },
-  { key: 'backOutdoorTemp', label: 'Außentemp. hinten (SW)', group: 'temperature' },
-  { key: 'pvPower', label: 'PV-Leistung / Sonne (FusionSolar inputPower)', group: 'pv' },
-  { key: 'windSpeed', label: 'Windgeschwindigkeit', group: 'wind' },
-  { key: 'forecastMaxTemp', label: 'Vorhersage Max-Temp', group: 'temperature' },
-  { key: 'forecastCloudCover', label: 'Vorhersage Bewölkung', group: 'cloud' },
+  { key: 'outdoorTemp', labelDe: 'Außentemperatur', labelEn: 'Outdoor temperature', group: 'temperature' },
+  { key: 'frontOutdoorTemp', labelDe: 'Außentemp. vorne (NO)', labelEn: 'Outdoor temp. front (NE)', group: 'temperature' },
+  { key: 'backOutdoorTemp', labelDe: 'Außentemp. hinten (SW)', labelEn: 'Outdoor temp. back (SW)', group: 'temperature' },
+  { key: 'pvPower', labelDe: 'PV-Leistung / Sonne (FusionSolar inputPower)', labelEn: 'PV power / sun (FusionSolar inputPower)', group: 'pv' },
+  { key: 'windSpeed', labelDe: 'Windgeschwindigkeit', labelEn: 'Wind speed', group: 'wind' },
+  { key: 'forecastMaxTemp', labelDe: 'Vorhersage Max-Temp', labelEn: 'Forecast max temp', group: 'temperature' },
+  { key: 'forecastCloudCover', labelDe: 'Vorhersage Bewölkung', labelEn: 'Forecast cloud cover', group: 'cloud' },
 ];
 
 /** value-string → live value lookup, formatted for display. */
 type ValueLookup = (deviceId: string, feature: string) => string | undefined;
 
-const STALENESS_LABELS: Record<string, string> = {
-  fresh: 'aktuell',
-  soon: 'bald veraltet',
-  stale: 'veraltet',
-  unknown: '—',
-};
+function stalenessLabel(state: string): string {
+  switch (state) {
+    case 'fresh':
+      return t('aktuell', 'fresh');
+    case 'soon':
+      return t('bald veraltet', 'stale soon');
+    case 'stale':
+      return t('veraltet', 'stale');
+    default:
+      return '—';
+  }
+}
 
 /**
  * Identity string for an option. Encodes the source kind plus the
@@ -188,7 +196,7 @@ function buildOptions(
       out.push({
         value: encodeSourceRef({ kind: 'hmip', deviceId: d.deviceId, feature: 'actualTemperature' }),
         label: withVal(
-          `${deviceLabel(d)} · Temperatur`,
+          `${deviceLabel(d)} · ${t('Temperatur', 'Temperature')}`,
           d.deviceId,
           'actualTemperature',
         ),
@@ -202,7 +210,7 @@ function buildOptions(
           feature: 'actualTemperature',
         }),
         label: withVal(
-          `${deviceLabel(d)} · Temperatur`,
+          `${deviceLabel(d)} · ${t('Temperatur', 'Temperature')}`,
           d.deviceId,
           'actualTemperature',
         ),
@@ -210,20 +218,20 @@ function buildOptions(
     }
     out.push({
       value: encodeSourceRef({ kind: 'openmeteo_http', field: 'temperature' }),
-      label: 'Open-Meteo (direkt) · Außentemperatur',
+      label: t('Open-Meteo (direkt) · Außentemperatur', 'Open-Meteo (direct) · Outdoor temperature'),
     });
     out.push({
       value: encodeSourceRef({ kind: 'openmeteo_http', field: 'maxTempToday' }),
-      label: 'Open-Meteo (direkt) · Tageshöchsttemperatur',
+      label: t('Open-Meteo (direkt) · Tageshöchsttemperatur', 'Open-Meteo (direct) · Daily high temperature'),
     });
   } else if (group === 'pv') {
     const FUSION_LABELS: Record<string, string> = {
-      inputPower: 'PV-Erzeugung / Sonne (empfohlen)',
-      activePower: 'Wechselrichter AC-Leistung',
-      meterActivePower: 'Netzleistung (Bezug/Einspeisung)',
-      batterySoc: 'Akku-Ladestand (%)',
-      batteryChargeDischargePower: 'Akku Lade-/Entladeleistung',
-      internalTemp: 'Wechselrichter-Temperatur',
+      inputPower: t('PV-Erzeugung / Sonne (empfohlen)', 'PV generation / sun (recommended)'),
+      activePower: t('Wechselrichter AC-Leistung', 'Inverter AC power'),
+      meterActivePower: t('Netzleistung (Bezug/Einspeisung)', 'Grid power (import/export)'),
+      batterySoc: t('Akku-Ladestand (%)', 'Battery charge level (%)'),
+      batteryChargeDischargePower: t('Akku Lade-/Entladeleistung', 'Battery charge/discharge power'),
+      internalTemp: t('Wechselrichter-Temperatur', 'Inverter temperature'),
     };
     for (const f of [
       'inputPower',
@@ -246,7 +254,7 @@ function buildOptions(
           deviceId: d.deviceId,
           feature: 'illumination',
         }),
-        label: withVal(`${deviceLabel(d)} · Beleuchtungsstärke`, d.deviceId, 'illumination'),
+        label: withVal(`${deviceLabel(d)} · ${t('Beleuchtungsstärke', 'Illuminance')}`, d.deviceId, 'illumination'),
       });
       out.push({
         value: encodeSourceRef({
@@ -254,12 +262,12 @@ function buildOptions(
           deviceId: d.deviceId,
           feature: 'sunshineDuration',
         }),
-        label: withVal(`${deviceLabel(d)} · Sonnenscheindauer`, d.deviceId, 'sunshineDuration'),
+        label: withVal(`${deviceLabel(d)} · ${t('Sonnenscheindauer', 'Sunshine duration')}`, d.deviceId, 'sunshineDuration'),
       });
     }
     out.push({
       value: encodeSourceRef({ kind: 'openmeteo_http', field: 'radiation' }),
-      label: 'Open-Meteo (direkt) · Globalstrahlung (W/m²)',
+      label: t('Open-Meteo (direkt) · Globalstrahlung (W/m²)', 'Open-Meteo (direct) · Global radiation (W/m²)'),
     });
   } else if (group === 'wind') {
     for (const d of discovery.openMeteo) {
@@ -269,12 +277,12 @@ function buildOptions(
           deviceId: d.deviceId,
           feature: 'windSpeed',
         }),
-        label: withVal(`${deviceLabel(d)} · Wind`, d.deviceId, 'windSpeed'),
+        label: withVal(`${deviceLabel(d)} · ${t('Wind', 'Wind')}`, d.deviceId, 'windSpeed'),
       });
     }
     out.push({
       value: encodeSourceRef({ kind: 'openmeteo_http', field: 'windSpeed' }),
-      label: 'Open-Meteo (direkt) · Windgeschwindigkeit (m/s)',
+      label: t('Open-Meteo (direkt) · Windgeschwindigkeit (m/s)', 'Open-Meteo (direct) · Wind speed (m/s)'),
     });
   } else if (group === 'cloud') {
     for (const d of discovery.openMeteo) {
@@ -284,18 +292,18 @@ function buildOptions(
           deviceId: d.deviceId,
           feature: 'sunshineDuration',
         }),
-        label: withVal(`${deviceLabel(d)} · Sonnenscheindauer`, d.deviceId, 'sunshineDuration'),
+        label: withVal(`${deviceLabel(d)} · ${t('Sonnenscheindauer', 'Sunshine duration')}`, d.deviceId, 'sunshineDuration'),
       });
     }
     out.push({
       value: encodeSourceRef({ kind: 'openmeteo_http', field: 'cloudCover' }),
-      label: 'Open-Meteo (direkt) · Bewölkung (%)',
+      label: t('Open-Meteo (direkt) · Bewölkung (%)', 'Open-Meteo (direct) · Cloud cover (%)'),
     });
   }
 
   out.push({
     value: encodeSourceRef({ kind: 'static', value: 0 }),
-    label: 'Fester Wert · 0',
+    label: t('Fester Wert · 0', 'Fixed value · 0'),
   });
   return out;
 }
@@ -487,8 +495,8 @@ export function SourcesTab(): JSX.Element {
   if (draftConfig === null) {
     return (
       <section class="tab-sources" data-testid="tab-sources">
-        <h2>Quellen-Mapping</h2>
-        <p>Konfiguration wird geladen…</p>
+        <h2>{t('Quellen-Mapping', 'Source mapping')}</h2>
+        <p>{t('Konfiguration wird geladen…', 'Loading configuration…')}</p>
       </section>
     );
   }
@@ -496,7 +504,7 @@ export function SourcesTab(): JSX.Element {
   return (
     <section class="tab-sources" data-testid="tab-sources">
       <header class="tab-sources__header">
-        <h2>Quellen-Mapping</h2>
+        <h2>{t('Quellen-Mapping', 'Source mapping')}</h2>
         <div class="tab-sources__actions">
           <button
             type="button"
@@ -506,10 +514,10 @@ export function SourcesTab(): JSX.Element {
             }}
             disabled={discovery.discovering.value}
           >
-            {discovery.discovering.value ? 'Suche läuft…' : 'Geräte suchen'}
+            {discovery.discovering.value ? t('Suche läuft…', 'Searching…') : t('Geräte suchen', 'Discover devices')}
           </button>
           <span class="tab-sources__autosave" data-testid="sources-autosave">
-            {cfg.loading.value ? 'Speichert…' : 'Automatisch gespeichert'}
+            {cfg.loading.value ? t('Speichert…', 'Saving…') : t('Automatisch gespeichert', 'Auto-saved')}
           </span>
         </div>
       </header>
@@ -526,10 +534,10 @@ export function SourcesTab(): JSX.Element {
         <details open>
           <summary>FusionSolar</summary>
           <p>
-            Konfigurierte Basis-URL: <code>{draftConfig.fusionSolar.baseUrl}</code>
+            {t('Konfigurierte Basis-URL:', 'Configured base URL:')} <code>{draftConfig.fusionSolar.baseUrl}</code>
           </p>
           <label class="tab-sources__field">
-            <span>PV-Spitzenleistung bei voller Sonne (kWp)</span>
+            <span>{t('PV-Spitzenleistung bei voller Sonne (kWp)', 'PV peak power at full sun (kWp)')}</span>
             <input
               type="number"
               min={0.1}
@@ -549,13 +557,15 @@ export function SourcesTab(): JSX.Element {
               }}
             />
             <small>
-              Maximale Erzeugung deiner Anlage = „volle Sonne". Bezugsgröße für
-              die Wärmelast (z. B. 8.8 für 8,8 kWp).
+              {t(
+                'Maximale Erzeugung deiner Anlage = „volle Sonne". Bezugsgröße für die Wärmelast (z. B. 8.8 für 8,8 kWp).',
+                'Maximum generation of your system = "full sun". Reference value for the heat load (e.g. 8.8 for 8.8 kWp).',
+              )}
             </small>
           </label>
         </details>
         <details open>
-          <summary>HCU Temperatur-Sensoren ({discovery.temperatureSources.value.length})</summary>
+          <summary>{t('HCU Temperatur-Sensoren', 'HCU temperature sensors')} ({discovery.temperatureSources.value.length})</summary>
           <ul data-testid="sources-list-climate">
             {discovery.temperatureSources.value.map((d) => (
               <li key={d.deviceId}>
@@ -565,7 +575,7 @@ export function SourcesTab(): JSX.Element {
           </ul>
         </details>
         <details open>
-          <summary>OpenMeteo-Kandidaten ({discovery.openMeteo.value.length})</summary>
+          <summary>{t('OpenMeteo-Kandidaten', 'OpenMeteo candidates')} ({discovery.openMeteo.value.length})</summary>
           <ul data-testid="sources-list-openmeteo">
             {discovery.openMeteo.value.map((d) => (
               <li key={d.deviceId}>
@@ -575,12 +585,12 @@ export function SourcesTab(): JSX.Element {
           </ul>
         </details>
         <details>
-          <summary>Open-Meteo (direkt, ohne HCU-Plugin)</summary>
+          <summary>{t('Open-Meteo (direkt, ohne HCU-Plugin)', 'Open-Meteo (direct, without HCU plugin)')}</summary>
           <p class="tab-sources__hint">
-            Holt Wetterdaten (Temperatur, Bewölkung, Globalstrahlung, Wind,
-            Niederschlag, Tageshöchstwert) direkt von open-meteo.com für deinen
-            Standort. Aktivieren und in den Dropdowns unten „Open-Meteo (direkt)"
-            als Quelle wählen.
+            {t(
+              'Holt Wetterdaten (Temperatur, Bewölkung, Globalstrahlung, Wind, Niederschlag, Tageshöchstwert) direkt von open-meteo.com für deinen Standort. Aktivieren und in den Dropdowns unten „Open-Meteo (direkt)" als Quelle wählen.',
+              'Fetches weather data (temperature, cloud cover, global radiation, wind, precipitation, daily high) directly from open-meteo.com for your location. Enable it and select "Open-Meteo (direct)" as the source in the dropdowns below.',
+            )}
           </p>
           <label class="tab-sources__check">
             <input
@@ -597,10 +607,10 @@ export function SourcesTab(): JSX.Element {
                 );
               }}
             />
-            <span>Open-Meteo direkt abrufen</span>
+            <span>{t('Open-Meteo direkt abrufen', 'Fetch Open-Meteo directly')}</span>
           </label>
           <label class="tab-sources__field">
-            <span>Abruf-Intervall (Minuten)</span>
+            <span>{t('Abruf-Intervall (Minuten)', 'Fetch interval (minutes)')}</span>
             <input
               type="number"
               min={5}
@@ -628,14 +638,14 @@ export function SourcesTab(): JSX.Element {
         </details>
       </div>
 
-      <h3>Globale Signale</h3>
+      <h3>{t('Globale Signale', 'Global signals')}</h3>
       <table class="tab-sources__table">
         <thead>
           <tr>
-            <th>Signal</th>
-            <th>Primärquelle</th>
-            <th>Ersatzquelle</th>
-            <th>Status</th>
+            <th>{t('Signal', 'Signal')}</th>
+            <th>{t('Primärquelle', 'Primary source')}</th>
+            <th>{t('Ersatzquelle', 'Fallback source')}</th>
+            <th>{t('Status', 'Status')}</th>
             <th />
           </tr>
         </thead>
@@ -652,7 +662,7 @@ export function SourcesTab(): JSX.Element {
             return (
               <Fragment key={sig.key}>
                 <tr data-testid={`sources-row-${sig.key}`}>
-                  <th scope="row">{sig.label}</th>
+                  <th scope="row">{t(sig.labelDe, sig.labelEn)}</th>
                   <td>
                     <select
                       data-testid={`sources-${sig.key}-primary`}
@@ -687,7 +697,7 @@ export function SourcesTab(): JSX.Element {
                         )
                       }
                     >
-                      <option value="__none__">— keine —</option>
+                      <option value="__none__">{t('— keine —', '— none —')}</option>
                       {options.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
@@ -701,7 +711,7 @@ export function SourcesTab(): JSX.Element {
                       data-testid={`sources-${sig.key}-staleness`}
                       data-state={staleness ?? 'unknown'}
                     >
-                      {STALENESS_LABELS[staleness ?? 'unknown']}
+                      {stalenessLabel(staleness ?? 'unknown')}
                     </span>
                   </td>
                   <td>
@@ -712,7 +722,7 @@ export function SourcesTab(): JSX.Element {
                         void runProbe(sig.key);
                       }}
                     >
-                      Testen
+                      {t('Testen', 'Test')}
                     </button>
                   </td>
                 </tr>
@@ -741,16 +751,16 @@ export function SourcesTab(): JSX.Element {
         </tbody>
       </table>
 
-      <h3>Räume · Innentemperatur</h3>
+      <h3>{t('Räume · Innentemperatur', 'Rooms · indoor temperature')}</h3>
       {draftConfig.rooms.length === 0 ? (
-        <p class="tab-sources__hint">Keine Räume konfiguriert. Lege zuerst Räume im Tab „Räume" an.</p>
+        <p class="tab-sources__hint">{t('Keine Räume konfiguriert. Lege zuerst Räume im Tab „Räume" an.', 'No rooms configured. First add rooms in the "Rooms" tab.')}</p>
       ) : (
         <table class="tab-sources__table">
           <thead>
             <tr>
-              <th>Raum</th>
-              <th>Primärquelle</th>
-              <th>Ersatzquelle</th>
+              <th>{t('Raum', 'Room')}</th>
+              <th>{t('Primärquelle', 'Primary source')}</th>
+              <th>{t('Ersatzquelle', 'Fallback source')}</th>
             </tr>
           </thead>
           <tbody>
@@ -798,7 +808,7 @@ export function SourcesTab(): JSX.Element {
                         )
                       }
                     >
-                      <option value="__none__">— keine —</option>
+                      <option value="__none__">{t('— keine —', '— none —')}</option>
                       {options.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
@@ -819,7 +829,7 @@ export function SourcesTab(): JSX.Element {
         </div>
       )}
       {cfg.saveOk.value && (
-        <p class="tab-sources__ok" data-testid="sources-save-ok">Gespeichert.</p>
+        <p class="tab-sources__ok" data-testid="sources-save-ok">{t('Gespeichert.', 'Saved.')}</p>
       )}
     </section>
   );

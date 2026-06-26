@@ -12,6 +12,7 @@
 import { h, type JSX } from 'preact';
 
 import { compassLabel, deviceLabel } from '../format.js';
+import { t } from '../i18n.js';
 import { windowSunStatus, type SunWindowStatus } from '../sunIncidence.js';
 import type { Window as WindowDef } from '../../../../shared/types.js';
 
@@ -28,10 +29,10 @@ export interface WindowSunCardProps {
   now?: Date;
 }
 
-const STATUS_META: Record<SunWindowStatus, { label: string; icon: string }> = {
-  lit: { label: 'besonnt', icon: '🟠' },
-  soon: { label: 'bald besonnt', icon: '🟡' },
-  away: { label: 'abgewandt / verschattet', icon: '⚪' },
+const STATUS_META: Record<SunWindowStatus, { label: () => string; icon: string }> = {
+  lit: { label: (): string => t('besonnt', 'sunlit'), icon: '🟠' },
+  soon: { label: (): string => t('bald besonnt', 'soon sunlit'), icon: '🟡' },
+  away: { label: (): string => t('abgewandt / verschattet', 'facing away / shaded'), icon: '⚪' },
 };
 
 export function WindowSunCard(props: WindowSunCardProps): JSX.Element {
@@ -67,7 +68,7 @@ export function WindowSunCard(props: WindowSunCardProps): JSX.Element {
       </header>
       <div class="window-sun-card__meta">
         <span>{compassLabel(w.orientationDeg)} ({Math.round(w.orientationDeg)}°)</span>
-        <span class="window-sun-card__status">{meta.label}</span>
+        <span class="window-sun-card__status">{meta.label()}</span>
       </div>
     </article>
   );

@@ -9,6 +9,8 @@
 import { h, type JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
+import { t, locale } from '../../i18n.js';
+
 interface DwdWarning {
   level: number;
   event: string;
@@ -29,19 +31,25 @@ interface DwdResponse {
   warnings: DwdWarning[];
 }
 
-const LEVEL_LABEL: Record<number, string> = {
-  1: 'Wetterwarnung',
-  2: 'Markante Wetterwarnung',
-  3: 'Unwetterwarnung',
-  4: 'Extremes Unwetter',
+const LEVEL_LABEL: Record<number, [de: string, en: string]> = {
+  1: ['Wetterwarnung', 'Weather warning'],
+  2: ['Markante Wetterwarnung', 'Significant weather warning'],
+  3: ['Unwetterwarnung', 'Severe weather warning'],
+  4: ['Extremes Unwetter', 'Extreme severe weather'],
 };
+
+function levelLabel(level: number): string {
+  const pair = LEVEL_LABEL[level];
+  return pair === undefined ? t('Warnung', 'Warning') : t(pair[0], pair[1]);
+}
 
 function fmtTime(ms: number | null): string {
   if (ms === null) return '';
-  return new Date(ms).toLocaleString('de-DE', {
+  return new Date(ms).toLocaleString(locale(), {
     weekday: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 }
 
@@ -87,11 +95,11 @@ export function DwdWarnings(props: {
   return (
     <section class="dwd-warnings" data-testid="dwd-warnings">
       <header class="dwd-warnings__head">
-        <h2>Unwetterwarnungen (DWD)</h2>
+        <h2>{t('Unwetterwarnungen (DWD)', 'Severe weather warnings (DWD)')}</h2>
         {data !== null && (
           <span class="dwd-warnings__region">
             {data.regionName}
-            {data.time !== null ? ` · Stand ${fmtTime(data.time)}` : ''}
+            {data.time !== null ? ` · ${t('Stand', 'as of')} ${fmtTime(data.time)}` : ''}
           </span>
         )}
       </header>
@@ -106,15 +114,15 @@ export function DwdWarnings(props: {
           >
             <div class="dwd-warning__top">
               <span class="dwd-warning__badge">
-                {w.preliminary ? 'Vorabinfo' : LEVEL_LABEL[w.level] ?? 'Warnung'}
+                {w.preliminary ? t('Vorabinfo', 'Preliminary info') : levelLabel(w.level)}
               </span>
               <span class="dwd-warning__event">{w.event}</span>
             </div>
             <p class="dwd-warning__headline">{w.headline}</p>
             {(w.start !== null || w.end !== null) && (
               <p class="dwd-warning__when">
-                {w.start !== null ? `ab ${fmtTime(w.start)}` : ''}
-                {w.end !== null ? ` bis ${fmtTime(w.end)}` : ''}
+                {w.start !== null ? `${t('ab', 'from')} ${fmtTime(w.start)}` : ''}
+                {w.end !== null ? ` ${t('bis', 'until')} ${fmtTime(w.end)}` : ''}
               </p>
             )}
             {w.instruction.length > 0 && (

@@ -10,6 +10,7 @@ import { h, type JSX } from 'preact';
 import { useEffect } from 'preact/hooks';
 
 import { useMessages } from '../hooks/useMessages.js';
+import { t, locale } from '../i18n.js';
 import type { Message, MessageKind } from '../types.js';
 
 const KIND_ICON: Record<MessageKind, string> = {
@@ -20,13 +21,22 @@ const KIND_ICON: Record<MessageKind, string> = {
   info: 'ℹ',
 };
 
-const KIND_LABEL: Record<MessageKind, string> = {
-  ventilate: 'Lüften',
-  open: 'Öffnen',
-  close: 'Hitzeschutz',
-  weather: 'Wetter',
-  info: 'Info',
-};
+function kindLabel(kind: MessageKind): string {
+  switch (kind) {
+    case 'ventilate':
+      return t('Lüften', 'Ventilate');
+    case 'open':
+      return t('Öffnen', 'Open');
+    case 'close':
+      return t('Hitzeschutz', 'Heat protection');
+    case 'weather':
+      return t('Wetter', 'Weather');
+    case 'info':
+      return t('Info', 'Info');
+    default:
+      return kind;
+  }
+}
 
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
@@ -34,7 +44,7 @@ function formatTimestamp(iso: string): string {
     return iso;
   }
   try {
-    return new Intl.DateTimeFormat('de-DE', {
+    return new Intl.DateTimeFormat(locale(), {
       dateStyle: 'short',
       timeStyle: 'short',
     }).format(d);
@@ -64,21 +74,23 @@ export function MessagesTab(_props: MessagesTabProps): JSX.Element {
   return (
     <section class="tab tab--messages" data-testid="tab-messages">
       <header class="tab__header">
-        <h2 class="tab__title">Nachrichten</h2>
+        <h2 class="tab__title">{t('Nachrichten', 'Messages')}</h2>
         <span class="tab__subtitle" data-testid="messages-unread-count">
-          {unread.value > 0 ? `${unread.value} ungelesen` : 'Alle gelesen'}
+          {unread.value > 0
+            ? t(`${unread.value} ungelesen`, `${unread.value} unread`)
+            : t('Alle gelesen', 'All read')}
         </span>
       </header>
 
       {!available.value && (
         <p class="empty" data-testid="messages-unavailable">
-          Nachrichten sind derzeit nicht verfügbar.
+          {t('Nachrichten sind derzeit nicht verfügbar.', 'Messages are currently unavailable.')}
         </p>
       )}
 
       {available.value && list.length === 0 && (
         <p class="empty" data-testid="messages-empty">
-          Noch keine Nachrichten.
+          {t('Noch keine Nachrichten.', 'No messages yet.')}
         </p>
       )}
 
@@ -96,7 +108,7 @@ export function MessagesTab(_props: MessagesTabProps): JSX.Element {
             <div class="message-item__body">
               <div class="message-item__top">
                 <span class="message-item__title">{m.title}</span>
-                <span class="message-item__kind">{KIND_LABEL[m.kind]}</span>
+                <span class="message-item__kind">{kindLabel(m.kind)}</span>
               </div>
               <p class="message-item__text">{m.body}</p>
               <time class="message-item__ts" dateTime={m.ts}>

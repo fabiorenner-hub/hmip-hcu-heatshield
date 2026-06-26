@@ -19,6 +19,7 @@ import { HouseDigitalTwin } from './houseDigitalTwin.js';
 import { LiveMetricsRail } from './liveMetricsRail.js';
 import { RoomsAndFacadesPanel } from './roomsAndFacadesPanel.js';
 import { riskBreakdowns } from '../../store.js';
+import { t } from '../../i18n.js';
 import type { DashboardSnapshot } from '../../types.js';
 
 export interface DashboardGridProps {
@@ -45,7 +46,7 @@ export function DashboardGrid(props: DashboardGridProps): JSX.Element {
           <div class="skeleton skeleton--rail" />
         </div>
         <p class="dashboard-grid__loading" role="status">
-          warte auf Daten …
+          {t('warte auf Daten …', 'waiting for data …')}
         </p>
       </div>
     );
@@ -90,7 +91,7 @@ export function DashboardGrid(props: DashboardGridProps): JSX.Element {
             data-testid="scrub-reset"
             onClick={(): void => setScrubAt(null)}
           >
-            Zurück zu „Jetzt“
+            {t('Zurück zu „Jetzt“', 'Back to “Now”')}
           </button>
         )}
         <ForecastTimeline snapshot={snapshot} now={now} />
@@ -116,18 +117,20 @@ function OnboardingCard(): JSX.Element {
         <div class="onboarding__badge" aria-hidden="true">
           🛡️
         </div>
-        <h1 class="onboarding__title">Willkommen bei Heat Shield</h1>
+        <h1 class="onboarding__title">{t('Willkommen bei Heat Shield', 'Welcome to Heat Shield')}</h1>
         <p class="onboarding__lead">
-          Vorausschauender Hitzeschutz für deine Rollläden. In drei Schritten ist
-          alles eingerichtet – danach übernimmt die Automatik.
+          {t(
+            'Vorausschauender Hitzeschutz für deine Rollläden. In drei Schritten ist alles eingerichtet – danach übernimmt die Automatik.',
+            'Predictive heat protection for your shutters. Everything is set up in three steps – then the automation takes over.',
+          )}
         </p>
         <ol class="onboarding__steps">
           <li class="onboarding__step">
             <span class="onboarding__step-num">1</span>
             <div class="onboarding__step-body">
-              <span class="onboarding__step-title">Quellen verbinden</span>
+              <span class="onboarding__step-title">{t('Quellen verbinden', 'Connect sources')}</span>
               <span class="onboarding__step-text">
-                Wetter, PV und HmIP-Geräte erkennen lassen.
+                {t('Wetter, PV und HmIP-Geräte erkennen lassen.', 'Let weather, PV and HmIP devices be detected.')}
               </span>
               <button
                 type="button"
@@ -136,16 +139,16 @@ function OnboardingCard(): JSX.Element {
                   route('/sources');
                 }}
               >
-                Quellen öffnen
+                {t('Quellen öffnen', 'Open sources')}
               </button>
             </div>
           </li>
           <li class="onboarding__step">
             <span class="onboarding__step-num">2</span>
             <div class="onboarding__step-body">
-              <span class="onboarding__step-title">Räume &amp; Fenster anlegen</span>
+              <span class="onboarding__step-title">{t('Räume & Fenster anlegen', 'Add rooms & windows')}</span>
               <span class="onboarding__step-text">
-                Räume mit Ausrichtung und Rollläden zuordnen.
+                {t('Räume mit Ausrichtung und Rollläden zuordnen.', 'Assign rooms with orientation and shutters.')}
               </span>
               <button
                 type="button"
@@ -154,16 +157,16 @@ function OnboardingCard(): JSX.Element {
                   route('/rooms');
                 }}
               >
-                Räume anlegen
+                {t('Räume anlegen', 'Add rooms')}
               </button>
             </div>
           </li>
           <li class="onboarding__step">
             <span class="onboarding__step-num">3</span>
             <div class="onboarding__step-body">
-              <span class="onboarding__step-title">Geführte Einrichtung</span>
+              <span class="onboarding__step-title">{t('Geführte Einrichtung', 'Guided setup')}</span>
               <span class="onboarding__step-text">
-                Alles auf einmal mit dem Assistenten erledigen.
+                {t('Alles auf einmal mit dem Assistenten erledigen.', 'Do everything at once with the wizard.')}
               </span>
               <button
                 type="button"
@@ -172,7 +175,7 @@ function OnboardingCard(): JSX.Element {
                   route('/wizard');
                 }}
               >
-                Assistent starten
+                {t('Assistent starten', 'Start wizard')}
               </button>
             </div>
           </li>

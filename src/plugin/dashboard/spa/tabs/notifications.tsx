@@ -12,6 +12,7 @@ import { useEffect, useState } from 'preact/hooks';
 
 import type { Config } from '../../../../shared/types.js';
 import { useConfig } from '../hooks/useConfig.js';
+import { t } from '../i18n.js';
 
 interface RoutableProps {
   path?: string;
@@ -29,6 +30,7 @@ const DEFAULT_NOTIFICATIONS: NonNullable<Config['notifications']> = {
   morningBriefLocalTime: '07:30',
   dailySummaryLocalTime: '21:00',
   dailySummaryEnabled: false,
+  language: 'de',
   events: { ventilate: true, open: true, close: true, weather: true },
   forecastUpdates: { enabled: false, everyHours: 3 },
 };
@@ -70,22 +72,24 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
   };
 
   const handleTelegramTest = async (): Promise<void> => {
-    setTelegramTest('Sende…');
+    setTelegramTest(t('Sende…', 'Sending…'));
     if (draftConfig !== null) {
       await cfg.save(draftConfig);
     }
     try {
       const res = await fetch('/api/notifications/test', { method: 'POST' });
       if (res.status === 503) {
-        setTelegramTest('Nicht verfügbar (Plugin-Boot).');
+        setTelegramTest(t('Nicht verfügbar (Plugin-Boot).', 'Unavailable (plugin boot).'));
         return;
       }
       const json = (await res.json()) as { ok: boolean; error?: string };
       setTelegramTest(
-        json.ok ? 'Gesendet ✅' : `Fehler: ${json.error ?? 'unbekannt'}`,
+        json.ok
+          ? t('Gesendet ✅', 'Sent ✅')
+          : t(`Fehler: ${json.error ?? 'unbekannt'}`, `Error: ${json.error ?? 'unknown'}`),
       );
     } catch {
-      setTelegramTest('Netzwerkfehler');
+      setTelegramTest(t('Netzwerkfehler', 'Network error'));
     }
   };
 
@@ -93,9 +97,9 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
     return (
       <section class="module-panel tab-notifications" data-testid="tab-notifications">
         <header class="module-panel__head">
-          <h1>Benachrichtigungen</h1>
+          <h1>{t('Benachrichtigungen', 'Notifications')}</h1>
         </header>
-        <p class="module-panel__hint">Lade Konfiguration…</p>
+        <p class="module-panel__hint">{t('Lade Konfiguration…', 'Loading configuration…')}</p>
       </section>
     );
   }
@@ -105,28 +109,33 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
   return (
     <section class="module-panel tab-notifications" data-testid="tab-notifications">
       <header class="module-panel__head">
-        <h1>Benachrichtigungen</h1>
+        <h1>{t('Benachrichtigungen', 'Notifications')}</h1>
         <span class="module-panel__badge" data-testid="notifications-autosave">
-          {cfg.loading.value ? 'Speichert…' : 'Automatisch gespeichert'}
+          {cfg.loading.value ? t('Speichert…', 'Saving…') : t('Automatisch gespeichert', 'Auto-saved')}
         </span>
       </header>
       <p class="module-panel__intro">
-        Push-Hinweise und der interaktive Bot laufen über Telegram. Richte den
-        Bot einmal ein, wähle aus, worüber du informiert werden möchtest, und
-        teste die Verbindung.
+        {t(
+          'Push-Hinweise und der interaktive Bot laufen über Telegram. Richte den Bot einmal ein, wähle aus, worüber du informiert werden möchtest, und teste die Verbindung.',
+          'Push notifications and the interactive bot run via Telegram. Set up the bot once, choose what you want to be informed about, and test the connection.',
+        )}
       </p>
 
       <article class="module-panel__card" data-testid="notif-telegram-card">
-        <h2>Telegram-Bot</h2>
+        <h2>{t('Telegram-Bot', 'Telegram bot')}</h2>
         <p class="tab-rules__hint">
-          Einrichten: 1) In Telegram <strong>@BotFather</strong> öffnen,{' '}
-          <code>/newbot</code> senden, Namen vergeben → du erhältst den{' '}
-          <strong>Bot-Token</strong> (Form <code>123456:ABC-DEF…</code>). 2)
-          Deinem neuen Bot eine beliebige Nachricht schreiben. 3) Deine{' '}
-          <strong>Chat-ID</strong> über <strong>@userinfobot</strong> auslesen.
-          Beides hier eintragen, „Telegram aktiv" anhaken und unten testen. Für
-          den interaktiven Bot „Chat-Befehle aktiv" einschalten und im Chat{' '}
-          <code>/hilfe</code> senden.
+          {t('Einrichten:', 'Setup:')} 1) {t('In Telegram', 'In Telegram, open')}{' '}
+          <strong>@BotFather</strong> {t('öffnen,', '')}{' '}
+          <code>/newbot</code> {t('senden, Namen vergeben → du erhältst den', 'send, assign a name → you receive the')}{' '}
+          <strong>{t('Bot-Token', 'bot token')}</strong> ({t('Form', 'form')} <code>123456:ABC-DEF…</code>). 2){' '}
+          {t('Deinem neuen Bot eine beliebige Nachricht schreiben.', 'Send any message to your new bot.')} 3){' '}
+          {t('Deine', 'Read your')}{' '}
+          <strong>{t('Chat-ID', 'chat ID')}</strong> {t('über', 'via')} <strong>@userinfobot</strong> {t('auslesen.', '.')}{' '}
+          {t(
+            'Beides hier eintragen, „Telegram aktiv" anhaken und unten testen. Für den interaktiven Bot „Chat-Befehle aktiv" einschalten und im Chat',
+            'Enter both here, tick "Telegram active" and test below. For the interactive bot, enable "Chat commands active" and, in the chat, send',
+          )}{' '}
+          <code>/hilfe</code> {t('senden.', '.')}
         </p>
         <label class="tab-rules__check">
           <input
@@ -141,15 +150,15 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
               }));
             }}
           />
-          <span>Telegram aktiv</span>
+          <span>{t('Telegram aktiv', 'Telegram active')}</span>
         </label>
         <label class="tab-rules__field">
-          <span>Bot-Token</span>
+          <span>{t('Bot-Token', 'Bot token')}</span>
           <input
             type="text"
             data-testid="notif-telegram-token"
             value={n?.telegram.botToken ?? ''}
-            placeholder="123456:ABC… (maskiert angezeigt)"
+            placeholder={t('123456:ABC… (maskiert angezeigt)', '123456:ABC… (shown masked)')}
             onInput={(e): void => {
               const v = (e.currentTarget as HTMLInputElement).value;
               patchNotifications((c) => ({
@@ -160,7 +169,7 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
           />
         </label>
         <label class="tab-rules__field">
-          <span>Chat-ID</span>
+          <span>{t('Chat-ID', 'Chat ID')}</span>
           <input
             type="text"
             data-testid="notif-telegram-chat"
@@ -187,7 +196,7 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
               }));
             }}
           />
-          <span>Chat-Befehle aktiv (Bot reagiert auf /status, /wetter …)</span>
+          <span>{t('Chat-Befehle aktiv (Bot reagiert auf /status, /wetter …)', 'Chat commands active (bot responds to /status, /wetter …)')}</span>
         </label>
         <label class="tab-rules__check">
           <input
@@ -202,15 +211,15 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
               }));
             }}
           />
-          <span>Steuerbefehle erlauben (/pause, /urlaub, /set …)</span>
+          <span>{t('Steuerbefehle erlauben (/pause, /urlaub, /set …)', 'Allow control commands (/pause, /urlaub, /set …)')}</span>
         </label>
         <label class="tab-rules__field">
-          <span>Weitere erlaubte Chat-IDs (kommagetrennt)</span>
+          <span>{t('Weitere erlaubte Chat-IDs (kommagetrennt)', 'Additional allowed chat IDs (comma-separated)')}</span>
           <input
             type="text"
             data-testid="notif-telegram-allowed"
             value={(n?.telegram.allowedChatIds ?? []).join(', ')}
-            placeholder="z. B. 111111, 222222"
+            placeholder={t('z. B. 111111, 222222', 'e.g. 111111, 222222')}
             onInput={(e): void => {
               const raw = (e.currentTarget as HTMLInputElement).value;
               const ids = raw
@@ -232,7 +241,7 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
               void handleTelegramTest();
             }}
           >
-            Telegram-Test senden
+            {t('Telegram-Test senden', 'Send Telegram test')}
           </button>
           {telegramTest !== null && (
             <span
@@ -246,9 +255,9 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
       </article>
 
       <article class="module-panel__card" data-testid="notif-events-card">
-        <h2>Ereignisse &amp; Zeitpläne</h2>
+        <h2>{t('Ereignisse & Zeitpläne', 'Events & schedules')}</h2>
         <label class="tab-rules__field">
-          <span>Morgen-Briefing Uhrzeit</span>
+          <span>{t('Morgen-Briefing Uhrzeit', 'Morning briefing time')}</span>
           <input
             type="time"
             data-testid="notif-morning-time"
@@ -262,10 +271,10 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
         <div class="tab-rules__event-toggles">
           {(['ventilate', 'open', 'close', 'weather'] as const).map((key) => {
             const labels: Record<typeof key, string> = {
-              ventilate: 'Lüften',
-              open: 'Öffnen',
-              close: 'Schließen',
-              weather: 'Wetter',
+              ventilate: t('Lüften', 'Ventilate'),
+              open: t('Öffnen', 'Open'),
+              close: t('Schließen', 'Close'),
+              weather: t('Wetter', 'Weather'),
             };
             return (
               <label key={key} class="tab-rules__check">
@@ -296,10 +305,10 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
               patchNotifications((c) => ({ ...c, dailySummaryEnabled: on }));
             }}
           />
-          <span>Täglicher Abend-Rückblick</span>
+          <span>{t('Täglicher Abend-Rückblick', 'Daily evening summary')}</span>
         </label>
         <label class="tab-rules__field">
-          <span>Rückblick Uhrzeit</span>
+          <span>{t('Rückblick Uhrzeit', 'Summary time')}</span>
           <input
             type="time"
             data-testid="notif-daily-summary-time"
@@ -313,7 +322,7 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
       </article>
 
       <article class="module-panel__card" data-testid="notif-forecast-card">
-        <h2>Regelmäßige Wetter-Updates</h2>
+        <h2>{t('Regelmäßige Wetter-Updates', 'Regular weather updates')}</h2>
         <label class="tab-rules__check">
           <input
             type="checkbox"
@@ -327,10 +336,10 @@ export function NotificationsTab(_props: RoutableProps): JSX.Element {
               }));
             }}
           />
-          <span>Wetter-Updates senden</span>
+          <span>{t('Wetter-Updates senden', 'Send weather updates')}</span>
         </label>
         <label class="tab-rules__field">
-          <span>Alle … Stunden</span>
+          <span>{t('Alle … Stunden', 'Every … hours')}</span>
           <input
             type="number"
             min={1}

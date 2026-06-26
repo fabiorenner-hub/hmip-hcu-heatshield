@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 
 import { ExpandableChart, type ChartSeries } from '../lineChart.js';
 import { Portal } from '../portal.js';
+import { t, tServer } from '../../i18n.js';
 import type {
   LearnedRoomInfo,
   RiskFactorName,
@@ -25,7 +26,7 @@ import type {
   WindowRiskBreakdown,
 } from '../../types.js';
 
-const RISK_FACTOR_LABELS: Record<RiskFactorName, string> = {
+const RISK_FACTOR_LABELS_DE: Record<RiskFactorName, string> = {
   sunFactor: 'Sonne',
   roomTempFactor: 'Raumtemp.',
   windowTypeFactor: 'Fenstertyp',
@@ -36,7 +37,23 @@ const RISK_FACTOR_LABELS: Record<RiskFactorName, string> = {
   priorityFactor: 'Priorität',
 };
 
-const STATUS_LABELS: Record<string, string> = {
+const RISK_FACTOR_LABELS_EN: Record<RiskFactorName, string> = {
+  sunFactor: 'Sun',
+  roomTempFactor: 'Room temp.',
+  windowTypeFactor: 'Window type',
+  forecastTempFactor: 'Forecast',
+  pvFactor: 'PV',
+  radiationFactor: 'Radiation',
+  outdoorTempFactor: 'Outdoor temp.',
+  priorityFactor: 'Priority',
+};
+
+/** Bilingual risk-factor label. */
+function riskFactorLabel(name: RiskFactorName): string {
+  return t(RISK_FACTOR_LABELS_DE[name], RISK_FACTOR_LABELS_EN[name]);
+}
+
+const STATUS_LABELS_DE: Record<string, string> = {
   recommended: 'Empfohlen',
   scheduled: 'Geplant',
   executing: 'Fährt',
@@ -44,6 +61,22 @@ const STATUS_LABELS: Record<string, string> = {
   blocked: 'Blockiert',
   manuallyOverridden: 'Manuell übersteuert',
 };
+
+const STATUS_LABELS_EN: Record<string, string> = {
+  recommended: 'Recommended',
+  scheduled: 'Scheduled',
+  executing: 'Moving',
+  completed: 'Done',
+  blocked: 'Blocked',
+  manuallyOverridden: 'Manually overridden',
+};
+
+/** Bilingual planned-action status label. */
+function statusLabel(status: string): string {
+  const de = STATUS_LABELS_DE[status];
+  const en = STATUS_LABELS_EN[status];
+  return de !== undefined && en !== undefined ? t(de, en) : status;
+}
 
 function clampPct(v: number): number {
   if (!Number.isFinite(v)) return 0;
@@ -101,7 +134,7 @@ export function RoomDetailModal(props: {
       .map((s) => ({ t: Date.parse(s.ts), v: s.value }))
       .filter((p) => Number.isFinite(p.t) && p.t >= past12);
     if (outdoor.length > 0) {
-      out.push({ label: 'Außen', color: '#f59e0b', points: outdoor });
+      out.push({ label: t('Außen', 'Outdoor'), color: '#f59e0b', points: outdoor });
     }
     return out;
   }, [samples, room.id, room.name, past12]);
@@ -111,7 +144,7 @@ export function RoomDetailModal(props: {
     const pts = fc
       .map((p) => ({ t: Date.parse(p.ts), v: clampPct(p.percent) }))
       .filter((p) => Number.isFinite(p.t));
-    return pts.length >= 2 ? [{ label: 'Rollo', color: '#38bdf8', points: pts }] : [];
+    return pts.length >= 2 ? [{ label: t('Rollo', 'Shutter'), color: '#38bdf8', points: pts }] : [];
   }, [room.shutterForecast]);
 
   // Weighted risk factors, descending.
@@ -138,7 +171,7 @@ export function RoomDetailModal(props: {
         class="room-detail"
         data-testid={`room-detail-${room.id}`}
         role="dialog"
-        aria-label={`Detail ${room.name}`}
+        aria-label={`${t('Detail', 'Detail')} ${room.name}`}
         onClick={props.onClose}
       >
       <div
@@ -155,7 +188,7 @@ export function RoomDetailModal(props: {
           <button
             type="button"
             class="room-detail__close"
-            aria-label="Schließen"
+            aria-label={t('Schließen', 'Close')}
             onClick={props.onClose}
           >
             ×
@@ -163,21 +196,21 @@ export function RoomDetailModal(props: {
         </header>
 
         <div class="room-detail__metrics">
-          <Metric label="Rollo" value={`${clampPct(room.shutterPercent)} %`} />
+          <Metric label={t('Rollo', 'Shutter')} value={`${clampPct(room.shutterPercent)} %`} />
           <Metric
-            label="Innen"
+            label={t('Innen', 'Indoor')}
             value={room.indoorTempC === null ? '–' : `${room.indoorTempC.toFixed(1)} °C`}
           />
-          <Metric label="Wärmelast" value={heatPct === null ? '–' : `${heatPct} %`} />
-          <Metric label="Fassade" value={`${room.facade} · ${orient}`} />
-          <Metric label="Fenster" value={room.windowOpen === true ? 'offen' : 'zu'} />
-          <Metric label="Status" value={STATUS_LABELS[room.status] ?? room.status} />
+          <Metric label={t('Wärmelast', 'Heat load')} value={heatPct === null ? '–' : `${heatPct} %`} />
+          <Metric label={t('Fassade', 'Facade')} value={`${room.facade} · ${orient}`} />
+          <Metric label={t('Fenster', 'Window')} value={room.windowOpen === true ? t('offen', 'open') : t('zu', 'closed')} />
+          <Metric label={t('Status', 'Status')} value={statusLabel(room.status)} />
         </div>
 
         <section class="room-detail__section">
-          <h4>Verlauf · letzte 12 h</h4>
+          <h4>{t('Verlauf · letzte 12 h', 'History · last 12 h')}</h4>
           <ExpandableChart
-            title={`${room.name} · Temperaturverlauf`}
+            title={`${room.name} · ${t('Temperaturverlauf', 'Temperature history')}`}
             series={tempSeries}
             unit="°C"
             nowT={nowMs}
@@ -186,9 +219,9 @@ export function RoomDetailModal(props: {
 
         {shutterSeries.length > 0 && (
           <section class="room-detail__section">
-            <h4>Rollo-Prognose · nächste 12 h</h4>
+            <h4>{t('Rollo-Prognose · nächste 12 h', 'Shutter forecast · next 12 h')}</h4>
             <ExpandableChart
-              title={`${room.name} · Rollo-Prognose`}
+              title={`${room.name} · ${t('Rollo-Prognose', 'Shutter forecast')}`}
               series={shutterSeries}
               unit="%"
               nowT={nowMs}
@@ -198,11 +231,11 @@ export function RoomDetailModal(props: {
 
         {riskRows.length > 0 && (
           <section class="room-detail__section">
-            <h4>Wärmerisiko-Faktoren</h4>
+            <h4>{t('Wärmerisiko-Faktoren', 'Heat-risk factors')}</h4>
             <div class="room-detail__risk">
               {riskRows.slice(0, 6).map((r) => (
                 <div class="room-detail__riskrow" key={r.name}>
-                  <span class="room-detail__riskname">{RISK_FACTOR_LABELS[r.name]}</span>
+                  <span class="room-detail__riskname">{riskFactorLabel(r.name)}</span>
                   <span class="room-detail__riskbar">
                     <span
                       class="room-detail__riskfill"
@@ -216,13 +249,13 @@ export function RoomDetailModal(props: {
         )}
 
         <section class="room-detail__section">
-          <h4>Lern- / Kalibrier-Status</h4>
+          <h4>{t('Lern- / Kalibrier-Status', 'Learning / calibration status')}</h4>
           {lr === undefined ? (
-            <p class="room-detail__empty">Noch keine Lerndaten für diesen Raum.</p>
+            <p class="room-detail__empty">{t('Noch keine Lerndaten für diesen Raum.', 'No learning data for this room yet.')}</p>
           ) : (
             <ul class="room-detail__learn">
               <li>
-                Ø Abweichung ggü. Komfort:{' '}
+                {t('Ø Abweichung ggü. Komfort:', 'Avg. deviation vs. comfort:')}{' '}
                 <b>
                   {lr.avgOvershootC === null
                     ? '—'
@@ -230,16 +263,16 @@ export function RoomDetailModal(props: {
                 </b>
               </li>
               <li>
-                Ø Fahrten/Tag: <b>{lr.avgMovesPerDay}</b>
+                {t('Ø Fahrten/Tag:', 'Avg. moves/day:')} <b>{lr.avgMovesPerDay}</b>
               </li>
               {lr.comfortBiasC !== 0 && (
                 <li>
-                  Komfort-Bias: <b>{lr.comfortBiasC > 0 ? '+' : ''}{lr.comfortBiasC} K</b>
+                  {t('Komfort-Bias:', 'Comfort bias:')} <b>{lr.comfortBiasC > 0 ? '+' : ''}{lr.comfortBiasC} K</b>
                 </li>
               )}
-              <li class="room-detail__rec">{lr.recommendation}</li>
+              <li class="room-detail__rec">{tServer(lr.recommendation)}</li>
               {lr.calibrationNote !== undefined && (
-                <li class="room-detail__calib">🌡 {lr.calibrationNote}</li>
+                <li class="room-detail__calib">🌡 {tServer(lr.calibrationNote)}</li>
               )}
             </ul>
           )}

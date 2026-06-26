@@ -16,6 +16,7 @@
 import { h, type JSX } from 'preact';
 
 import { CONNECTION_LABELS_DE, MODE_LABELS_DE } from '../format.js';
+import { t } from '../i18n.js';
 import type { ConnectionState } from '../store.js';
 import type { Mode } from '../types.js';
 
@@ -30,6 +31,26 @@ const MODE_ICONS: Record<Mode, string> = {
   MAINTENANCE: '🔧',
 };
 
+/** English counterparts to {@link MODE_LABELS_DE} (German lives in format.ts). */
+const MODE_LABELS_EN: Record<string, string> = {
+  NORMAL: 'Normal',
+  SUMMER_WATCH: 'Summer watch',
+  ACTIVE_HEAT_PROTECTION: 'Active heat protection',
+  HEATWAVE: 'Heatwave',
+  NIGHT_COOLING: 'Night cooling',
+  STORM: 'Storm',
+  VACATION: 'Vacation',
+  MAINTENANCE: 'Maintenance',
+};
+
+/** English counterparts to {@link CONNECTION_LABELS_DE}. */
+const CONNECTION_LABELS_EN: Record<string, string> = {
+  connecting: 'connecting…',
+  open: 'live',
+  reconnecting: 'reconnecting…',
+  closed: 'offline',
+};
+
 export interface ModeHeaderProps {
   mode: Mode | null;
   connection: ConnectionState;
@@ -42,7 +63,7 @@ export interface ModeHeaderProps {
 export function ModeHeader(props: ModeHeaderProps): JSX.Element {
   const mode: Mode = props.mode ?? 'NORMAL';
   const icon = MODE_ICONS[mode];
-  const label = MODE_LABELS_DE[mode] ?? mode;
+  const label = t(MODE_LABELS_DE[mode] ?? mode, MODE_LABELS_EN[mode] ?? mode);
 
   return (
     <header
@@ -57,21 +78,25 @@ export function ModeHeader(props: ModeHeaderProps): JSX.Element {
         <h2 class="mode-header__label">{label}</h2>
         {mode === 'STORM' && (
           <span class="mode-header__warning" data-testid="storm-warning">
-            {props.stormSubtitle ?? 'Sturmschutz aktiv'}
+            {props.stormSubtitle ?? t('Sturmschutz aktiv', 'Storm protection active')}
           </span>
         )}
       </div>
       <div class="mode-header__meta">
         {props.nextCycleInSeconds !== null && (
           <span class="mode-header__cycle" data-testid="cycle-countdown">
-            nächster Zyklus in {Math.max(0, Math.round(props.nextCycleInSeconds))}s
+            {t('nächster Zyklus in', 'next cycle in')}{' '}
+            {Math.max(0, Math.round(props.nextCycleInSeconds))}s
           </span>
         )}
         <span
           class={`mode-header__pill mode-header__pill--${props.connection}`}
           data-testid="connection-state"
         >
-          {CONNECTION_LABELS_DE[props.connection] ?? props.connection}
+          {t(
+            CONNECTION_LABELS_DE[props.connection] ?? props.connection,
+            CONNECTION_LABELS_EN[props.connection] ?? props.connection,
+          )}
         </span>
       </div>
     </header>

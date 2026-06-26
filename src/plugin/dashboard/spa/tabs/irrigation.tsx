@@ -1,11 +1,9 @@
 /**
- * Heat Shield — "Bewässerung" tab.
+ * Heat Shield — "Bewässerung" / "Irrigation" tab.
  *
- * Focus: rain, precipitation amount and thunderstorms. Pulls the Open-Meteo
- * forecast client-side (CORS, no key) and shows precipitation KPIs, a 24 h
- * precipitation + probability view, a 7-day precipitation outlook and a
- * thunderstorm indicator. A Gardena smart-irrigation hook-up is scaffolded as
- * a "geplant" placeholder (the user has an API key; integration follows).
+ * Rain/precipitation focus + the live irrigation zones and Gardena sensors.
+ * Open-Meteo forecast is fetched client-side (CORS, no key). Fully bilingual
+ * via the inline `t(de, en)` helper.
  */
 
 import { h, type JSX } from 'preact';
@@ -15,6 +13,7 @@ import { ExpandableChart, type ChartSeries } from '../components/lineChart.js';
 import { IrrigationZones } from '../components/dashboard/irrigationZones.js';
 import { useConfig } from '../hooks/useConfig.js';
 import { snapshot } from '../store.js';
+import { t, fmtNum, fmtTime } from '../i18n.js';
 
 interface RoutableProps {
   path?: string;
@@ -44,6 +43,10 @@ function num(v: unknown): number | null {
 
 function isThunder(code: number | null): boolean {
   return code !== null && code >= 95;
+}
+
+function mm(v: number): string {
+  return `${fmtNum(v, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`;
 }
 
 export function IrrigationTab(_props: RoutableProps): JSX.Element {
@@ -124,9 +127,7 @@ export function IrrigationTab(_props: RoutableProps): JSX.Element {
     .some((p) => isThunder(p.code));
   const nextRain = next24.find((p) => (p.precip ?? 0) >= 0.1 || (p.prob ?? 0) >= 50);
   const nextRainLabel =
-    nextRain === undefined
-      ? 'kein Regen in 24 h'
-      : new Date(nextRain.t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    nextRain === undefined ? t('kein Regen in 24 h', 'no rain in 24 h') : fmtTime(nextRain.t);
 
   const autoEnabled = config.value?.irrigation?.enabled ?? false;
   const toggleAuto = (next: boolean): void => {
@@ -139,26 +140,26 @@ export function IrrigationTab(_props: RoutableProps): JSX.Element {
     const pts = next24
       .filter((p) => Number.isFinite(p.t) && p.precip !== null)
       .map((p) => ({ t: p.t, v: p.precip as number }));
-    return pts.length >= 2 ? [{ label: 'Niederschlag', color: '#38bdf8', points: pts }] : [];
+    return pts.length >= 2 ? [{ label: t('Niederschlag', 'Precipitation'), color: '#38bdf8', points: pts }] : [];
   }, [next24]);
 
   const probSeries: ChartSeries[] = useMemo(() => {
     const pts = next24
       .filter((p) => Number.isFinite(p.t) && p.prob !== null)
       .map((p) => ({ t: p.t, v: p.prob as number }));
-    return pts.length >= 2 ? [{ label: 'Regenwahrscheinlichkeit', color: '#818cf8', points: pts }] : [];
+    return pts.length >= 2 ? [{ label: t('Regenwahrscheinlichkeit', 'Rain probability'), color: '#818cf8', points: pts }] : [];
   }, [next24]);
 
   const dailySeries: ChartSeries[] = useMemo(() => {
     const pts = (data?.daily ?? [])
       .filter((d) => Number.isFinite(d.t) && d.sum !== null)
       .map((d) => ({ t: d.t, v: d.sum as number }));
-    return pts.length >= 2 ? [{ label: 'Tagessumme', color: '#0ea5e9', points: pts }] : [];
+    return pts.length >= 2 ? [{ label: t('Tagessumme', 'Daily total'), color: '#0ea5e9', points: pts }] : [];
   }, [data]);
 
   const kpi = (label: string, value: string, testId: string, cls = ''): JSX.Element => (
     <article class={`module-panel__card ${cls}`} data-testid={testId}>
-      <h2>{label}</h2>
+      <h3>{label}</h3>
       <p class="module-panel__metric">{value}</p>
     </article>
   );
@@ -166,26 +167,33 @@ export function IrrigationTab(_props: RoutableProps): JSX.Element {
   return (
     <section class="module-panel tab-irrigation" data-testid="tab-irrigation">
       <header class="module-panel__head">
-        <h1>Bewässerung</h1>
-        <span class="module-panel__badge">Regen · Niederschlag · Gewitter</span>
+        <h1>{t('Bewässerung', 'Irrigation')}</h1>
+        <span class="module-panel__badge">{t('Regen · Niederschlag · Gewitter', 'Rain · Precipitation · Thunderstorms')}</span>
       </header>
       <p class="module-panel__intro">
-        Niederschlags-Fokus für die Garten-Bewässerung: aktuelle und erwartete
-        Regenmengen, Regenwahrscheinlichkeit und Gewitterrisiko. Grundlage für eine
-        spätere automatische Bewässerung (Gardena).
+        {t(
+          'Niederschlags-Fokus für die Garten-Bewässerung: aktuelle und erwartete Regenmengen, Regenwahrscheinlichkeit und Gewitterrisiko, plus die Zonen-Steuerung und Gardena-Sensoren.',
+          'Precipitation focus for garden irrigation: current and expected rainfall, rain probability and thunderstorm risk, plus zone control and Gardena sensors.',
+        )}
       </p>
 
       <article class="module-panel__card irr-auto-toggle" data-testid="irr-auto-toggle">
         <div class="irr-auto-toggle__row">
           <div>
-            <h2>Automatische Bewässerung</h2>
+            <h3>{t('Automatische Bewässerung', 'Automatic irrigation')}</h3>
             <p class="module-panel__hint">
               {autoEnabled
-                ? 'Die Automatik steuert die Ventile bedarfsgerecht nach Wasserbilanz und Wetter.'
-                : 'Automatik ist aus – Ventile lassen sich nur manuell starten.'}
+                ? t(
+                    'Die Automatik steuert die Ventile bedarfsgerecht nach Wasserbilanz und Wetter.',
+                    'Automation controls the valves on demand based on the water balance and weather.',
+                  )
+                : t(
+                    'Automatik ist aus – Ventile lassen sich nur manuell starten.',
+                    'Automation is off – valves can only be started manually.',
+                  )}
             </p>
           </div>
-          <label class="irr-switch" title="Automatik ein/aus">
+          <label class="irr-switch" title={t('Automatik ein/aus', 'Automation on/off')}>
             <input
               type="checkbox"
               data-testid="irr-auto-switch"
@@ -194,13 +202,13 @@ export function IrrigationTab(_props: RoutableProps): JSX.Element {
               onChange={(e): void => toggleAuto((e.currentTarget as HTMLInputElement).checked)}
             />
             <span class="irr-switch__track" aria-hidden="true" />
-            <span class="irr-switch__label">{autoEnabled ? 'An' : 'Aus'}</span>
+            <span class="irr-switch__label">{autoEnabled ? t('An', 'On') : t('Aus', 'Off')}</span>
           </label>
         </div>
       </article>
 
       {error && data === null && (
-        <p class="module-panel__hint">Wetterdaten konnten nicht geladen werden.</p>
+        <p class="module-panel__hint">{t('Wetterdaten konnten nicht geladen werden.', 'Weather data could not be loaded.')}</p>
       )}
 
       {snapshot.value?.irrigation !== undefined && (
@@ -209,18 +217,16 @@ export function IrrigationTab(_props: RoutableProps): JSX.Element {
 
       <div class="irrigation__kpis">
         {kpi(
-          'Niederschlag jetzt',
-          data?.precipNow === null || data?.precipNow === undefined
-            ? '–'
-            : `${data.precipNow.toFixed(1)} mm`,
+          t('Niederschlag jetzt', 'Precipitation now'),
+          data?.precipNow === null || data?.precipNow === undefined ? '–' : mm(data.precipNow),
           'irr-precip-now',
         )}
-        {kpi('Summe nächste 24 h', `${sum24.toFixed(1)} mm`, 'irr-sum-24')}
-        {kpi('Max. Regenwahrsch. 24 h', `${Math.round(maxProb24)} %`, 'irr-prob-24')}
-        {kpi('Nächster Regen', nextRainLabel, 'irr-next-rain')}
+        {kpi(t('Summe nächste 24 h', 'Sum next 24 h'), mm(sum24), 'irr-sum-24')}
+        {kpi(t('Max. Regenwahrsch. 24 h', 'Max rain prob. 24 h'), `${Math.round(maxProb24)} %`, 'irr-prob-24')}
+        {kpi(t('Nächster Regen', 'Next rain'), nextRainLabel, 'irr-next-rain')}
         {kpi(
-          'Gewitterrisiko (12 h)',
-          thunderSoon ? 'ja ⚡' : 'nein',
+          t('Gewitterrisiko (12 h)', 'Thunderstorm risk (12 h)'),
+          thunderSoon ? t('ja ⚡', 'yes ⚡') : t('nein', 'no'),
           'irr-thunder',
           thunderSoon ? 'irrigation__thunder' : '',
         )}
@@ -228,41 +234,41 @@ export function IrrigationTab(_props: RoutableProps): JSX.Element {
 
       <div class="irrigation__charts">
         <article class="module-panel__card">
-          <h2>Niederschlag · nächste 24 h</h2>
+          <h3>{t('Niederschlag · nächste 24 h', 'Precipitation · next 24 h')}</h3>
           {precipSeries.length > 0 ? (
             <ExpandableChart
-              title="Niederschlag · nächste 24 h"
+              title={t('Niederschlag · nächste 24 h', 'Precipitation · next 24 h')}
               series={precipSeries}
               unit="mm"
               nowT={now}
             />
           ) : (
-            <p class="module-panel__hint">Keine Niederschlagsdaten.</p>
+            <p class="module-panel__hint">{t('Keine Niederschlagsdaten.', 'No precipitation data.')}</p>
           )}
         </article>
         <article class="module-panel__card">
-          <h2>Regenwahrscheinlichkeit · 24 h</h2>
+          <h3>{t('Regenwahrscheinlichkeit · 24 h', 'Rain probability · 24 h')}</h3>
           {probSeries.length > 0 ? (
             <ExpandableChart
-              title="Regenwahrscheinlichkeit · nächste 24 h"
+              title={t('Regenwahrscheinlichkeit · nächste 24 h', 'Rain probability · next 24 h')}
               series={probSeries}
               unit="%"
               nowT={now}
             />
           ) : (
-            <p class="module-panel__hint">Keine Daten.</p>
+            <p class="module-panel__hint">{t('Keine Daten.', 'No data.')}</p>
           )}
         </article>
         <article class="module-panel__card">
-          <h2>Niederschlag · 7 Tage</h2>
+          <h3>{t('Niederschlag · 7 Tage', 'Precipitation · 7 days')}</h3>
           {dailySeries.length > 0 ? (
             <ExpandableChart
-              title="Niederschlag · Tagessummen (7 Tage)"
+              title={t('Niederschlag · Tagessummen (7 Tage)', 'Precipitation · daily totals (7 days)')}
               series={dailySeries}
               unit="mm"
             />
           ) : (
-            <p class="module-panel__hint">Keine Daten.</p>
+            <p class="module-panel__hint">{t('Keine Daten.', 'No data.')}</p>
           )}
         </article>
       </div>
@@ -272,12 +278,7 @@ export function IrrigationTab(_props: RoutableProps): JSX.Element {
   );
 }
 
-/**
- * Gardena sensor section — shows the live soil-moisture / soil-temperature /
- * light sensor cards from the snapshot's `gardena` block. Valve control lives
- * entirely in the zone cards above (one control surface); valves are assigned
- * and enabled/disabled under Einstellungen → Bewässerung.
- */
+/** Gardena sensor section — live soil-moisture / temperature / light cards. */
 function GardenaSensors(): JSX.Element {
   const snap = snapshot.value;
   const gardena = snap?.gardena;
@@ -286,8 +287,8 @@ function GardenaSensors(): JSX.Element {
   return (
     <div class="gardena-wrap">
       <article class="module-panel__card gardena-card" data-testid="gardena-sensors-card">
-        <h2>
-          Gardena-Sensoren
+        <h3>
+          {t('Gardena-Sensoren', 'Gardena sensors')}
           <span class="gardena-card__badge gardena-card__badge--live">
             {gardena?.cloud === true
               ? gardena.connected === true
@@ -295,13 +296,16 @@ function GardenaSensors(): JSX.Element {
                 : 'cloud'
               : 'live'}
           </span>
-        </h2>
+        </h3>
 
         {sensors.length === 0 ? (
           <p class="module-panel__hint">
             {gardena?.error != null && gardena.error !== ''
-              ? `Verbindung: ${gardena.error}`
-              : 'Noch kein Gardena-Sensor sichtbar. Verbinde dein Gardena-Konto unter Einstellungen → Bewässerung. Bodenfeuchte-Sensoren erscheinen dann automatisch.'}
+              ? `${t('Verbindung', 'Connection')}: ${gardena.error}`
+              : t(
+                  'Noch kein Gardena-Sensor sichtbar. Verbinde dein Gardena-Konto unter Einstellungen → Bewässerung. Bodenfeuchte-Sensoren erscheinen dann automatisch.',
+                  'No Gardena sensor visible yet. Connect your Gardena account under Settings → Irrigation. Soil-moisture sensors then appear automatically.',
+                )}
           </p>
         ) : (
           <div class="gardena__sensors" data-testid="gardena-sensors">
@@ -310,20 +314,20 @@ function GardenaSensors(): JSX.Element {
                 <h3>{s.name}</h3>
                 <dl class="gardena-sensor__grid">
                   <div>
-                    <dt>Bodenfeuchte</dt>
+                    <dt>{t('Bodenfeuchte', 'Soil moisture')}</dt>
                     <dd>{s.soilMoisturePct === null ? '–' : `${Math.round(s.soilMoisturePct)} %`}</dd>
                   </div>
                   <div>
-                    <dt>Bodentemperatur</dt>
-                    <dd>{s.soilTempC === null ? '–' : `${s.soilTempC.toFixed(1)} °C`}</dd>
+                    <dt>{t('Bodentemperatur', 'Soil temperature')}</dt>
+                    <dd>{s.soilTempC === null ? '–' : `${fmtNum(s.soilTempC, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} °C`}</dd>
                   </div>
                   <div>
-                    <dt>Licht</dt>
+                    <dt>{t('Licht', 'Light')}</dt>
                     <dd>{s.lux === null ? '–' : `${Math.round(s.lux)} lx`}</dd>
                   </div>
                   {s.batteryPct != null && (
                     <div>
-                      <dt>Batterie</dt>
+                      <dt>{t('Batterie', 'Battery')}</dt>
                       <dd>{Math.round(s.batteryPct)} %</dd>
                     </div>
                   )}

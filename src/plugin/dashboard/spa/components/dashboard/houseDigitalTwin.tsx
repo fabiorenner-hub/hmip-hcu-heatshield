@@ -43,6 +43,7 @@ import { Portal } from '../portal.js';
 import { getSunPosition } from '../sunPolarPlot.js';
 import { Icon, type IconName } from '../icons.js';
 import { formatSignal, formatWindKmh } from '../../format.js';
+import { t, tServer } from '../../i18n.js';
 import type {
   DashboardSnapshot,
   FacadeKey,
@@ -344,7 +345,7 @@ export function HouseDigitalTwin(props: HouseDigitalTwinProps): JSX.Element {
       >
         <div class="twin-sky" style={{ backgroundImage: skyGradient(sun.elevationDeg) }} aria-hidden="true" />
         <div class="twin-shadow" style={shadowStyle} aria-hidden="true" />
-        <img class="house-twin__bg" src={bg} alt="Hausansicht" aria-hidden="true" />
+        <img class="house-twin__bg" src={bg} alt={t('Hausansicht', 'House view')} aria-hidden="true" />
 
         <SunArc
         latitude={latitude}
@@ -531,6 +532,13 @@ const FACADE_POS: Record<FacadeKey, { left: string; top: string; label: string; 
 
 const FACADE_KEYS: FacadeKey[] = ['N', 'E', 'S', 'W'];
 
+const FACADE_LABEL_EN: Record<FacadeKey, string> = { N: 'NORTH', E: 'EAST', S: 'SOUTH', W: 'WEST' };
+
+/** Bilingual facade name (NORD/OST/SÜD/WEST → NORTH/EAST/SOUTH/WEST). */
+function facadeLabel(k: FacadeKey): string {
+  return t(FACADE_POS[k].label, FACADE_LABEL_EN[k]);
+}
+
 /** Direct-sun incidence on a vertical facade in [0,1]. */
 function facadeIncidence01(normalDeg: number, sun: { azimuthDeg: number; elevationDeg: number }): number {
   if (sun.elevationDeg <= 0) return 0;
@@ -564,13 +572,13 @@ function FacadeExposureLabels(props: {
             style={{ left: pos.left, top: pos.top }}
             data-facade={k}
           >
-            <span class="facade-card__dir">{pos.label}</span>
+            <span class="facade-card__dir">{facadeLabel(k)}</span>
             <span class="facade-card__pct">{pct === null ? '–' : `${pct} %`}</span>
             {inc > 0.05 && (
               <span
                 class="facade-card__inc"
                 style={{ opacity: (0.25 + inc * 0.75).toFixed(2) }}
-                title={`Direkte Sonne ${Math.round(inc * 100)} %`}
+                title={`${t('Direkte Sonne', 'Direct sun')} ${Math.round(inc * 100)} %`}
                 aria-hidden="true"
               >
                 ☀
@@ -787,7 +795,7 @@ function RoomBadge(props: {
   const next = room.nextAction;
   const band = props.heatmapOn ? heatBand(room.heatLoad01) : null;
   const fresh = room.indoorTempState ?? 'fresh';
-  const title = next !== null ? `${next.reason} (${statusLabel(status)})` : statusLabel(status);
+  const title = next !== null ? `${tServer(next.reason)} (${statusLabel(status)})` : statusLabel(status);
   const tempStr = room.indoorTempC === null || !Number.isFinite(animTemp) ? '–' : `${animTemp.toFixed(1)}°`;
   const pctStr = `${Math.round(animPct)} %`;
 
@@ -833,15 +841,15 @@ function RoomBadge(props: {
             {fresh !== 'fresh' && (
               <span
                 class={`room-badge__fresh room-badge__fresh--${fresh}`}
-                title={fresh === 'stale' ? 'Messwert veraltet' : 'Kein Sensor zugewiesen'}
-                aria-label={fresh === 'stale' ? 'Messwert veraltet' : 'Kein Sensor zugewiesen'}
+                title={fresh === 'stale' ? t('Messwert veraltet', 'Reading outdated') : t('Kein Sensor zugewiesen', 'No sensor assigned')}
+                aria-label={fresh === 'stale' ? t('Messwert veraltet', 'Reading outdated') : t('Kein Sensor zugewiesen', 'No sensor assigned')}
               />
             )}
           </span>
         </span>
       </span>
       {room.windowOpen === true && (
-        <Icon name="fenster" size={15} class="room-badge__window" title="Fenster offen" />
+        <Icon name="fenster" size={15} class="room-badge__window" title={t('Fenster offen', 'Window open')} />
       )}
       <span
         class="room-badge__status"
@@ -876,7 +884,7 @@ function ShutterGlyph(props: { percent: number; roof?: boolean; running?: boolea
       width={18}
       height={18}
       role="img"
-      aria-label={`Rollo ${Math.round(props.percent)} %${props.roof === true ? ' (Dachfenster)' : ''}`}
+      aria-label={`${t('Rollo', 'Shutter')} ${Math.round(props.percent)} %${props.roof === true ? ` (${t('Dachfenster', 'Roof window')})` : ''}`}
     >
       <rect x={3} y={innerTop} width={W - 6} height={innerH} rx={1.5} fill="#fcd9866b" />
       {closedH > 0.4 && (
@@ -920,21 +928,21 @@ function shutterBand(pct: number): 'open' | 'mid' | 'closed' {
 function statusLabel(s: PlannedActionState): string {
   switch (s) {
     case 'recommended':
-      return 'Empfohlen';
+      return t('Empfohlen', 'Recommended');
     case 'scheduled':
-      return 'Geplant';
+      return t('Geplant', 'Scheduled');
     case 'executing':
-      return 'Fährt';
+      return t('Fährt', 'Moving');
     case 'completed':
-      return 'Erledigt';
+      return t('Erledigt', 'Done');
     case 'blocked':
-      return 'Blockiert';
+      return t('Blockiert', 'Blocked');
     case 'manuallyOverridden':
-      return 'Manuell übersteuert';
+      return t('Manuell übersteuert', 'Manually overridden');
   }
 }
 
-const RISK_FACTOR_LABELS: Record<RiskFactorName, string> = {
+const RISK_FACTOR_LABELS_DE: Record<RiskFactorName, string> = {
   sunFactor: 'Sonne',
   roomTempFactor: 'Raumtemp.',
   windowTypeFactor: 'Fenstertyp',
@@ -944,6 +952,22 @@ const RISK_FACTOR_LABELS: Record<RiskFactorName, string> = {
   outdoorTempFactor: 'Außentemp.',
   priorityFactor: 'Priorität',
 };
+
+const RISK_FACTOR_LABELS_EN: Record<RiskFactorName, string> = {
+  sunFactor: 'Sun',
+  roomTempFactor: 'Room temp.',
+  windowTypeFactor: 'Window type',
+  forecastTempFactor: 'Forecast',
+  pvFactor: 'PV',
+  radiationFactor: 'Radiation',
+  outdoorTempFactor: 'Outdoor temp.',
+  priorityFactor: 'Priority',
+};
+
+/** Bilingual risk-factor label. */
+function riskFactorLabel(name: RiskFactorName): string {
+  return t(RISK_FACTOR_LABELS_DE[name], RISK_FACTOR_LABELS_EN[name]);
+}
 
 /** Tiny sparkline from a numeric series, scaled to [min,max]. */
 function Sparkline(props: {
@@ -1078,7 +1102,7 @@ function RoomPopover(props: {
           visibility: box !== null ? 'visible' : 'hidden',
         }}
         role="dialog"
-        aria-label={`Details ${room.name}`}
+        aria-label={`${t('Details', 'Details')} ${room.name}`}
       >
       <div class="twin-popover__head">
         <span class="twin-popover__title">
@@ -1087,51 +1111,51 @@ function RoomPopover(props: {
           )}
           {room.name}
         </span>
-        <button type="button" class="twin-popover__close" onClick={props.onClose} aria-label="Schließen">
+        <button type="button" class="twin-popover__close" onClick={props.onClose} aria-label={t('Schließen', 'Close')}>
           ×
         </button>
       </div>
       <dl class="twin-popover__grid">
-        <PopRow label="Innen">
+        <PopRow label={t('Innen', 'Indoor')}>
           {room.indoorTempC === null ? '–' : `${room.indoorTempC.toFixed(1)} °C`}
           <TrendArrow trend={room.trend} />
-          {room.indoorTempState === 'stale' && <span class="twin-popover__warn"> · veraltet</span>}
-          {room.indoorTempState === 'unbound' && <span class="twin-popover__warn"> · kein Sensor</span>}
+          {room.indoorTempState === 'stale' && <span class="twin-popover__warn"> · {t('veraltet', 'outdated')}</span>}
+          {room.indoorTempState === 'unbound' && <span class="twin-popover__warn"> · {t('kein Sensor', 'no sensor')}</span>}
         </PopRow>
-        <PopRow label="Rollo">
+        <PopRow label={t('Rollo', 'Shutter')}>
           {clampPct(room.shutterPercent)} %{' '}
           <span class="twin-popover__muted">
-            (max {room.roof === true ? '100' : '95'} %{room.roof === true ? ', Dachfenster' : ''})
+            (max {room.roof === true ? '100' : '95'} %{room.roof === true ? `, ${t('Dachfenster', 'roof window')}` : ''})
           </span>
-          {previewPct !== null && <span class="twin-popover__preview"> → Prognose {previewPct} %</span>}
+          {previewPct !== null && <span class="twin-popover__preview"> → {t('Prognose', 'Forecast')} {previewPct} %</span>}
         </PopRow>
         {heatPct !== null && (
-          <PopRow label="Wärmelast">
+          <PopRow label={t('Wärmelast', 'Heat load')}>
             <span class={`twin-popover__heat twin-popover__heat--${heatBand(room.heatLoad01) ?? 'low'}`}>
               {heatPct} %
             </span>
           </PopRow>
         )}
-        <PopRow label="Fassade">
+        <PopRow label={t('Fassade', 'Facade')}>
           {room.facade} · {orient}
         </PopRow>
-        <PopRow label="Fenster">{room.windowOpen === true ? 'offen' : 'geschlossen'}</PopRow>
-        <PopRow label="Status">{statusLabel(room.status)}</PopRow>
+        <PopRow label={t('Fenster', 'Window')}>{room.windowOpen === true ? t('offen', 'open') : t('geschlossen', 'closed')}</PopRow>
+        <PopRow label={t('Status', 'Status')}>{statusLabel(room.status)}</PopRow>
       </dl>
 
       {fcVals.length >= 2 && (
         <div class="twin-popover__chart">
-          <span class="twin-popover__chart-label">Rollo-Prognose 12 h</span>
+          <span class="twin-popover__chart-label">{t('Rollo-Prognose 12 h', 'Shutter forecast 12 h')}</span>
           <Sparkline values={fcVals} width={208} height={30} min={0} max={100} fill="rgba(245,179,1,0.18)" />
         </div>
       )}
 
       {topRisk.length > 0 && (
         <div class="twin-popover__risk">
-          <span class="twin-popover__chart-label">Wärmerisiko-Faktoren</span>
+          <span class="twin-popover__chart-label">{t('Wärmerisiko-Faktoren', 'Heat-risk factors')}</span>
           {topRisk.map((r) => (
             <div class="twin-popover__riskrow" key={r.name}>
-              <span class="twin-popover__riskname">{RISK_FACTOR_LABELS[r.name]}</span>
+              <span class="twin-popover__riskname">{riskFactorLabel(r.name)}</span>
               <span class="twin-popover__riskbar">
                 <span
                   class="twin-popover__riskfill"
@@ -1145,7 +1169,7 @@ function RoomPopover(props: {
 
       {room.nextAction !== null && (
         <p class="twin-popover__action">
-          <b>Nächste Aktion:</b> {room.nextAction.reason} (Ziel {clampPct(room.nextAction.targetPercent)} %)
+          <b>{t('Nächste Aktion:', 'Next action:')}</b> {tServer(room.nextAction.reason)} ({t('Ziel', 'Target')} {clampPct(room.nextAction.targetPercent)} %)
         </p>
       )}
 
@@ -1163,7 +1187,7 @@ function RoomPopover(props: {
         data-testid={`room-detail-open-${room.id}`}
         onClick={props.onOpenDetail}
       >
-        Detailansicht öffnen →
+        {t('Detailansicht öffnen →', 'Open detail view →')}
       </button>
       </div>
     </Portal>
@@ -1198,7 +1222,7 @@ function ManualShutterControl(props: {
   };
   return (
     <div class="twin-control" data-testid={`twin-control-${props.windowId}`}>
-      <span class="twin-popover__chart-label">Manuell steuern</span>
+      <span class="twin-popover__chart-label">{t('Manuell steuern', 'Manual control')}</span>
       <div class="twin-control__row">
         <input
           type="range"
@@ -1206,14 +1230,14 @@ function ManualShutterControl(props: {
           max={max}
           step={5}
           value={val}
-          aria-label="Rollo-Position"
+          aria-label={t('Rollo-Position', 'Shutter position')}
           onInput={(e): void => setVal(Number((e.currentTarget as HTMLInputElement).value))}
         />
         <span class="twin-control__val">{val}%</span>
         <button
           type="button"
           class="twin-iconbtn"
-          title="Auf diese Position fahren"
+          title={t('Auf diese Position fahren', 'Move to this position')}
           onClick={(): void => {
             haptic(10);
             void send(val);
@@ -1224,18 +1248,18 @@ function ManualShutterControl(props: {
       </div>
       <div class="twin-control__quick">
         <button type="button" onClick={(): void => { setVal(0); void send(0); }}>
-          Auf
+          {t('Auf', 'Open')}
         </button>
         <button type="button" onClick={(): void => { setVal(50); void send(50); }}>
           50 %
         </button>
         <button type="button" onClick={(): void => { setVal(max); void send(max); }}>
-          Zu
+          {t('Zu', 'Closed')}
         </button>
       </div>
-      {status === 'ok' && <span class="twin-control__status">Befehl gesendet ✓</span>}
+      {status === 'ok' && <span class="twin-control__status">{t('Befehl gesendet ✓', 'Command sent ✓')}</span>}
       {status === 'err' && (
-        <span class="twin-control__status twin-control__status--err">Fehler beim Senden</span>
+        <span class="twin-control__status twin-control__status--err">{t('Fehler beim Senden', 'Error sending')}</span>
       )}
     </div>
   );
@@ -1258,7 +1282,7 @@ function ScoreRing(props: { score: number }): JSX.Element {
   const frac = clamp(animated / 100, 0, 1);
   const color = props.score >= 70 ? '#22c55e' : props.score >= 45 ? '#f0b300' : '#ef4444';
   return (
-    <span class="twin-score" title="Schutz-Score: wie gut die Räume aktuell vor Wärmelast geschützt sind">
+    <span class="twin-score" title={t('Schutz-Score: wie gut die Räume aktuell vor Wärmelast geschützt sind', 'Protection score: how well the rooms are currently protected against heat load')}>
       <svg viewBox="0 0 32 32" width={30} height={30} aria-hidden="true">
         <circle cx={16} cy={16} r={r} fill="none" stroke="rgba(255,255,255,0.15)" stroke-width={4} />
         <circle
@@ -1274,7 +1298,7 @@ function ScoreRing(props: { score: number }): JSX.Element {
         />
       </svg>
       <span class="twin-score__body">
-        <span class="twin-score__label">Schutz</span>
+        <span class="twin-score__label">{t('Schutz', 'Protection')}</span>
         <span class="twin-score__value">{Math.round(animated)}</span>
       </span>
     </span>
@@ -1300,17 +1324,17 @@ function TwinToolbar(props: {
       <div class="twin-toolbar__insights">
         {insights.score !== null && <ScoreRing score={insights.score} />}
         {max12 !== null && (
-          <span class="twin-insight twin-insight--wide" title="Außentemperatur-Prognose der nächsten 12 h">
+          <span class="twin-insight twin-insight--wide" title={t('Außentemperatur-Prognose der nächsten 12 h', 'Outdoor temperature forecast for the next 12 h')}>
             <Sparkline values={tempSeries} width={72} height={20} stroke="#fb923c" />
             <span class="twin-insight__value">{max12}°</span>
           </span>
         )}
-        <span class="twin-insight" title="Durchschnittlicher Rollo-Stand">
+        <span class="twin-insight" title={t('Durchschnittlicher Rollo-Stand', 'Average shutter position')}>
           <span class="twin-insight__label">Ø</span>
           <span class="twin-insight__value">{insights.avgShutter}%</span>
         </span>
         {insights.openWindows > 0 && (
-          <span class="twin-insight twin-insight--secondary" title="Räume mit offenem Fenster">
+          <span class="twin-insight twin-insight--secondary" title={t('Räume mit offenem Fenster', 'Rooms with an open window')}>
             <Icon name="fenster" size={13} class="twin-insight__icon" />
             <span class="twin-insight__value">{insights.openWindows}</span>
           </span>
@@ -1323,7 +1347,7 @@ function TwinToolbar(props: {
           data-testid="twin-heatmap-toggle"
           aria-pressed={props.heatmapOn}
           onClick={props.onToggleHeatmap}
-          title="Wärme-Heatmap ein-/ausblenden"
+          title={t('Wärme-Heatmap ein-/ausblenden', 'Toggle heat map')}
         >
           🌡
         </button>
@@ -1333,7 +1357,7 @@ function TwinToolbar(props: {
           data-testid="twin-legend-toggle"
           aria-pressed={props.showLegend}
           onClick={props.onToggleLegend}
-          title="Legende ein-/ausblenden"
+          title={t('Legende ein-/ausblenden', 'Toggle legend')}
         >
           ⓘ
         </button>
@@ -1342,7 +1366,7 @@ function TwinToolbar(props: {
           class="twin-iconbtn twin-iconbtn--reset"
           data-testid="twin-reset"
           onClick={props.onReset}
-          title="Haus auf Standard zurücksetzen (Anordnung, Sperre, Wärme, Legende)"
+          title={t('Haus auf Standard zurücksetzen (Anordnung, Sperre, Wärme, Legende)', 'Reset house to defaults (layout, lock, heat, legend)')}
         >
           ↺
         </button>
@@ -1354,14 +1378,14 @@ function TwinToolbar(props: {
           onClick={props.onToggleLock}
           title={
             props.locked
-              ? 'Badges sind gesperrt – zum Verschieben entsperren'
-              : 'Badges verschiebbar – zum Sperren klicken'
+              ? t('Badges sind gesperrt – zum Verschieben entsperren', 'Badges are locked – unlock to move them')
+              : t('Badges verschiebbar – zum Sperren klicken', 'Badges movable – click to lock')
           }
         >
           {props.locked ? (
-            <Icon name="schloss" size={17} class="twin-iconbtn__glyph" title="Gesperrt" />
+            <Icon name="schloss" size={17} class="twin-iconbtn__glyph" title={t('Gesperrt', 'Locked')} />
           ) : (
-            <Icon name="schloss-auf" size={17} class="twin-iconbtn__glyph" title="Entsperrt" />
+            <Icon name="schloss-auf" size={17} class="twin-iconbtn__glyph" title={t('Entsperrt', 'Unlocked')} />
           )}
         </button>
       </div>
@@ -1400,10 +1424,10 @@ function computeInsights(rooms: RoomDetail[]): {
 
 function TwinLegend(props: { onClose: () => void }): JSX.Element {
   return (
-    <div class="twin-legend" data-testid="twin-legend" role="dialog" aria-label="Legende">
+    <div class="twin-legend" data-testid="twin-legend" role="dialog" aria-label={t('Legende', 'Legend')}>
       <div class="twin-legend__head">
-        <span class="twin-legend__title">Legende</span>
-        <button type="button" class="twin-legend__close" onClick={props.onClose} aria-label="Legende schließen">
+        <span class="twin-legend__title">{t('Legende', 'Legend')}</span>
+        <button type="button" class="twin-legend__close" onClick={props.onClose} aria-label={t('Legende schließen', 'Close legend')}>
           ×
         </button>
       </div>
@@ -1411,13 +1435,15 @@ function TwinLegend(props: { onClose: () => void }): JSX.Element {
         <li class="twin-legend__row">
           <ShutterGlyph percent={70} />
           <span>
-            Rollo-Stand: <b>0 % offen</b> → <b>95 % geschlossen</b>. Goldener Teil = zu, heller Teil =
-            Tageslicht. Klick auf ein Badge zeigt Details.
+            {t(
+              'Rollo-Stand: 0 % offen → 95 % geschlossen. Goldener Teil = zu, heller Teil = Tageslicht. Klick auf ein Badge zeigt Details.',
+              'Shutter position: 0 % open → 95 % closed. Golden part = closed, lighter part = daylight. Click a badge for details.',
+            )}
           </span>
         </li>
         <li class="twin-legend__row">
           <Icon name="fenster" size={16} class="twin-legend__icon" />
-          <span>Fenster im Raum ist offen oder gekippt.</span>
+          <span>{t('Fenster im Raum ist offen oder gekippt.', 'A window in the room is open or tilted.')}</span>
         </li>
         <li class="twin-legend__row">
           <span class="twin-legend__dots">
@@ -1426,7 +1452,7 @@ function TwinLegend(props: { onClose: () => void }): JSX.Element {
             <span class="room-badge__status" data-state="blocked" />
             <span class="room-badge__status" data-state="manuallyOverridden" />
           </span>
-          <span>Status: Geplant · Fährt · Blockiert · Manuell übersteuert.</span>
+          <span>{t('Status: Geplant · Fährt · Blockiert · Manuell übersteuert.', 'Status: Scheduled · Moving · Blocked · Manually overridden.')}</span>
         </li>
         <li class="twin-legend__row">
           <span class="twin-legend__heat">
@@ -1435,14 +1461,18 @@ function TwinLegend(props: { onClose: () => void }): JSX.Element {
             <span class="twin-legend__heat-dot twin-legend__heat-dot--high" />
           </span>
           <span>
-            „Wärme" tönt Badges nach Wärmelast. Sonnenbogen scrubben zeigt die <b>Rollo-Prognose</b> der
-            nächsten 12 h (Markierung „≈P").
+            {t(
+              '„Wärme" tönt Badges nach Wärmelast. Sonnenbogen scrubben zeigt die Rollo-Prognose der nächsten 12 h (Markierung „≈P").',
+              '“Heat” tints badges by heat load. Scrubbing the sun arc shows the shutter forecast for the next 12 h (marked “≈P”).',
+            )}
           </span>
         </li>
         <li class="twin-legend__row twin-legend__row--note">
           <span>
-            <b>95 %</b> ist die stärkste automatische Schließung – ein kleiner Spalt verhindert Hitzestau
-            hinter dem Rollladen. <b>100 %</b> nur manuell oder bei Dachfenstern.
+            {t(
+              '95 % ist die stärkste automatische Schließung – ein kleiner Spalt verhindert Hitzestau hinter dem Rollladen. 100 % nur manuell oder bei Dachfenstern.',
+              '95 % is the strongest automatic closing – a small gap prevents heat build-up behind the shutter. 100 % only manually or for roof windows.',
+            )}
           </span>
         </li>
       </ul>
@@ -1458,10 +1488,10 @@ function EnvironmentOverlay(props: { snapshot: DashboardSnapshot }): JSX.Element
       : null;
   return (
     <div class="twin-overlay twin-overlay--env" data-testid="overlay-environment">
-      <EnvChip icon="sonne" label="Sonnenintensität" text={formatSignal(env?.radiationWm2.value ?? null, 'W/m²', 0)} />
-      <EnvChip icon="uv" label="UV-Index" text={formatSignal(env?.uvIndex.value ?? null, '', 1)} />
-      <EnvChip icon="wind" label="Wind" text={formatWindKmh(env?.windMs.value ?? null)} />
-      <EnvChip icon="feuchte" label="Luftfeuchte" text={humidityPct === null ? '–' : `${humidityPct} %`} />
+      <EnvChip icon="sonne" label={t('Sonnenintensität', 'Sun intensity')} text={formatSignal(env?.radiationWm2.value ?? null, 'W/m²', 0)} />
+      <EnvChip icon="uv" label={t('UV-Index', 'UV index')} text={formatSignal(env?.uvIndex.value ?? null, '', 1)} />
+      <EnvChip icon="wind" label={t('Wind', 'Wind')} text={formatWindKmh(env?.windMs.value ?? null)} />
+      <EnvChip icon="feuchte" label={t('Luftfeuchte', 'Humidity')} text={humidityPct === null ? '–' : `${humidityPct} %`} />
     </div>
   );
 }
@@ -1501,19 +1531,19 @@ function MobileRoomList(props: {
     <div class="twin-mobile" data-testid="twin-mobile">
       <div class="twin-mobile__head">
         {insights.score !== null && <ScoreRing score={insights.score} />}
-        <span class="twin-insight" title="Durchschnittlicher Rollo-Stand">
-          <span class="twin-insight__label">Ø Rollo</span>
+        <span class="twin-insight" title={t('Durchschnittlicher Rollo-Stand', 'Average shutter position')}>
+          <span class="twin-insight__label">{t('Ø Rollo', 'Ø shutter')}</span>
           <span class="twin-insight__value">{insights.avgShutter}%</span>
         </span>
         {insights.openWindows > 0 && (
-          <span class="twin-insight twin-insight--secondary" title="Räume mit offenem Fenster">
+          <span class="twin-insight twin-insight--secondary" title={t('Räume mit offenem Fenster', 'Rooms with an open window')}>
             <Icon name="fenster" size={13} class="twin-insight__icon" />
             <span class="twin-insight__value">{insights.openWindows}</span>
           </span>
         )}
       </div>
       {sorted.length === 0 ? (
-        <p class="twin-mobile__empty">Noch keine Räume erkannt.</p>
+        <p class="twin-mobile__empty">{t('Noch keine Räume erkannt.', 'No rooms detected yet.')}</p>
       ) : (
         <ul class="twin-mobile__list">
           {sorted.map((room) => (
@@ -1568,7 +1598,7 @@ function MobileRoomRow(props: {
           <TrendArrow trend={room.trend} />
         </span>
         {room.windowOpen === true && (
-          <Icon name="fenster" size={14} class="twin-row__win" title="Fenster offen" />
+          <Icon name="fenster" size={14} class="twin-row__win" title={t('Fenster offen', 'Window open')} />
         )}
         <span class="room-badge__status" data-state={room.status} aria-hidden="true" />
         <span class="twin-row__chev" aria-hidden="true">
@@ -1579,15 +1609,15 @@ function MobileRoomRow(props: {
         <div class="twin-row__detail">
           <dl class="twin-row__grid">
             <div class="twin-row__cell">
-              <dt>Innen</dt>
+              <dt>{t('Innen', 'Indoor')}</dt>
               <dd>
                 {room.indoorTempC === null ? '–' : `${room.indoorTempC.toFixed(1)} °C`}
-                {room.indoorTempState === 'stale' && <span class="twin-popover__warn"> · veraltet</span>}
-                {room.indoorTempState === 'unbound' && <span class="twin-popover__warn"> · kein Sensor</span>}
+                {room.indoorTempState === 'stale' && <span class="twin-popover__warn"> · {t('veraltet', 'outdated')}</span>}
+                {room.indoorTempState === 'unbound' && <span class="twin-popover__warn"> · {t('kein Sensor', 'no sensor')}</span>}
               </dd>
             </div>
             <div class="twin-row__cell">
-              <dt>Rollo</dt>
+              <dt>{t('Rollo', 'Shutter')}</dt>
               <dd>
                 {pct} %{' '}
                 <span class="twin-popover__muted">(max {room.roof === true ? '100' : '95'} %)</span>
@@ -1595,7 +1625,7 @@ function MobileRoomRow(props: {
             </div>
             {heatPct !== null && (
               <div class="twin-row__cell">
-                <dt>Wärmelast</dt>
+                <dt>{t('Wärmelast', 'Heat load')}</dt>
                 <dd>
                   <span class={`twin-popover__heat twin-popover__heat--${heatBand(room.heatLoad01) ?? 'low'}`}>
                     {heatPct} %
@@ -1604,24 +1634,24 @@ function MobileRoomRow(props: {
               </div>
             )}
             <div class="twin-row__cell">
-              <dt>Fassade</dt>
+              <dt>{t('Fassade', 'Facade')}</dt>
               <dd>
                 {room.facade}
                 {room.orientationDeg !== undefined ? ` · ${Math.round(room.orientationDeg)}°` : ''}
               </dd>
             </div>
             <div class="twin-row__cell">
-              <dt>Fenster</dt>
-              <dd>{room.windowOpen === true ? 'offen' : 'geschlossen'}</dd>
+              <dt>{t('Fenster', 'Window')}</dt>
+              <dd>{room.windowOpen === true ? t('offen', 'open') : t('geschlossen', 'closed')}</dd>
             </div>
             <div class="twin-row__cell">
-              <dt>Status</dt>
+              <dt>{t('Status', 'Status')}</dt>
               <dd>{statusLabel(room.status)}</dd>
             </div>
           </dl>
           {room.nextAction !== null && (
             <p class="twin-row__action">
-              <b>Nächste Aktion:</b> {room.nextAction.reason} (Ziel{' '}
+              <b>{t('Nächste Aktion:', 'Next action:')}</b> {tServer(room.nextAction.reason)} ({t('Ziel', 'Target')}{' '}
               {clampPct(room.nextAction.targetPercent)} %)
             </p>
           )}
@@ -1634,7 +1664,7 @@ function MobileRoomRow(props: {
             data-testid={`room-detail-open-${room.id}`}
             onClick={props.onOpenDetail}
           >
-            Detailansicht öffnen →
+            {t('Detailansicht öffnen →', 'Open detail view →')}
           </button>
         </div>
       )}

@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { APP_VERSION } from '../version.js';
 import { GITHUB_URL } from '../hooks/useUpdateCheck.js';
 import { useDiscovery } from '../hooks/useDiscovery.js';
+import { t } from '../i18n.js';
 
 interface RoutableProps {
   path?: string;
@@ -39,18 +40,20 @@ interface EndpointDef {
   body?: string;
 }
 
-const ENDPOINTS: EndpointDef[] = [
-  { label: 'State', method: 'GET', path: '/api/state' },
-  { label: 'Config', method: 'GET', path: '/api/config' },
-  { label: 'Diagnostics', method: 'GET', path: '/api/diagnostics' },
-  { label: 'Metrics', method: 'GET', path: '/api/metrics' },
-  { label: 'Entscheidungen (200)', method: 'GET', path: '/api/decisions?n=200' },
-  { label: 'Trends (24 h)', method: 'GET', path: '/api/trends?seconds=86400' },
-  { label: 'Connect-Log (1000)', method: 'GET', path: '/api/connect/log?n=1000' },
-  { label: 'Quellen entdecken', method: 'POST', path: '/api/sources/discover', body: '{}' },
-  { label: 'GARDENA testen', method: 'POST', path: '/api/gardena/test', body: '{}' },
-  { label: 'Probelauf (synthetisch)', method: 'POST', path: '/api/probe/run', body: '{}' },
-];
+function getEndpoints(): EndpointDef[] {
+  return [
+    { label: t('Status', 'State'), method: 'GET', path: '/api/state' },
+    { label: t('Konfiguration', 'Config'), method: 'GET', path: '/api/config' },
+    { label: t('Diagnose', 'Diagnostics'), method: 'GET', path: '/api/diagnostics' },
+    { label: t('Metriken', 'Metrics'), method: 'GET', path: '/api/metrics' },
+    { label: t('Entscheidungen (200)', 'Decisions (200)'), method: 'GET', path: '/api/decisions?n=200' },
+    { label: t('Trends (24 h)', 'Trends (24 h)'), method: 'GET', path: '/api/trends?seconds=86400' },
+    { label: t('Connect-Log (1000)', 'Connect log (1000)'), method: 'GET', path: '/api/connect/log?n=1000' },
+    { label: t('Quellen entdecken', 'Discover sources'), method: 'POST', path: '/api/sources/discover', body: '{}' },
+    { label: t('GARDENA testen', 'Test GARDENA'), method: 'POST', path: '/api/gardena/test', body: '{}' },
+    { label: t('Probelauf (synthetisch)', 'Dry run (synthetic)'), method: 'POST', path: '/api/probe/run', body: '{}' },
+  ];
+}
 
 const LEVELS = ['all', 'info', 'warn', 'error'] as const;
 
@@ -79,7 +82,7 @@ function ConnectLog(): JSX.Element {
     try {
       const res = await fetch('/api/connect/log?n=1000', { headers: { Accept: 'application/json' } });
       if (res.status === 503) {
-        setError('Connect-Protokoll noch nicht verbunden.');
+        setError(t('Connect-Protokoll noch nicht verbunden.', 'Connect log not connected yet.'));
         return;
       }
       if (!res.ok) {
@@ -90,7 +93,7 @@ function ConnectLog(): JSX.Element {
       setEntries(Array.isArray(j.entries) ? j.entries : []);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Netzwerkfehler');
+      setError(err instanceof Error ? err.message : t('Netzwerkfehler', 'Network error'));
     }
   };
 
@@ -116,22 +119,22 @@ function ConnectLog(): JSX.Element {
 
   return (
     <article class="module-panel__card" data-testid="logs-connect">
-      <h3>Connect-Protokoll (live)</h3>
+      <h3>{t('Connect-Protokoll (live)', 'Connect log (live)')}</h3>
       <div class="logs-toolbar">
         <label class="logs-toolbar__field">
-          <span>Level</span>
+          <span>{t('Level', 'Level')}</span>
           <select value={level} onChange={(e): void => setLevel((e.currentTarget as HTMLSelectElement).value)}>
             {LEVELS.map((l) => (
               <option key={l} value={l}>{l}</option>
             ))}
           </select>
         </label>
-        <button type="button" class="irr-btn irr-btn--ghost" onClick={(): void => void load()}>Neu laden</button>
+        <button type="button" class="irr-btn irr-btn--ghost" onClick={(): void => void load()}>{t('Neu laden', 'Reload')}</button>
         <button type="button" class={`irr-btn${live ? '' : ' irr-btn--ghost'}`} onClick={(): void => setLive((v) => !v)}>
-          {live ? 'Live: an' : 'Live: aus'}
+          {live ? t('Live: an', 'Live: on') : t('Live: aus', 'Live: off')}
         </button>
-        <button type="button" class="irr-btn irr-btn--ghost" onClick={(): void => download('connect-log.txt', asText)}>Download</button>
-        <span class="logs-toolbar__count">{shown.length} Einträge</span>
+        <button type="button" class="irr-btn irr-btn--ghost" onClick={(): void => download('connect-log.txt', asText)}>{t('Download', 'Download')}</button>
+        <span class="logs-toolbar__count">{t(`${shown.length} Einträge`, `${shown.length} entries`)}</span>
       </div>
       {error !== null && <p class="module-panel__hint">{error}</p>}
       <pre class="logs-pre logs-pre--log" data-testid="logs-connect-pre">{asText || '—'}</pre>
@@ -147,7 +150,7 @@ function EndpointRunner(): JSX.Element {
   const run = async (ep: EndpointDef): Promise<void> => {
     setBusy(true);
     setTitle(`${ep.method} ${ep.path}`);
-    setOut('Lädt…');
+    setOut(t('Lädt…', 'Loading…'));
     try {
       const init: RequestInit =
         ep.method === 'POST'
@@ -163,7 +166,7 @@ function EndpointRunner(): JSX.Element {
       }
       setOut(`# HTTP ${res.status}\n${pretty}`);
     } catch (err) {
-      setOut(err instanceof Error ? err.message : 'Netzwerkfehler');
+      setOut(err instanceof Error ? err.message : t('Netzwerkfehler', 'Network error'));
     } finally {
       setBusy(false);
     }
@@ -179,13 +182,15 @@ function EndpointRunner(): JSX.Element {
 
   return (
     <article class="module-panel__card" data-testid="logs-endpoints">
-      <h3>API-Werkzeuge</h3>
+      <h3>{t('API-Werkzeuge', 'API tools')}</h3>
       <p class="module-panel__hint">
-        Roh-Antworten aller Diagnose-Endpunkte. Der Probelauf rechnet einen
-        synthetischen Zyklus, ohne einen Rollladen zu fahren.
+        {t(
+          'Roh-Antworten aller Diagnose-Endpunkte. Der Probelauf rechnet einen synthetischen Zyklus, ohne einen Rollladen zu fahren.',
+          'Raw responses of all diagnostic endpoints. The dry run computes a synthetic cycle without moving any shutter.',
+        )}
       </p>
       <div class="logs-endpoints__grid">
-        {ENDPOINTS.map((ep) => (
+        {getEndpoints().map((ep) => (
           <button
             key={ep.path}
             type="button"
@@ -202,8 +207,8 @@ function EndpointRunner(): JSX.Element {
         <div class="logs-result">
           <div class="logs-toolbar">
             <span class="logs-toolbar__title">{title}</span>
-            <button type="button" class="irr-btn irr-btn--ghost" onClick={copy}>Kopieren</button>
-            <button type="button" class="irr-btn irr-btn--ghost" onClick={(): void => download('debug.json', out)}>Download</button>
+            <button type="button" class="irr-btn irr-btn--ghost" onClick={copy}>{t('Kopieren', 'Copy')}</button>
+            <button type="button" class="irr-btn irr-btn--ghost" onClick={(): void => download('debug.json', out)}>{t('Download', 'Download')}</button>
           </div>
           <pre class="logs-pre" data-testid="logs-result-pre">{out}</pre>
         </div>
@@ -219,20 +224,21 @@ export function LogsDebugTab(_props: RoutableProps): JSX.Element {
   return (
     <section class="module-panel tab-logs-debug" data-testid="tab-logs-debug">
       <header class="module-panel__head">
-        <h1>Logs &amp; Debug</h1>
-        <span class="module-panel__badge">Logs · Roh-Daten · Werkzeuge</span>
+        <h1>{t('Logs & Debug', 'Logs & Debug')}</h1>
+        <span class="module-panel__badge">{t('Logs · Roh-Daten · Werkzeuge', 'Logs · Raw data · Tools')}</span>
       </header>
       <p class="module-panel__intro">
-        Umfangreiche Diagnose: das Live-Connect-Protokoll, alle Diagnose-Endpunkte
-        als Roh-JSON (mit Kopieren/Download) und Build-Infos — ideal für
-        Fehlersuche und Bug-Reports.
+        {t(
+          'Umfangreiche Diagnose: das Live-Connect-Protokoll, alle Diagnose-Endpunkte als Roh-JSON (mit Kopieren/Download) und Build-Infos — ideal für Fehlersuche und Bug-Reports.',
+          'Extensive diagnostics: the live Connect log, all diagnostic endpoints as raw JSON (with copy/download) and build info — ideal for troubleshooting and bug reports.',
+        )}
       </p>
 
       <article class="module-panel__card" data-testid="logs-sysinfo">
-        <h3>System &amp; Build</h3>
+        <h3>{t('System & Build', 'System & build')}</h3>
         <dl class="logs-sysinfo">
-          <div><dt>Version</dt><dd>v{APP_VERSION}</dd></div>
-          <div><dt>Build</dt><dd>{build ?? '—'}</dd></div>
+          <div><dt>{t('Version', 'Version')}</dt><dd>v{APP_VERSION}</dd></div>
+          <div><dt>{t('Build', 'Build')}</dt><dd>{build ?? '—'}</dd></div>
           <div><dt>GitHub</dt><dd><a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">{GITHUB_URL}</a></dd></div>
           <div><dt>User-Agent</dt><dd class="logs-sysinfo__ua">{typeof navigator !== 'undefined' ? navigator.userAgent : '—'}</dd></div>
         </dl>

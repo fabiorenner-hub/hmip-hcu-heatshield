@@ -16,6 +16,7 @@
 import { h, type JSX } from 'preact';
 import { useState } from 'preact/hooks';
 
+import { t, tServer } from '../i18n.js';
 import type { LearningRecommendation } from '../hooks/useLearning.js';
 
 export interface RecommendationPanelProps {
@@ -41,9 +42,9 @@ export function RecommendationPanel(
     <section
       class="recommendation-panel"
       data-testid="recommendation-panel"
-      aria-label="Lern-Vorschläge"
+      aria-label={t('Lern-Vorschläge', 'Learning suggestions')}
     >
-      <h3>Vorschläge</h3>
+      <h3>{t('Vorschläge', 'Suggestions')}</h3>
       <ul class="recommendation-panel__list">
         {visible.map((r) => {
           const patch = r.suggestedConfigPatch;
@@ -57,10 +58,10 @@ export function RecommendationPanel(
               data-severity={r.severity}
             >
               <div class="recommendation-panel__title">
-                <strong>{r.title}</strong>
+                <strong>{tServer(r.title)}</strong>
                 <span class="recommendation-panel__room"> · {r.roomId}</span>
               </div>
-              <p class="recommendation-panel__message">{r.message}</p>
+              <p class="recommendation-panel__message">{tServer(r.message)}</p>
               {patch !== undefined && (
                 <p class="recommendation-panel__patch" data-testid="patch-summary">
                   <code>{patch.path.join('.')}</code>:{' '}
@@ -71,7 +72,10 @@ export function RecommendationPanel(
               )}
               {failed && (
                 <p class="recommendation-panel__error" role="alert">
-                  Anwenden fehlgeschlagen — bitte erneut versuchen.
+                  {t(
+                    'Anwenden fehlgeschlagen — bitte erneut versuchen.',
+                    'Apply failed — please try again.',
+                  )}
                 </p>
               )}
               <div class="recommendation-panel__actions">
@@ -90,7 +94,7 @@ export function RecommendationPanel(
                       }
                     }}
                   >
-                    {pending ? 'Wird angewendet …' : 'Anwenden'}
+                    {pending ? t('Wird angewendet …', 'Applying …') : t('Anwenden', 'Apply')}
                   </button>
                 )}
                 <button
@@ -101,7 +105,7 @@ export function RecommendationPanel(
                     await props.onDismiss(r.id);
                   }}
                 >
-                  Verwerfen
+                  {t('Verwerfen', 'Dismiss')}
                 </button>
               </div>
             </li>

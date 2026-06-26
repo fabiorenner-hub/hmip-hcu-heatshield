@@ -19,6 +19,7 @@ import type {
   PlannedAction,
   RoomDetail,
 } from '../../types.js';
+import { t, fmtTime } from '../../i18n.js';
 
 export type ActionCategory = 'shade' | 'vent' | 'nightvent' | 'cool' | 'warn';
 
@@ -40,38 +41,31 @@ export function actionCategory(action: PlannedAction): ActionCategory {
   return 'shade';
 }
 
-const FACADE_ADJ: Record<FacadeKey, string> = {
-  N: 'Nord',
-  E: 'Ost',
-  S: 'Süd',
-  W: 'West',
+const FACADE_ADJ: Record<FacadeKey, [de: string, en: string]> = {
+  N: ['Nord', 'North'],
+  E: ['Ost', 'East'],
+  S: ['Süd', 'South'],
+  W: ['West', 'West'],
 };
-
-function fmtHour(ts: string): string {
-  return new Date(ts).toLocaleTimeString('de-DE', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function clampPct(v: number): number {
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.min(100, Math.round(v)));
 }
 
-/** Relative ETA from now to a scheduled timestamp, in German. */
+/** Relative ETA from now to a scheduled timestamp (localized). */
 export function formatEta(scheduledTs: string, now: Date): string {
   const deltaMs = Date.parse(scheduledTs) - now.getTime();
   if (!Number.isFinite(deltaMs) || deltaMs <= 60_000) {
-    return 'jetzt';
+    return t('jetzt', 'now');
   }
   const totalMin = Math.round(deltaMs / 60_000);
   if (totalMin < 60) {
-    return `in ${totalMin} min`;
+    return t(`in ${totalMin} min`, `in ${totalMin} min`);
   }
   const hrs = Math.floor(totalMin / 60);
   const mins = totalMin % 60;
-  return mins === 0 ? `in ${hrs} h` : `in ${hrs} h ${mins} min`;
+  return mins === 0 ? t(`in ${hrs} h`, `in ${hrs} h`) : t(`in ${hrs} h ${mins} min`, `in ${hrs} h ${mins} min`);
 }
 
 /**
@@ -86,13 +80,14 @@ export function resolveActionLabel(
 ): string {
   const room = rooms.find((r) => r.nextAction?.windowId === action.windowId);
   if (room !== undefined) {
-    return `${FACADE_ADJ[room.facade]}-Rollläden (${room.name})`;
+    const [de, en] = FACADE_ADJ[room.facade];
+    return t(`${de}-Rollläden (${room.name})`, `${en} shutters (${room.name})`);
   }
   const win = windows.find((w) => w.id === action.windowId);
   if (win?.name !== undefined && win.name.length > 0) {
     return win.name;
   }
-  return 'Rollläden';
+  return t('Rollläden', 'Shutters');
 }
 
 export function ForecastTimeline(props: {
@@ -123,9 +118,11 @@ export function ForecastTimeline(props: {
 
   return (
     <section class="forecast-timeline" data-testid="forecast-timeline">
-      <h2 class="forecast-timeline__title">{titlePrefix} – Nächste {horizonH} Stunden</h2>
+      <h2 class="forecast-timeline__title">
+        {titlePrefix} – {t(`Nächste ${horizonH} Stunden`, `Next ${horizonH} hours`)}
+      </h2>
       {cards.length === 0 ? (
-        <p class="forecast-timeline__empty">warte auf Daten</p>
+        <p class="forecast-timeline__empty">{t('warte auf Daten', 'waiting for data')}</p>
       ) : (
         <div class="forecast-timeline__track">
           {cards.map((c, i) => (
@@ -134,7 +131,7 @@ export function ForecastTimeline(props: {
               class={`forecast-card ${i === 0 ? 'forecast-card--now' : ''}`}
               data-testid={i === 0 ? 'forecast-card-now' : `forecast-card-${i}`}
             >
-              <span class="forecast-card__time">{i === 0 ? 'Jetzt' : fmtHour(c.ts)}</span>
+              <span class="forecast-card__time">{i === 0 ? t('Jetzt', 'Now') : fmtTime(c.ts)}</span>
               <span class="forecast-card__icon" aria-hidden="true">{c.weatherIcon}</span>
               <span class="forecast-card__temp">{Math.round(c.tempC)} °C</span>
               <span class="forecast-card__rad">{Math.round(c.radiationWm2)} W/m²</span>
@@ -148,10 +145,10 @@ export function ForecastTimeline(props: {
 
       {showActions && (
         <Fragment>
-          <h3 class="forecast-timeline__subtitle">Nächste Aktionen</h3>
+          <h3 class="forecast-timeline__subtitle">{t('Nächste Aktionen', 'Next actions')}</h3>
           <div class="next-actions" data-testid="next-actions">
             {sortedActions.length === 0 ? (
-              <p class="next-actions__empty">Keine geplanten Aktionen</p>
+              <p class="next-actions__empty">{t('Keine geplanten Aktionen', 'No planned actions')}</p>
             ) : (
               <ul class="next-actions__list">
                 {sortedActions.map((a) => {
@@ -167,7 +164,7 @@ export function ForecastTimeline(props: {
                     >
                       <span class="action-row__dot" aria-hidden="true" />
                       <span class="action-row__text">
-                        {label} auf {clampPct(a.targetPercent)} %
+                        {label} {t('auf', 'to')} {clampPct(a.targetPercent)} %
                       </span>
                       <span class="action-row__eta">{formatEta(a.scheduledTs, now)}</span>
                     </li>

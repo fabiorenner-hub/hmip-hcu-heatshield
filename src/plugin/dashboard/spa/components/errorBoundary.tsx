@@ -7,6 +7,8 @@
 
 import { Component, Fragment, h, type ComponentChildren, type JSX } from 'preact';
 
+import { t } from '../i18n.js';
+
 export interface ErrorBoundaryProps {
   children: ComponentChildren;
   fallback?: (error: Error) => ComponentChildren;
@@ -35,7 +37,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       }
       return (
         <div class="error-boundary" role="alert">
-          <strong>Something went wrong.</strong>
+          <strong>{t('Etwas ist schief gelaufen.', 'Something went wrong.')}</strong>
           <pre>{state.error.message}</pre>
         </div>
       );

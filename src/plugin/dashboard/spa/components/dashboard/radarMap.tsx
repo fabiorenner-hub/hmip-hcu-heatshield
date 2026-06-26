@@ -15,6 +15,8 @@ import { h, type JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import * as L from 'leaflet';
 
+import { t, locale } from '../../i18n.js';
+
 interface RvFrame {
   time: number;
   path: string;
@@ -187,29 +189,30 @@ export function RadarMap(props: { latitude: number; longitude: number }): JSX.El
   const label =
     activeTime === null
       ? '—'
-      : new Date(activeTime * 1000).toLocaleTimeString('de-DE', {
+      : new Date(activeTime * 1000).toLocaleTimeString(locale(), {
           hour: '2-digit',
           minute: '2-digit',
+          hour12: false,
         });
 
   return (
     <section class="radar" data-testid="radar-map">
       <header class="radar__head">
-        <h2>Regenradar</h2>
+        <h2>{t('Regenradar', 'Rain radar')}</h2>
         <span class="radar__time" data-testid="radar-time">
           {label}
         </span>
       </header>
       <div class="radar__map" ref={containerRef} data-testid="radar-canvas" />
       {failed ? (
-        <p class="radar__error">Karte konnte nicht geladen werden.</p>
+        <p class="radar__error">{t('Karte konnte nicht geladen werden.', 'Map could not be loaded.')}</p>
       ) : (
         <div class="radar__controls">
           <button
             type="button"
             class="radar__play"
             data-testid="radar-play"
-            aria-label={playing ? 'Pause' : 'Abspielen'}
+            aria-label={playing ? t('Pause', 'Pause') : t('Abspielen', 'Play')}
             onClick={(): void => setPlaying((p) => !p)}
           >
             {playing ? '⏸' : '▶'}
@@ -222,7 +225,7 @@ export function RadarMap(props: { latitude: number; longitude: number }): JSX.El
             value={activeIdx}
             disabled={frames.length < 2}
             onInput={onScrub}
-            aria-label="Radar-Zeitpunkt"
+            aria-label={t('Radar-Zeitpunkt', 'Radar time')}
           />
           <button
             type="button"
@@ -231,7 +234,7 @@ export function RadarMap(props: { latitude: number; longitude: number }): JSX.El
             aria-pressed={clouds}
             onClick={(): void => setClouds((c) => !c)}
           >
-            Wolken
+            {t('Wolken', 'Clouds')}
           </button>
           <span class="radar__legend">RainViewer · dBZ</span>
         </div>

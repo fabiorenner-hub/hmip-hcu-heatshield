@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 
 import { ExpandableChart, type ChartSeries } from '../lineChart.js';
 import { snapshot } from '../../store.js';
+import { t } from '../../i18n.js';
 
 interface TrendSample {
   ts: string;
@@ -79,13 +80,13 @@ export function TrendCard(props: {
     if (props.variant === 'pv') {
       const pv = grouped.get('pv');
       if (pv !== undefined && pv.length > 0) {
-        out.push({ label: 'PV-Leistung', color: '#f59e0b', points: pv });
+        out.push({ label: t('PV-Leistung', 'PV power'), color: '#f59e0b', points: pv });
       }
       return out;
     }
     const outdoor = grouped.get('outdoor');
     if (outdoor !== undefined && outdoor.length > 0) {
-      out.push({ label: 'Außen', color: '#e2e8f0', points: outdoor });
+      out.push({ label: t('Außen', 'Outdoor'), color: '#e2e8f0', points: outdoor });
     }
     let ci = 0;
     for (const [key, pts] of grouped) {
@@ -110,7 +111,7 @@ export function TrendCard(props: {
           unit={props.variant === 'pv' ? 'kW' : '°C'}
         />
       ) : (
-        <p class="module-panel__hint">Noch keine Verlaufsdaten.</p>
+        <p class="module-panel__hint">{t('Noch keine Verlaufsdaten.', 'No trend data yet.')}</p>
       )}
     </article>
   );

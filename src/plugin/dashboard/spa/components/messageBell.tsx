@@ -14,6 +14,8 @@
 
 import { h, type JSX } from 'preact';
 
+import { t } from '../i18n.js';
+
 export interface MessageBellProps {
   /** Number of unread messages. */
   unread: number;
@@ -24,8 +26,8 @@ export interface MessageBellProps {
 export function MessageBell(props: MessageBellProps): JSX.Element {
   const hasUnread = props.unread > 0;
   const label = hasUnread
-    ? `Nachrichten – ${props.unread} ungelesen`
-    : 'Nachrichten';
+    ? t(`Nachrichten – ${props.unread} ungelesen`, `Messages – ${props.unread} unread`)
+    : t('Nachrichten', 'Messages');
   return (
     <button
       type="button"

@@ -40,6 +40,7 @@ import { DiscoveryStatus } from '../components/discoveryStatus.js';
 import { CompassPicker } from '../components/compassPicker.js';
 import { deviceLabel, PRIORITY_LABELS } from '../format.js';
 import { applyProfile, type ProfileName } from '../profiles.js';
+import { t } from '../i18n.js';
 import type {
   Config,
   Location,
@@ -106,7 +107,10 @@ export function WizardTab(): JSX.Element {
       if (res.ok && json?.ok === true) {
         const ok: ValidationOutcome = {
           ok: true,
-          message: `Schritt ${n} validiert (status=${json.status ?? 'unknown'}).`,
+          message: t(
+            `Schritt ${n} validiert (status=${json.status ?? 'unknown'}).`,
+            `Step ${n} validated (status=${json.status ?? 'unknown'}).`,
+          ),
         };
         return ok;
       }
@@ -118,7 +122,7 @@ export function WizardTab(): JSX.Element {
     } catch (err) {
       return {
         ok: false,
-        message: err instanceof Error ? err.message : 'unknown error',
+        message: err instanceof Error ? err.message : t('Unbekannter Fehler', 'Unknown error'),
       };
     }
   };
@@ -247,7 +251,7 @@ export function WizardTab(): JSX.Element {
   return (
     <section class="tab-wizard" data-testid="tab-wizard">
       <header class="tab-wizard__header">
-        <h2>Einrichtungs-Assistent — Schritt {step} / 5</h2>
+        <h2>{t(`Einrichtungs-Assistent — Schritt ${step} / 5`, `Setup wizard — Step ${step} / 5`)}</h2>
       </header>
 
       <ol class="tab-wizard__steps" data-testid="wizard-steps">
@@ -320,7 +324,7 @@ export function WizardTab(): JSX.Element {
             void handleValidateStep(step);
           }}
         >
-          Validieren
+          {t('Validieren', 'Validate')}
         </button>
         <button
           type="button"
@@ -328,7 +332,7 @@ export function WizardTab(): JSX.Element {
           onClick={handleBack}
           disabled={step === 1}
         >
-          Zurück
+          {t('Zurück', 'Back')}
         </button>
         <button
           type="button"
@@ -337,7 +341,7 @@ export function WizardTab(): JSX.Element {
             void handleNext();
           }}
         >
-          {step === 5 ? 'Speichern' : 'Weiter'}
+          {step === 5 ? t('Speichern', 'Save') : t('Weiter', 'Next')}
         </button>
       </div>
     </section>
@@ -356,9 +360,9 @@ function Step1(props: Step1Props): JSX.Element {
   );
   return (
     <div data-testid="wizard-step-1">
-      <h3>Standort</h3>
+      <h3>{t('Standort', 'Location')}</h3>
       <label>
-        Latitude
+        {t('Breitengrad', 'Latitude')}
         <input
           type="number"
           step={0.01}
@@ -373,7 +377,7 @@ function Step1(props: Step1Props): JSX.Element {
         />
       </label>
       <label>
-        Longitude
+        {t('Längengrad', 'Longitude')}
         <input
           type="number"
           step={0.01}
@@ -388,7 +392,7 @@ function Step1(props: Step1Props): JSX.Element {
         />
       </label>
       <label>
-        Zeitzone
+        {t('Zeitzone', 'Time zone')}
         <input
           type="text"
           data-testid="wizard-timezone"
@@ -402,7 +406,10 @@ function Step1(props: Step1Props): JSX.Element {
         />
       </label>
       <p data-testid="wizard-sun-preview">
-        Sonnenstand jetzt: Azimut {sun.azimuthDeg.toFixed(1)}°, Höhe {sun.elevationDeg.toFixed(1)}°
+        {t(
+          `Sonnenstand jetzt: Azimut ${sun.azimuthDeg.toFixed(1)}°, Höhe ${sun.elevationDeg.toFixed(1)}°`,
+          `Sun position now: azimuth ${sun.azimuthDeg.toFixed(1)}°, elevation ${sun.elevationDeg.toFixed(1)}°`,
+        )}
       </p>
     </div>
   );
@@ -417,7 +424,7 @@ function Step2(props: Step2Props): JSX.Element {
   const { discovery, openMeteoDeviceId, setOpenMeteoDeviceId } = props;
   return (
     <div data-testid="wizard-step-2">
-      <h3>Datenquellen</h3>
+      <h3>{t('Datenquellen', 'Data sources')}</h3>
       <button
         type="button"
         data-testid="wizard-discover"
@@ -426,10 +433,10 @@ function Step2(props: Step2Props): JSX.Element {
         }}
         disabled={discovery.discovering.value}
       >
-        {discovery.discovering.value ? 'Suche läuft…' : 'Geräte suchen'}
+        {discovery.discovering.value ? t('Suche läuft…', 'Searching…') : t('Geräte suchen', 'Discover devices')}
       </button>
       <DiscoveryStatus discovery={discovery} />
-      <h4>Temperatur-Sensoren (HCU)</h4>
+      <h4>{t('Temperatur-Sensoren (HCU)', 'Temperature sensors (HCU)')}</h4>
       <ul data-testid="wizard-list-climate">
         {discovery.temperatureSources.value.map((d) => (
           <li key={d.deviceId}>
@@ -437,7 +444,7 @@ function Step2(props: Step2Props): JSX.Element {
           </li>
         ))}
       </ul>
-      <h4>OpenMeteo-Kandidaten</h4>
+      <h4>{t('OpenMeteo-Kandidaten', 'OpenMeteo candidates')}</h4>
       <ul data-testid="wizard-list-openmeteo">
         {discovery.openMeteo.value.map((d) => (
           <li key={d.deviceId}>
@@ -467,18 +474,18 @@ interface Step3Props {
 function Step3(props: Step3Props): JSX.Element {
   return (
     <div data-testid="wizard-step-3">
-      <h3>Räume</h3>
+      <h3>{t('Räume', 'Rooms')}</h3>
       <button type="button" data-testid="wizard-add-room" onClick={props.onAdd}>
-        + Raum hinzufügen
+        {t('+ Raum hinzufügen', '+ Add room')}
       </button>
       {props.rooms.length === 0 ? (
-        <p>Noch keine Räume. Lege mindestens einen Raum an.</p>
+        <p>{t('Noch keine Räume. Lege mindestens einen Raum an.', 'No rooms yet. Add at least one room.')}</p>
       ) : (
         <table data-testid="wizard-rooms-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Priorität</th>
+              <th>{t('Name', 'Name')}</th>
+              <th>{t('Priorität', 'Priority')}</th>
             </tr>
           </thead>
           <tbody>
@@ -533,23 +540,25 @@ interface Step4Props {
 function Step4(props: Step4Props): JSX.Element {
   return (
     <div data-testid="wizard-step-4">
-      <h3>Fenster &amp; Rollläden</h3>
+      <h3>{t('Fenster & Rollläden', 'Windows & shutters')}</h3>
       {props.shutters.length === 0 && (
         <p>
-          Keine Rollladen-Geräte erkannt (Geräte mit shutterLevel-Feature).
-          Geräte­suche in Schritt 2 ausführen.
+          {t(
+            'Keine Rollladen-Geräte erkannt (Geräte mit shutterLevel-Feature). Gerätesuche in Schritt 2 ausführen.',
+            'No shutter devices detected (devices with a shutterLevel feature). Run device discovery in step 2.',
+          )}
         </p>
       )}
       <table class="window-table">
         <thead>
           <tr>
-            <th>Rollladen</th>
-            <th>Raum</th>
-            <th>Himmelsrichtung</th>
-            <th>Typ</th>
-            <th>Fensterkontakt</th>
-            <th>Max. Schließung</th>
-            <th>Blockiert</th>
+            <th>{t('Rollladen', 'Shutter')}</th>
+            <th>{t('Raum', 'Room')}</th>
+            <th>{t('Himmelsrichtung', 'Orientation')}</th>
+            <th>{t('Typ', 'Type')}</th>
+            <th>{t('Fensterkontakt', 'Window contact')}</th>
+            <th>{t('Max. Schließung', 'Max. closing')}</th>
+            <th>{t('Blockiert', 'Blocked')}</th>
           </tr>
         </thead>
         <tbody>
@@ -569,7 +578,7 @@ function Step4(props: Step4Props): JSX.Element {
                       props.onAssign(d.deviceId, (e.currentTarget as HTMLSelectElement).value)
                     }
                   >
-                    <option value="">— wählen —</option>
+                    <option value="">{t('— wählen —', '— select —')}</option>
                     {props.rooms.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
@@ -599,8 +608,8 @@ function Step4(props: Step4Props): JSX.Element {
                       })
                     }
                   >
-                    <option value="facade">Fassade</option>
-                    <option value="roof_window">Dachfenster</option>
+                    <option value="facade">{t('Fassade', 'Facade')}</option>
+                    <option value="roof_window">{t('Dachfenster', 'Roof window')}</option>
                   </select>
                 </td>
                 <td>
@@ -615,7 +624,7 @@ function Step4(props: Step4Props): JSX.Element {
                       });
                     }}
                   >
-                    <option value="">— kein —</option>
+                    <option value="">{t('— kein —', '— none —')}</option>
                     {props.contacts.map((c) => (
                       <option key={c.deviceId} value={c.deviceId}>
                         {deviceLabel(c)}
@@ -664,7 +673,7 @@ function Step4(props: Step4Props): JSX.Element {
                         })
                       }
                     />
-                    <span>Automatik aus</span>
+                    <span>{t('Automatik aus', 'Automation off')}</span>
                   </label>
                 </td>
               </tr>
@@ -683,7 +692,7 @@ interface Step5Props {
 function Step5(props: Step5Props): JSX.Element {
   return (
     <div data-testid="wizard-step-5">
-      <h3>Profil & Feintuning</h3>
+      <h3>{t('Profil & Feintuning', 'Profile & fine-tuning')}</h3>
       <div class="tab-wizard__profile-switcher" role="tablist">
         {PROFILES.map((p) => (
           <button
@@ -699,7 +708,7 @@ function Step5(props: Step5Props): JSX.Element {
         ))}
       </div>
       <p>
-        Aktuell gewählt: <strong>{props.profile}</strong>
+        {t('Aktuell gewählt:', 'Currently selected:')} <strong>{props.profile}</strong>
       </p>
     </div>
   );

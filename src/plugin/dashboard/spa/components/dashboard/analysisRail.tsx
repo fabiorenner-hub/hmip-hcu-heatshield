@@ -15,10 +15,28 @@
 import { h, type JSX } from 'preact';
 import { useState } from 'preact/hooks';
 
-import { HEAT_INDEX_BUCKETS, MODE_LEGEND_DE, MODE_ORDER } from './legend.js';
+import { buildHeatIndexBuckets, buildModeLegend, MODE_ORDER } from './legend.js';
 import { ExpandableChart, type ChartSeries } from '../lineChart.js';
 import { MODE_LABELS_DE, formatSignal, formatWindKmh } from '../../format.js';
+import { t, tServer, fmtTime } from '../../i18n.js';
 import type { DashboardSnapshot, Mode, RoomDetail } from '../../types.js';
+
+/** English counterparts to {@link MODE_LABELS_DE} (German lives in format.ts). */
+const MODE_LABELS_EN: Record<string, string> = {
+  NORMAL: 'Normal',
+  SUMMER_WATCH: 'Summer watch',
+  ACTIVE_HEAT_PROTECTION: 'Active heat protection',
+  HEATWAVE: 'Heatwave',
+  NIGHT_COOLING: 'Night cooling',
+  STORM: 'Storm',
+  VACATION: 'Vacation',
+  MAINTENANCE: 'Maintenance',
+};
+
+/** Bilingual engine-mode label by mode id. */
+function modeLabel(m: string): string {
+  return t(MODE_LABELS_DE[m] ?? m, MODE_LABELS_EN[m] ?? m);
+}
 
 export function AnalysisRail(props: {
   snapshot: DashboardSnapshot;
@@ -47,15 +65,15 @@ export function LearningCard(props: { snapshot: DashboardSnapshot }): JSX.Elemen
   return (
     <section class="analysis-card learning-card" data-testid="learning-card">
       <header class="analysis-card__head">
-        <span class="analysis-card__title">Lernen · Beschattungs-Effekt</span>
+        <span class="analysis-card__title">{t('Lernen · Beschattungs-Effekt', 'Learning · shading effect')}</span>
         {learning !== undefined && (
           <span class="learning-card__days" data-testid="learning-days">
-            {learning.days} {learning.days === 1 ? 'Tag' : 'Tage'}
+            {learning.days} {learning.days === 1 ? t('Tag', 'day') : t('Tage', 'days')}
           </span>
         )}
       </header>
       {rooms.length === 0 ? (
-        <p class="analysis-card__empty">warte auf Daten</p>
+        <p class="analysis-card__empty">{t('warte auf Daten', 'waiting for data')}</p>
       ) : (
         <ul class="learning-list">
           {rooms.map((r) => (
@@ -69,9 +87,9 @@ export function LearningCard(props: { snapshot: DashboardSnapshot }): JSX.Elemen
               <span class="learning-row__metrics">
                 {r.avgOvershootC === null
                   ? '—'
-                  : `${r.avgOvershootC > 0 ? '+' : ''}${r.avgOvershootC} K ggü. Komfort`}
+                  : `${r.avgOvershootC > 0 ? '+' : ''}${r.avgOvershootC} K ${t('ggü. Komfort', 'vs. comfort')}`}
                 {' · '}
-                {r.avgMovesPerDay} Fahrten/Tag
+                {r.avgMovesPerDay} {t('Fahrten/Tag', 'moves/day')}
                 {r.comfortBiasC !== 0 && (
                   <span class="learning-row__bias">
                     {' · '}
@@ -80,10 +98,10 @@ export function LearningCard(props: { snapshot: DashboardSnapshot }): JSX.Elemen
                   </span>
                 )}
               </span>
-              <span class="learning-row__rec">{r.recommendation}</span>
+              <span class="learning-row__rec">{tServer(r.recommendation)}</span>
               {r.calibrationNote !== undefined && (
                 <span class="learning-row__calib" data-testid={`learning-calib-${r.id}`}>
-                  🌡 {r.calibrationNote}
+                  🌡 {tServer(r.calibrationNote)}
                 </span>
               )}
             </li>
@@ -104,14 +122,17 @@ export function AutomationStatusCard(props: {
   return (
     <section class="analysis-card automation-status" data-testid="automation-status">
       <header class="analysis-card__head">
-        <span class="analysis-card__title">Automatik-Logik</span>
+        <span class="analysis-card__title">{t('Automatik-Logik', 'Automation logic')}</span>
         <button
           type="button"
           class="automation-status__info"
           data-testid="automation-info-toggle"
           aria-expanded={open}
-          aria-label="Detaillierte Erklärung anzeigen"
-          title="Warum entscheidet das Plugin so? — ausführliche Erklärung"
+          aria-label={t('Detaillierte Erklärung anzeigen', 'Show detailed explanation')}
+          title={t(
+            'Warum entscheidet das Plugin so? — ausführliche Erklärung',
+            'Why does the plugin decide this way? — detailed explanation',
+          )}
           onClick={(): void => setOpen((v) => !v)}
         >
           ⓘ
@@ -119,16 +140,16 @@ export function AutomationStatusCard(props: {
       </header>
       <p class="automation-status__mode-line">
         <span class="automation-status__mode" data-testid="automation-mode">
-          {mode?.label ?? '–'}
+          {mode?.label !== undefined ? tServer(mode.label) : '–'}
         </span>
       </p>
       <p class="automation-status__goal" data-testid="automation-goal">
-        {mode?.goal ?? 'warte auf Daten'}
+        {mode?.goal !== undefined ? tServer(mode.goal) : t('warte auf Daten', 'waiting for data')}
       </p>
       {mode?.decidedBy !== undefined && (
         <p class="automation-status__decided" data-testid="automation-decided">
-          <span class="automation-status__decided-label">Ausschlaggebend</span>
-          <span class="automation-status__decided-text">{mode.decidedBy}</span>
+          <span class="automation-status__decided-label">{t('Ausschlaggebend', 'Decisive')}</span>
+          <span class="automation-status__decided-text">{tServer(mode.decidedBy)}</span>
         </p>
       )}
       {/* Reason chips only when there is no single "Ausschlaggebend" line —
@@ -136,11 +157,11 @@ export function AutomationStatusCard(props: {
       {mode?.decidedBy === undefined && (
         <div class="automation-status__chips" data-testid="automation-reasons">
           {reasons.length === 0 ? (
-            <span class="reason-chip reason-chip--muted">keine Begründung</span>
+            <span class="reason-chip reason-chip--muted">{t('keine Begründung', 'no reasoning')}</span>
           ) : (
             reasons.map((r) => (
               <span key={r} class="reason-chip" data-testid="reason-chip">
-                {r}
+                {tServer(r)}
               </span>
             ))
           )}
@@ -186,35 +207,55 @@ function AutomationExplanation(props: { snapshot: DashboardSnapshot }): JSX.Elem
 
   const roomName = (windowId: string): string => {
     const r = rooms.find((rm) => rm.nextAction?.windowId === windowId);
-    return r?.name ?? `Fenster …${windowId.slice(-4)}`;
+    return r?.name ?? `${t('Fenster', 'Window')} …${windowId.slice(-4)}`;
   };
 
   const overrides: string[] = [];
   if (snap.automationEnabled === false) {
-    overrides.push('Automatik ist AUS — alle Positionen werden gehalten.');
+    overrides.push(
+      t(
+        'Automatik ist AUS — alle Positionen werden gehalten.',
+        'Automation is OFF — all positions are held.',
+      ),
+    );
   }
   if (snap.userIntent?.paused === true) {
-    overrides.push('Manuell pausiert — keine automatischen Fahrten.');
+    overrides.push(
+      t('Manuell pausiert — keine automatischen Fahrten.', 'Manually paused — no automatic moves.'),
+    );
   }
   if (snap.userIntent?.vacation === true) {
-    overrides.push('Urlaubsmodus aktiv — Komfortschwellen abgesenkt.');
+    overrides.push(
+      t(
+        'Urlaubsmodus aktiv — Komfortschwellen abgesenkt.',
+        'Vacation mode active — comfort thresholds lowered.',
+      ),
+    );
   }
   if (snap.storm?.holdUntil != null) {
-    overrides.push('STURM-Halt aktiv — Sicherheitsposition hat Vorrang vor allem.');
+    overrides.push(
+      t(
+        'STURM-Halt aktiv — Sicherheitsposition hat Vorrang vor allem.',
+        'STORM hold active — the safe position takes precedence over everything.',
+      ),
+    );
   }
+
+  const modeLegend = buildModeLegend();
+  const buckets = buildHeatIndexBuckets();
 
   return (
     <div class="automation-explain" data-testid="automation-explain">
       <section class="automation-explain__block">
-        <h4>1 · Aktuelle Messlage</h4>
+        <h4>{t('1 · Aktuelle Messlage', '1 · Current readings')}</h4>
         <dl class="automation-explain__grid">
-          <ExplainRow label="Außentemperatur" value={formatSignal(sig?.outdoorTemp.value ?? null, '°C', 1)} />
-          <ExplainRow label="Tagesprognose (max)" value={formatSignal(sig?.forecastMaxTemp.value ?? null, '°C', 1)} />
-          <ExplainRow label="PV-Leistung" value={formatSignal(sig?.pvPower.value ?? null, 'kW', 1)} />
-          <ExplainRow label="Wind" value={formatWindKmh(sig?.windSpeed.value ?? null)} />
-          <ExplainRow label="Strahlung" value={formatSignal(sig?.radiation.value ?? null, 'W/m²', 0)} />
+          <ExplainRow label={t('Außentemperatur', 'Outdoor temperature')} value={formatSignal(sig?.outdoorTemp.value ?? null, '°C', 1)} />
+          <ExplainRow label={t('Tagesprognose (max)', 'Daily forecast (max)')} value={formatSignal(sig?.forecastMaxTemp.value ?? null, '°C', 1)} />
+          <ExplainRow label={t('PV-Leistung', 'PV power')} value={formatSignal(sig?.pvPower.value ?? null, 'kW', 1)} />
+          <ExplainRow label={t('Wind', 'Wind')} value={formatWindKmh(sig?.windSpeed.value ?? null)} />
+          <ExplainRow label={t('Strahlung', 'Radiation')} value={formatSignal(sig?.radiation.value ?? null, 'W/m²', 0)} />
           <ExplainRow
-            label="Wärmster Raum"
+            label={t('Wärmster Raum', 'Warmest room')}
             value={
               warmest === null || warmest.indoorTempC === null
                 ? '–'
@@ -225,27 +266,27 @@ function AutomationExplanation(props: { snapshot: DashboardSnapshot }): JSX.Elem
       </section>
 
       <section class="automation-explain__block">
-        <h4>2 · Entscheidung</h4>
+        <h4>{t('2 · Entscheidung', '2 · Decision')}</h4>
         <p class="automation-explain__lead">
-          Modus <b>{mode?.label ?? '–'}</b>
-          {mode?.decidedBy !== undefined ? ` — ${mode.decidedBy}.` : '.'}
+          {t('Modus', 'Mode')} <b>{mode?.label !== undefined ? tServer(mode.label) : '–'}</b>
+          {mode?.decidedBy !== undefined ? ` — ${tServer(mode.decidedBy)}.` : '.'}
         </p>
-        {mode?.id !== undefined && MODE_LEGEND_DE[mode.id as Mode] !== undefined && (
-          <p class="automation-explain__text">{MODE_LEGEND_DE[mode.id as Mode]}</p>
+        {mode?.id !== undefined && modeLegend[mode.id as Mode] !== undefined && (
+          <p class="automation-explain__text">{modeLegend[mode.id as Mode]}</p>
         )}
       </section>
 
       <section class="automation-explain__block">
-        <h4>3 · Was jetzt passiert</h4>
-        <p class="automation-explain__text">{mode?.goal ?? 'warte auf Daten'}</p>
+        <h4>{t('3 · Was jetzt passiert', '3 · What happens now')}</h4>
+        <p class="automation-explain__text">{mode?.goal !== undefined ? tServer(mode.goal) : t('warte auf Daten', 'waiting for data')}</p>
         {actions.length === 0 ? (
-          <p class="automation-explain__muted">Aktuell sind keine Rollladenfahrten geplant.</p>
+          <p class="automation-explain__muted">{t('Aktuell sind keine Rollladenfahrten geplant.', 'No shutter moves are currently planned.')}</p>
         ) : (
           <ul class="automation-explain__actions">
             {actions.slice(0, 8).map((a) => (
               <li key={`${a.windowId}-${a.scheduledTs}`}>
                 <b>{roomName(a.windowId)}</b> → {actionPct(a.targetPercent)} %
-                <span class="automation-explain__reason"> · {a.reason}</span>
+                <span class="automation-explain__reason"> · {tServer(a.reason)}</span>
               </li>
             ))}
           </ul>
@@ -254,7 +295,7 @@ function AutomationExplanation(props: { snapshot: DashboardSnapshot }): JSX.Elem
 
       {overrides.length > 0 && (
         <section class="automation-explain__block">
-          <h4>4 · Aktive Übersteuerungen</h4>
+          <h4>{t('4 · Aktive Übersteuerungen', '4 · Active overrides')}</h4>
           <ul class="automation-explain__overrides">
             {overrides.map((o) => (
               <li key={o}>{o}</li>
@@ -264,20 +305,20 @@ function AutomationExplanation(props: { snapshot: DashboardSnapshot }): JSX.Elem
       )}
 
       <details class="automation-explain__glossary">
-        <summary>Modus-Glossar &amp; Komfortindex</summary>
+        <summary>{t('Modus-Glossar & Komfortindex', 'Mode glossary & comfort index')}</summary>
         <dl class="automation-explain__modes">
           {MODE_ORDER.map((m: Mode) => (
             <div
               key={m}
               class={`automation-explain__mode ${mode?.id === m ? 'automation-explain__mode--active' : ''}`}
             >
-              <dt>{MODE_LABELS_DE[m] ?? m}</dt>
-              <dd>{MODE_LEGEND_DE[m]}</dd>
+              <dt>{modeLabel(m)}</dt>
+              <dd>{modeLegend[m]}</dd>
             </div>
           ))}
         </dl>
         <ul class="automation-explain__buckets">
-          {HEAT_INDEX_BUCKETS.map((b) => (
+          {buckets.map((b) => (
             <li key={b.label}>
               <span class="automation-explain__range">
                 {b.from}–{b.to}
@@ -335,19 +376,19 @@ export function TemperatureChart(props: {
 
   const series: ChartSeries[] = [];
   if (outdoorPts.length > 0) {
-    series.push({ label: 'Außen', color: '#f59e0b', points: outdoorPts });
+    series.push({ label: t('Außen', 'Outdoor'), color: '#f59e0b', points: outdoorPts });
   }
   // Measured indoor average as a short solid anchor at "now".
   if (indoorAvg !== null) {
     series.push({
-      label: 'Innen gemessen',
+      label: t('Innen gemessen', 'Indoor measured'),
       color: '#e8edf6',
       points: [{ t: nowMs, v: indoorAvg }],
     });
   }
   if (withShadePts.length > 0) {
     series.push({
-      label: 'Innen mit Beschattung',
+      label: t('Innen mit Beschattung', 'Indoor with shading'),
       color: '#22c55e',
       dashed: true,
       points: withShadePts,
@@ -355,7 +396,7 @@ export function TemperatureChart(props: {
   }
   if (noShadePts.length > 0) {
     series.push({
-      label: 'Innen ohne Beschattung',
+      label: t('Innen ohne Beschattung', 'Indoor without shading'),
       color: '#ef4444',
       dashed: true,
       points: noShadePts,
@@ -365,11 +406,11 @@ export function TemperatureChart(props: {
   return (
     <section class="analysis-card" data-testid="temperature-chart">
       <header class="analysis-card__head">
-        <span class="analysis-card__title">Temperatur – Prognose mit/ohne Beschattung</span>
+        <span class="analysis-card__title">{t('Temperatur – Prognose mit/ohne Beschattung', 'Temperature – forecast with/without shading')}</span>
       </header>
       {hasForecast ? (
         <ExpandableChart
-          title="Temperatur – Prognose mit/ohne Beschattung"
+          title={t('Temperatur – Prognose mit/ohne Beschattung', 'Temperature – forecast with/without shading')}
           series={series}
           unit="°C"
           nowT={nowMs}
@@ -377,7 +418,7 @@ export function TemperatureChart(props: {
         />
       ) : (
         <p class="analysis-card__empty" data-testid="temperature-chart-empty">
-          warte auf Prognosedaten
+          {t('warte auf Prognosedaten', 'waiting for forecast data')}
         </p>
       )}
     </section>
@@ -395,9 +436,9 @@ export function PvHistoryChart(props: {
   return (
     <section class="analysis-card" data-testid="pv-history-chart">
       <header class="analysis-card__head">
-        <span class="analysis-card__title">PV-Tagesverlauf</span>
+        <span class="analysis-card__title">{t('PV-Tagesverlauf', 'PV day curve')}</span>
       </header>
-      <ExpandableChart title="PV-Tagesverlauf" series={[series]} unit="kW" />
+      <ExpandableChart title={t('PV-Tagesverlauf', 'PV day curve')} series={[series]} unit="kW" />
     </section>
   );
 }
@@ -408,7 +449,7 @@ export function HeatLoadChart(props: {
 }): JSX.Element {
   const traj = props.snapshot.trajectories;
   const series: ChartSeries = {
-    label: 'Wärmelast',
+    label: t('Wärmelast', 'Heat load'),
     color: '#a855f7',
     points: (traj?.heatLoadForecast ?? []).map((p) => ({
       t: Date.parse(p.ts),
@@ -418,9 +459,9 @@ export function HeatLoadChart(props: {
   return (
     <section class="analysis-card" data-testid="heat-load-chart">
       <header class="analysis-card__head">
-        <span class="analysis-card__title">Wärmelast-Prognose</span>
+        <span class="analysis-card__title">{t('Wärmelast-Prognose', 'Heat-load forecast')}</span>
       </header>
-      <ExpandableChart title="Wärmelast-Prognose" series={[series]} unit="%" nowT={props.now.getTime()} />
+      <ExpandableChart title={t('Wärmelast-Prognose', 'Heat-load forecast')} series={[series]} unit="%" nowT={props.now.getTime()} />
     </section>
   );
 }
@@ -468,9 +509,7 @@ export function ShutterTimeline(props: {
   const nowMs = props.now.getTime();
   const bucketTimes = Array.from({ length: STEPS }, (_, i) => nowMs + i * STEP_MS);
   const hourLabel = (ms: number, i: number): string =>
-    i === 0
-      ? 'Jetzt'
-      : new Date(ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    i === 0 ? t('Jetzt', 'Now') : fmtTime(ms);
   /** Planned shutter percent for a room at a given instant. */
   const percentAt = (r: RoomDetail, ms: number): number => {
     const action = r.nextAction;
@@ -485,10 +524,10 @@ export function ShutterTimeline(props: {
   return (
     <section class="analysis-card shutter-timeline" data-testid="shutter-heatmap">
       <header class="analysis-card__head">
-        <span class="analysis-card__title">Rollladen-Steuerung · nächste 12 h</span>
+        <span class="analysis-card__title">{t('Rollladen-Steuerung · nächste 12 h', 'Shutter control · next 12 h')}</span>
       </header>
       {props.rooms.length === 0 ? (
-        <p class="analysis-card__empty">warte auf Daten</p>
+        <p class="analysis-card__empty">{t('warte auf Daten', 'waiting for data')}</p>
       ) : (
         <div class="heatmap-grid">
           <div class="heatmap-row heatmap-row--head" data-testid="heatmap-head">
@@ -514,7 +553,7 @@ export function ShutterTimeline(props: {
                       class={`heatmap-cell ${future ? 'heatmap-cell--future' : ''}`}
                       data-future={future ? 'true' : 'false'}
                       style={{ background: heatmapColor(pct) }}
-                      title={`${hourLabel(ms, i)}: ${pct} % geschlossen`}
+                      title={`${hourLabel(ms, i)}: ${pct} % ${t('geschlossen', 'closed')}`}
                     />
                   );
                 })}

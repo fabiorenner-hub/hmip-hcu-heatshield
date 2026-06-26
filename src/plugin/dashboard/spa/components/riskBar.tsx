@@ -12,6 +12,7 @@
 
 import { h, type JSX } from 'preact';
 
+import { t } from '../i18n.js';
 import type { RiskFactorName, WindowRiskBreakdown } from '../types.js';
 
 const FACTOR_ORDER: RiskFactorName[] = [
@@ -36,15 +37,15 @@ const FACTOR_COLORS: Record<RiskFactorName, string> = {
   priorityFactor: '#8e8e8e',
 };
 
-const FACTOR_LABELS: Record<RiskFactorName, string> = {
-  sunFactor: 'Sun',
-  roomTempFactor: 'Room °C',
-  windowTypeFactor: 'Window type',
-  forecastTempFactor: 'Forecast °C',
-  pvFactor: 'PV',
-  radiationFactor: 'Radiation',
-  outdoorTempFactor: 'Outdoor °C',
-  priorityFactor: 'Priority',
+const FACTOR_LABELS: Record<RiskFactorName, () => string> = {
+  sunFactor: (): string => t('Sonne', 'Sun'),
+  roomTempFactor: (): string => t('Raum °C', 'Room °C'),
+  windowTypeFactor: (): string => t('Fenstertyp', 'Window type'),
+  forecastTempFactor: (): string => t('Vorhersage °C', 'Forecast °C'),
+  pvFactor: (): string => t('PV', 'PV'),
+  radiationFactor: (): string => t('Strahlung', 'Radiation'),
+  outdoorTempFactor: (): string => t('Außen °C', 'Outdoor °C'),
+  priorityFactor: (): string => t('Priorität', 'Priority'),
 };
 
 export interface RiskBarProps {
@@ -64,7 +65,7 @@ export function RiskBar(props: RiskBarProps): JSX.Element {
 
   return (
     <div class="risk-bar" data-testid="risk-bar">
-      <div class="risk-bar__track" role="img" aria-label={`Risk ${risk.toFixed(2)}`}>
+      <div class="risk-bar__track" role="img" aria-label={`${t('Risiko', 'Risk')} ${risk.toFixed(2)}`}>
         {segments.map((s) => (
           <div
             key={s.name}
@@ -74,7 +75,7 @@ export function RiskBar(props: RiskBarProps): JSX.Element {
               width: `${s.widthPct.toFixed(1)}%`,
               background: FACTOR_COLORS[s.name],
             }}
-            title={`${FACTOR_LABELS[s.name]}: factor=${s.factor.toFixed(2)}, weight=${s.weight.toFixed(2)}`}
+            title={`${FACTOR_LABELS[s.name]()}: factor=${s.factor.toFixed(2)}, weight=${s.weight.toFixed(2)}`}
           />
         ))}
       </div>

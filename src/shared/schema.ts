@@ -491,6 +491,9 @@ export const NotificationsSchema = z
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/u, 'Erwartet "HH:MM" im 24h-Format')
       .default('21:00'),
     dailySummaryEnabled: z.boolean().default(false),
+    /** Language for server-sent notifications (Telegram). UI language is
+     *  per-device; this is the installation-wide notification language. */
+    language: z.enum(['de', 'en']).default('de'),
     events: NotificationEventsSchema,
     forecastUpdates: ForecastUpdatesSchema,
   })

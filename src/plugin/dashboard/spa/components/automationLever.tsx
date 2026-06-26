@@ -17,6 +17,7 @@ import { h, type JSX } from 'preact';
 import { useState } from 'preact/hooks';
 
 import { snapshot } from '../store.js';
+import { t } from '../i18n.js';
 
 export function AutomationLever(): JSX.Element {
   const snap = snapshot.value;
@@ -38,7 +39,7 @@ export function AutomationLever(): JSX.Element {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler');
+      setError(err instanceof Error ? err.message : t('Fehler', 'Error'));
       setPending(null);
     }
   };
@@ -70,7 +71,9 @@ export function AutomationLever(): JSX.Element {
           <span class="automation-lever__knob" />
         </span>
         <span class="automation-lever__label">
-          {enabled ? 'Automatik AKTIV' : 'Automatik AUS — Konfigurationsmodus'}
+          {enabled
+            ? t('Automatik AKTIV', 'Automation ACTIVE')
+            : t('Automatik AUS — Konfigurationsmodus', 'Automation OFF — configuration mode')}
         </span>
       </button>
       {error !== null && (

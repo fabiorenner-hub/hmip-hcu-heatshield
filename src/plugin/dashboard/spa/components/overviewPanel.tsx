@@ -20,6 +20,7 @@ import {
   stalenessDot,
   type StalenessState,
 } from '../format.js';
+import { t } from '../i18n.js';
 import { snapshot } from '../store.js';
 import type { SignalValue } from '../types.js';
 
@@ -83,19 +84,19 @@ function SignalTile(props: TileProps): JSX.Element {
         <span
           class="overview-tile__waiting"
           data-testid={`${props.testId}-waiting`}
-          title="Quelle zugewiesen — warte auf Daten von der HCU/Solaranlage"
+          title={t('Quelle zugewiesen — warte auf Daten von der HCU/Solaranlage', 'Source assigned — waiting for data from the HCU/solar system')}
         >
-          {sig.state === 'stale' ? '⚠ Daten veraltet' : '… warte auf Daten'}
+          {sig.state === 'stale' ? t('⚠ Daten veraltet', '⚠ Data stale') : t('… warte auf Daten', '… waiting for data')}
         </span>
       ) : (
         <button
           type="button"
           class="overview-tile__missing"
           data-testid={`${props.testId}-missing`}
-          title="Quelle im Tab Quellen zuweisen"
+          title={t('Quelle im Tab Quellen zuweisen', 'Assign a source in the Sources tab')}
           onClick={(): void => navigate('/sources')}
         >
-          – Quelle zuweisen
+          {t('– Quelle zuweisen', '– Assign source')}
         </button>
       )}
       <span
@@ -119,10 +120,10 @@ export function OverviewPanel(): JSX.Element {
     <section class="overview-panel" data-testid="overview-panel">
       {/* Sun tile — computed, no staleness dot. */}
       <div class="overview-tile" data-testid="overview-tile-sun">
-        <span class="overview-tile__label">Sonne</span>
+        <span class="overview-tile__label">{t('Sonne', 'Sun')}</span>
         {sun !== undefined ? (
           <span class="overview-tile__value">
-            {compassLabel(sun.azimuthDeg)} {Math.round(sun.azimuthDeg)}° · Höhe{' '}
+            {compassLabel(sun.azimuthDeg)} {Math.round(sun.azimuthDeg)}° · {t('Höhe', 'Elevation')}{' '}
             {Math.round(sun.elevationDeg)}°
           </span>
         ) : (
@@ -132,7 +133,7 @@ export function OverviewPanel(): JSX.Element {
 
       {/* Feels-like tile — PV-led effective heat load. */}
       <div class="overview-tile overview-tile--accent" data-testid="overview-tile-feelslike">
-        <span class="overview-tile__label">Gefühlte Wärme</span>
+        <span class="overview-tile__label">{t('Gefühlte Wärme', 'Feels like')}</span>
         {feelsLike !== undefined ? (
           <span class="overview-tile__value" data-testid="overview-feelslike-value">
             {feelsLike.feelsLikeC !== null
@@ -140,7 +141,7 @@ export function OverviewPanel(): JSX.Element {
               : '–'}
             <span class="overview-tile__sub">
               {' '}
-              · Last {Math.round(feelsLike.effectiveLoad01 * 100)} %
+              · {t('Last', 'Load')} {Math.round(feelsLike.effectiveLoad01 * 100)} %
             </span>
           </span>
         ) : (
@@ -149,14 +150,14 @@ export function OverviewPanel(): JSX.Element {
       </div>
 
       <SignalTile
-        label="Außentemperatur"
+        label={t('Außentemperatur', 'Outdoor temperature')}
         signal={signals?.outdoorTemp}
         unit="°C"
         testId="overview-tile-outdoor"
         trendPerHour={trends?.outdoorCph ?? null}
       />
       <SignalTile
-        label="PV-Leistung (Sonne)"
+        label={t('PV-Leistung (Sonne)', 'PV power (sun)')}
         signal={signals?.pvPower}
         unit="kW"
         digits={2}
@@ -164,7 +165,7 @@ export function OverviewPanel(): JSX.Element {
         trendPerHour={trends?.pvKwph ?? null}
       />
       <SignalTile
-        label="Wind"
+        label={t('Wind', 'Wind')}
         signal={signals?.windSpeed}
         unit="km/h"
         scale={3.6}
@@ -172,14 +173,14 @@ export function OverviewPanel(): JSX.Element {
         testId="overview-tile-wind"
       />
       <SignalTile
-        label="Bewölkung"
+        label={t('Bewölkung', 'Cloud cover')}
         signal={signals?.forecastCloudCover}
         unit="%"
         digits={0}
         testId="overview-tile-cloud"
       />
       <SignalTile
-        label="Vorhersage Max"
+        label={t('Vorhersage Max', 'Forecast max')}
         signal={signals?.forecastMaxTemp}
         unit="°C"
         testId="overview-tile-forecast"

@@ -23,6 +23,7 @@ import { WeatherFacts } from '../components/dashboard/weatherFacts.js';
 import { WeatherCharts } from '../components/dashboard/weatherCharts.js';
 import { useConfig } from '../hooks/useConfig.js';
 import { snapshot } from '../store.js';
+import { t } from '../i18n.js';
 
 interface TrendSample {
   ts: string;
@@ -31,14 +32,15 @@ interface TrendSample {
 }
 
 interface RangeOption {
-  label: string;
+  labelDe: string;
+  labelEn: string;
   seconds: number;
 }
 
 const RANGES: RangeOption[] = [
-  { label: '6 Stunden', seconds: 6 * 3600 },
-  { label: '24 Stunden', seconds: 24 * 3600 },
-  { label: '3 Tage', seconds: 3 * 24 * 3600 },
+  { labelDe: '6 Stunden', labelEn: '6 hours', seconds: 6 * 3600 },
+  { labelDe: '24 Stunden', labelEn: '24 hours', seconds: 24 * 3600 },
+  { labelDe: '3 Tage', labelEn: '3 days', seconds: 3 * 24 * 3600 },
 ];
 
 // A small, colour-blind-friendly palette cycled across room series.
@@ -99,7 +101,7 @@ export function HistoryTab(): JSX.Element {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Unbekannter Fehler');
+          setError(err instanceof Error ? err.message : t('Unbekannter Fehler', 'Unknown error'));
         }
       } finally {
         if (!cancelled) {
@@ -126,15 +128,15 @@ export function HistoryTab(): JSX.Element {
     const series: ChartSeries[] = [];
     const outdoor = grouped.get('outdoor');
     if (outdoor !== undefined && outdoor.length > 0) {
-      series.push({ label: 'Außen', color: '#e2e8f0', points: outdoor });
+      series.push({ label: t('Außen', 'Outdoor'), color: '#e2e8f0', points: outdoor });
     }
     const front = grouped.get('outdoorFront');
     if (front !== undefined && front.length > 0) {
-      series.push({ label: 'Außen vorne', color: '#94a3b8', points: front });
+      series.push({ label: t('Außen vorne', 'Outdoor front'), color: '#94a3b8', points: front });
     }
     const back = grouped.get('outdoorBack');
     if (back !== undefined && back.length > 0) {
-      series.push({ label: 'Außen hinten', color: '#64748b', points: back });
+      series.push({ label: t('Außen hinten', 'Outdoor back'), color: '#64748b', points: back });
     }
     let ci = 0;
     for (const [key, pts] of grouped) {
@@ -157,7 +159,7 @@ export function HistoryTab(): JSX.Element {
     if (pv === undefined || pv.length === 0) {
       return [];
     }
-    return [{ label: 'PV-Leistung', color: '#f59e0b', points: pv }];
+    return [{ label: t('PV-Leistung', 'PV power'), color: '#f59e0b', points: pv }];
   }, [grouped]);
 
   // Combined "12 h zurück + 12 h voraus" series: measured history (solid)
@@ -172,13 +174,13 @@ export function HistoryTab(): JSX.Element {
       (p) => p.t >= past12Ms && p.t <= nowMs,
     );
     if (outdoorPast.length > 0) {
-      out.push({ label: 'Außen gemessen', color: '#f59e0b', points: outdoorPast });
+      out.push({ label: t('Außen gemessen', 'Outdoor measured'), color: '#f59e0b', points: outdoorPast });
     }
     const outdoorFc = fcCards
       .map((c) => ({ t: Date.parse(c.ts), v: c.tempC }))
       .filter((p) => Number.isFinite(p.t) && p.t >= nowMs);
     if (outdoorFc.length > 0) {
-      out.push({ label: 'Außen Prognose', color: '#fbbf24', dashed: true, points: outdoorFc });
+      out.push({ label: t('Außen Prognose', 'Outdoor forecast'), color: '#fbbf24', dashed: true, points: outdoorFc });
     }
     return out;
   }, [grouped, fcCards, nowMs, past12Ms]);
@@ -187,14 +189,14 @@ export function HistoryTab(): JSX.Element {
     const out: ChartSeries[] = [];
     const pvPast = (grouped.get('pv') ?? []).filter((p) => p.t >= past12Ms && p.t <= nowMs);
     if (pvPast.length > 0) {
-      out.push({ label: 'PV gemessen', color: '#f59e0b', points: pvPast });
+      out.push({ label: t('PV gemessen', 'PV measured'), color: '#f59e0b', points: pvPast });
     }
     const pvFc = fcCards
       .filter((c) => c.pvForecastKw !== undefined)
       .map((c) => ({ t: Date.parse(c.ts), v: c.pvForecastKw as number }))
       .filter((p) => Number.isFinite(p.t) && p.t >= nowMs);
     if (pvFc.length > 0) {
-      out.push({ label: 'PV erwartet', color: '#38bdf8', dashed: true, points: pvFc });
+      out.push({ label: t('PV erwartet', 'PV expected'), color: '#38bdf8', dashed: true, points: pvFc });
     }
     return out;
   }, [grouped, fcCards, nowMs, past12Ms]);
@@ -205,13 +207,14 @@ export function HistoryTab(): JSX.Element {
   return (
     <section class="module-panel tab-history" data-testid="tab-history">
       <header class="module-panel__head">
-        <h1>Wetter</h1>
-        <span class="module-panel__badge">Aktuell · Vorhersage · Radar · Wind · Verlauf</span>
+        <h1>{t('Wetter', 'Weather')}</h1>
+        <span class="module-panel__badge">{t('Aktuell · Vorhersage · Radar · Wind · Verlauf', 'Current · Forecast · Radar · Wind · History')}</span>
       </header>
       <p class="module-panel__intro">
-        Aktuelle Werte, die Vorhersage der nächsten 24 Stunden, Regenradar, Wind und
-        amtliche Unwetterwarnungen (DWD) für deinen Standort — darunter der gemessene
-        Verlauf und die Wirkung auf dein Haus.
+        {t(
+          'Aktuelle Werte, die Vorhersage der nächsten 24 Stunden, Regenradar, Wind und amtliche Unwetterwarnungen (DWD) für deinen Standort — darunter der gemessene Verlauf und die Wirkung auf dein Haus.',
+          'Current values, the forecast for the next 24 hours, rain radar, wind and official severe-weather warnings (DWD) for your location — plus the measured history and the impact on your house.',
+        )}
       </p>
 
       {/* 1) Warnungen zuerst */}
@@ -227,18 +230,16 @@ export function HistoryTab(): JSX.Element {
           now={now}
           hours={24}
           showActions={false}
-          titlePrefix="Wettervorhersage"
+          titlePrefix={t('Wettervorhersage', 'Weather forecast')}
         />
       )}
 
-      {/* 4) Regenradar + Wind */}
-      <div class="weather-grid" data-testid="weather-grid">
-        <RadarMap latitude={latitude} longitude={longitude} />
-        <div class="weather-grid__side">
-          <WindRose latitude={latitude} longitude={longitude} />
-          <WindOutlook latitude={latitude} longitude={longitude} />
-        </div>
+      {/* 4) Wind (kompakt, volle Breite) + Regenradar (volle Breite darunter) */}
+      <div class="weather-wind" data-testid="weather-wind">
+        <WindRose latitude={latitude} longitude={longitude} />
+        <WindOutlook latitude={latitude} longitude={longitude} />
       </div>
+      <RadarMap latitude={latitude} longitude={longitude} />
 
       {/* 5) Diagramme (dive deep) */}
       <WeatherCharts latitude={latitude} longitude={longitude} />
@@ -246,34 +247,34 @@ export function HistoryTab(): JSX.Element {
       {/* 6) Gemessen + Prognose im Vergleich */}
       {snap !== null && (hasCombinedTemp || hasCombinedPv) && (
         <div class="forecast-section" data-testid="combined-section">
-          <h2 class="forecast-section__title">12 h zurück + 12 h voraus</h2>
+          <h2 class="forecast-section__title">{t('12 h zurück + 12 h voraus', '12 h back + 12 h ahead')}</h2>
           <div class="forecast-section__charts">
             <article class="module-panel__card">
-              <h3>Temperatur</h3>
+              <h3>{t('Temperatur', 'Temperature')}</h3>
               {hasCombinedTemp ? (
                 <ExpandableChart
-                  title="Temperatur · 12 h zurück + 12 h voraus"
-                  subtitle="durchgezogen = gemessen · gestrichelt = Prognose"
+                  title={t('Temperatur · 12 h zurück + 12 h voraus', 'Temperature · 12 h back + 12 h ahead')}
+                  subtitle={t('durchgezogen = gemessen · gestrichelt = Prognose', 'solid = measured · dashed = forecast')}
                   series={combinedTempSeries}
                   unit="°C"
                   nowT={nowMs}
                 />
               ) : (
-                <p class="module-panel__hint">Noch keine Verlaufsdaten.</p>
+                <p class="module-panel__hint">{t('Noch keine Verlaufsdaten.', 'No history data yet.')}</p>
               )}
             </article>
             <article class="module-panel__card">
-              <h3>PV-Leistung</h3>
+              <h3>{t('PV-Leistung', 'PV power')}</h3>
               {hasCombinedPv ? (
                 <ExpandableChart
-                  title="PV-Leistung · 12 h zurück + 12 h voraus"
-                  subtitle="durchgezogen = gemessen · gestrichelt = erwartet (aus Strahlung)"
+                  title={t('PV-Leistung · 12 h zurück + 12 h voraus', 'PV power · 12 h back + 12 h ahead')}
+                  subtitle={t('durchgezogen = gemessen · gestrichelt = erwartet (aus Strahlung)', 'solid = measured · dashed = expected (from radiation)')}
                   series={combinedPvSeries}
                   unit="kW"
                   nowT={nowMs}
                 />
               ) : (
-                <p class="module-panel__hint">Noch keine Verlaufsdaten.</p>
+                <p class="module-panel__hint">{t('Noch keine Verlaufsdaten.', 'No history data yet.')}</p>
               )}
             </article>
           </div>
@@ -283,7 +284,7 @@ export function HistoryTab(): JSX.Element {
       {/* 7) Gemessener Verlauf */}
       <div class="tab-history__verlauf">
         <header class="tab-history__header">
-          <h2>Verlauf</h2>
+          <h2>{t('Verlauf', 'History')}</h2>
           <div class="tab-history__ranges" role="tablist">
             {RANGES.map((r) => (
               <button
@@ -295,7 +296,7 @@ export function HistoryTab(): JSX.Element {
                 data-testid={`history-range-${r.seconds}`}
                 onClick={(): void => setSeconds(r.seconds)}
               >
-                {r.label}
+                {t(r.labelDe, r.labelEn)}
               </button>
             ))}
           </div>
@@ -303,33 +304,33 @@ export function HistoryTab(): JSX.Element {
 
         {error !== null && (
           <p class="tab-history__error" data-testid="history-error">
-            Fehler beim Laden: {error}
+            {t('Fehler beim Laden:', 'Error loading:')} {error}
           </p>
         )}
-        {loading && samples === null && <p>Lade Verlauf…</p>}
+        {loading && samples === null && <p>{t('Lade Verlauf…', 'Loading history…')}</p>}
 
         <article class="tab-history__chart-card module-panel__card">
-          <h3>Temperaturen</h3>
-          <ExpandableChart title="Temperaturen · Verlauf" series={tempSeries} unit="°C" />
+          <h3>{t('Temperaturen', 'Temperatures')}</h3>
+          <ExpandableChart title={t('Temperaturen · Verlauf', 'Temperatures · History')} series={tempSeries} unit="°C" />
         </article>
 
         <article class="tab-history__chart-card module-panel__card">
-          <h3>PV-Leistung</h3>
-          <ExpandableChart title="PV-Leistung · Verlauf" series={pvSeries} unit="kW" />
+          <h3>{t('PV-Leistung', 'PV power')}</h3>
+          <ExpandableChart title={t('PV-Leistung · Verlauf', 'PV power · History')} series={pvSeries} unit="kW" />
         </article>
       </div>
 
       {/* 8) Haus-Bezug: Innenraum-Prognose + Wirkung (klar abgetrennt) */}
       {snap !== null && (
         <div class="forecast-section" data-testid="forecast-section">
-          <h2 class="forecast-section__title">Innenraum-Prognose</h2>
+          <h2 class="forecast-section__title">{t('Innenraum-Prognose', 'Indoor forecast')}</h2>
           <div class="forecast-section__charts">
             <article class="module-panel__card">
-              <h3>Innentemperatur-Prognose</h3>
+              <h3>{t('Innentemperatur-Prognose', 'Indoor temperature forecast')}</h3>
               <TemperatureChart snapshot={snap} now={now} />
             </article>
             <article class="module-panel__card">
-              <h3>Wärmelast-Prognose</h3>
+              <h3>{t('Wärmelast-Prognose', 'Heat-load forecast')}</h3>
               <HeatLoadChart snapshot={snap} now={now} />
             </article>
           </div>
@@ -338,62 +339,72 @@ export function HistoryTab(): JSX.Element {
 
       {snap !== null && snap.impact !== undefined && (
         <div class="forecast-section" data-testid="impact-section">
-          <h2 class="forecast-section__title">Wirkung</h2>
+          <h2 class="forecast-section__title">{t('Wirkung', 'Impact')}</h2>
           <div class="forecast-section__charts">
             <article class="module-panel__card">
-              <h3>Komfort gehalten (heute)</h3>
+              <h3>{t('Komfort gehalten (heute)', 'Comfort held (today)')}</h3>
               <p class="module-panel__metric">
                 {snap.impact.comfortShareToday01 === null
                   ? '–'
                   : `${Math.round(snap.impact.comfortShareToday01 * 100)} %`}
               </p>
               <p class="module-panel__hint">
-                Anteil der Regelzyklen heute, in denen kein Raum über seiner
-                Warnschwelle lag.
+                {t(
+                  'Anteil der Regelzyklen heute, in denen kein Raum über seiner Warnschwelle lag.',
+                  'Share of control cycles today in which no room was above its warning threshold.',
+                )}
               </p>
             </article>
             <article class="module-panel__card">
-              <h3>Ø Rollladenfahrten / Tag</h3>
+              <h3>{t('Ø Rollladenfahrten / Tag', 'Avg. shutter moves / day')}</h3>
               <p class="module-panel__metric">
                 {snap.impact.avgMovesPerDay === null ? '–' : snap.impact.avgMovesPerDay}
               </p>
               <p class="module-panel__hint">
-                Gelernt über {snap.impact.learnDays} Tag(e). Ziel: so wenige
-                Bewegungen wie nötig.
+                {t(
+                  `Gelernt über ${snap.impact.learnDays} Tag(e). Ziel: so wenige Bewegungen wie nötig.`,
+                  `Learned over ${snap.impact.learnDays} day(s). Goal: as few moves as necessary.`,
+                )}
               </p>
             </article>
             <article class="module-panel__card">
-              <h3>PV-Eigenverbrauch</h3>
+              <h3>{t('PV-Eigenverbrauch', 'PV self-consumption')}</h3>
               <p class="module-panel__metric">
                 {snap.impact.pvSelfUse01 === undefined
                   ? '–'
                   : `${Math.round(snap.impact.pvSelfUse01 * 100)} %`}
               </p>
               <p class="module-panel__hint">
-                Anteil der PV-Erzeugung, der im Haus genutzt statt eingespeist
-                wird.
+                {t(
+                  'Anteil der PV-Erzeugung, der im Haus genutzt statt eingespeist wird.',
+                  'Share of PV generation used in the house instead of being fed into the grid.',
+                )}
               </p>
             </article>
             <article class="module-panel__card">
-              <h3>Selbstlernend</h3>
+              <h3>{t('Selbstlernend', 'Self-learning')}</h3>
               <p class="module-panel__metric">
                 {snap.impact.tunedRooms + snap.impact.calibratedRooms}
               </p>
               <p class="module-panel__hint">
-                {snap.impact.tunedRooms} Komfort- und {snap.impact.calibratedRooms}{' '}
-                Trägheits-Anpassung(en) aktiv.
+                {t(
+                  `${snap.impact.tunedRooms} Komfort- und ${snap.impact.calibratedRooms} Trägheits-Anpassung(en) aktiv.`,
+                  `${snap.impact.tunedRooms} comfort and ${snap.impact.calibratedRooms} inertia adjustment(s) active.`,
+                )}
               </p>
             </article>
             <article class="module-panel__card">
-              <h3>Prognosegüte</h3>
+              <h3>{t('Prognosegüte', 'Forecast accuracy')}</h3>
               <p class="module-panel__metric">
                 {snap.impact.forecastAccuracyC === undefined
                   ? '–'
                   : `± ${snap.impact.forecastAccuracyC} °C`}
               </p>
               <p class="module-panel__hint">
-                Mittlerer Fehler zwischen vorhergesagtem und tatsächlichem
-                Innen-Peak (kleiner = besser).
+                {t(
+                  'Mittlerer Fehler zwischen vorhergesagtem und tatsächlichem Innen-Peak (kleiner = besser).',
+                  'Mean error between the predicted and actual indoor peak (smaller = better).',
+                )}
               </p>
             </article>
           </div>

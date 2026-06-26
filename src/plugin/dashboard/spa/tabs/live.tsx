@@ -21,6 +21,7 @@ import { windowDisplayName } from '../format.js';
 import { useConfig } from '../hooks/useConfig.js';
 import { useLearning } from '../hooks/useLearning.js';
 import { connectionState, riskBreakdowns, snapshot } from '../store.js';
+import { t } from '../i18n.js';
 
 const WINDOW_PALETTE = [
   '#ef5350',
@@ -59,7 +60,7 @@ export function LiveTab(props: LiveTabProps = {}): JSX.Element {
   const stormHoldActive =
     snap?.storm.holdUntil !== null && snap?.storm.holdUntil !== undefined;
   const stormSubtitleProp = stormHoldActive
-    ? { stormSubtitle: 'Sturmschutz aktiv' }
+    ? { stormSubtitle: t('Sturmschutz aktiv', 'Storm protection active') }
     : {};
 
   const lat = config?.location.latitude ?? props.latitude ?? DEFAULT_LAT;
@@ -102,12 +103,12 @@ export function LiveTab(props: LiveTabProps = {}): JSX.Element {
             />
           ))}
           {(snap?.windows ?? []).length === 0 && (
-            <p class="tab-live__empty">Noch keine Fenster konfiguriert.</p>
+            <p class="tab-live__empty">{t('Noch keine Fenster konfiguriert.', 'No windows configured yet.')}</p>
           )}
         </div>
 
         <aside class="tab-live__sun">
-          <h3>Sonnenstand</h3>
+          <h3>{t('Sonnenstand', 'Sun position')}</h3>
           <SunPolarPlot
             latitude={lat}
             longitude={lon}
@@ -118,7 +119,7 @@ export function LiveTab(props: LiveTabProps = {}): JSX.Element {
 
       {config !== null && sunRules !== undefined && config.windows.length > 0 && (
         <section class="tab-live__window-sun" data-testid="live-window-sun">
-          <h3>Fenster &amp; Sonne</h3>
+          <h3>{t('Fenster & Sonne', 'Windows & Sun')}</h3>
           <div class="window-sun-grid">
             {config.windows.map((w) => (
               <WindowSunCard

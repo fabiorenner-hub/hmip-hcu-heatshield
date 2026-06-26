@@ -11,12 +11,20 @@
 import { h, type JSX } from 'preact';
 
 import { actionCategory } from './forecastTimeline.js';
+import { t, tServer } from '../../i18n.js';
 import type { DashboardSnapshot, FacadeKey, RoomDetail } from '../../types.js';
 
 const FACADE_ORDER: FacadeKey[] = ['N', 'E', 'S', 'W'];
-const FACADE_LABEL: Record<FacadeKey, string> = { N: 'NORD', E: 'OST', S: 'SÜD', W: 'WEST' };
+const FACADE_LABEL_DE: Record<FacadeKey, string> = { N: 'NORD', E: 'OST', S: 'SÜD', W: 'WEST' };
+const FACADE_LABEL_EN: Record<FacadeKey, string> = { N: 'NORTH', E: 'EAST', S: 'SOUTH', W: 'WEST' };
 const TREND_ARROW: Record<RoomDetail['trend'], string> = { up: '↑', down: '↓', flat: '→' };
-const STATUS_LABEL: Record<string, string> = {
+
+/** Bilingual facade label (Nord/Ost/Süd/West → North/East/South/West). */
+function facadeLabel(k: FacadeKey): string {
+  return t(FACADE_LABEL_DE[k], FACADE_LABEL_EN[k]);
+}
+
+const STATUS_LABEL_DE: Record<string, string> = {
   recommended: 'empfohlen',
   scheduled: 'geplant',
   executing: 'läuft',
@@ -24,6 +32,21 @@ const STATUS_LABEL: Record<string, string> = {
   blocked: 'blockiert',
   manuallyOverridden: 'manuell',
 };
+const STATUS_LABEL_EN: Record<string, string> = {
+  recommended: 'recommended',
+  scheduled: 'scheduled',
+  executing: 'running',
+  completed: 'done',
+  blocked: 'blocked',
+  manuallyOverridden: 'manual',
+};
+
+/** Bilingual planned-action status label. */
+function statusLabel(status: string): string {
+  const de = STATUS_LABEL_DE[status];
+  const en = STATUS_LABEL_EN[status];
+  return de !== undefined && en !== undefined ? t(de, en) : status;
+}
 
 /** Clamp a percent into a sane 0–100 integer for display. */
 function pct(v: number): number {
@@ -62,7 +85,7 @@ export function RoomsAndFacadesPanel(props: {
 
   return (
     <section class="rooms-panel" data-testid="rooms-panel">
-      <h2 class="rooms-panel__title">Räume &amp; Fassaden</h2>
+      <h2 class="rooms-panel__title">{t('Räume & Fassaden', 'Rooms & facades')}</h2>
 
       <div class="facade-map" data-testid="facade-map">
         {FACADE_ORDER.map((k) => (
@@ -72,7 +95,7 @@ export function RoomsAndFacadesPanel(props: {
             data-facade={k}
             data-strongest={k === strongest ? 'true' : 'false'}
           >
-            <span class="facade-tile__dir">{FACADE_LABEL[k]}</span>
+            <span class="facade-tile__dir">{facadeLabel(k)}</span>
             <span class="facade-tile__pct">{facades ? `${pct(facades[k])} %` : '– %'}</span>
           </div>
         ))}
@@ -91,19 +114,19 @@ export function RoomsAndFacadesPanel(props: {
           </colgroup>
           <thead>
             <tr>
-              <th>Raum</th>
-              <th>Fassade</th>
-              <th>Rollladen</th>
-              <th>Innen</th>
-              <th>Trend</th>
-              <th>Nächste Aktion</th>
-              <th>Status</th>
+              <th>{t('Raum', 'Room')}</th>
+              <th>{t('Fassade', 'Facade')}</th>
+              <th>{t('Rollladen', 'Shutter')}</th>
+              <th>{t('Innen', 'Indoor')}</th>
+              <th>{t('Trend', 'Trend')}</th>
+              <th>{t('Nächste Aktion', 'Next action')}</th>
+              <th>{t('Status', 'Status')}</th>
             </tr>
           </thead>
           <tbody>
             {rooms.length === 0 ? (
               <tr>
-                <td colSpan={7} class="rooms-table__empty">warte auf Daten</td>
+                <td colSpan={7} class="rooms-table__empty">{t('warte auf Daten', 'waiting for data')}</td>
               </tr>
             ) : (
               rooms.map((r) => (
@@ -114,7 +137,7 @@ export function RoomsAndFacadesPanel(props: {
                     )}
                     <span class="rooms-table__room-name">{r.name}</span>
                   </td>
-                  <td>{FACADE_LABEL[r.facade]}</td>
+                  <td>{facadeLabel(r.facade)}</td>
                   <td>
                     <div class="shutter-bar" data-testid="shutter-bar">
                       <div
@@ -135,7 +158,7 @@ export function RoomsAndFacadesPanel(props: {
                       <span
                         class={`action-chip action--${actionCategory(r.nextAction)}`}
                         data-category={actionCategory(r.nextAction)}
-                        title={r.nextAction.reason}
+                        title={tServer(r.nextAction.reason)}
                       >
                         {pct(r.nextAction.targetPercent)} %
                       </span>
@@ -143,7 +166,7 @@ export function RoomsAndFacadesPanel(props: {
                   </td>
                   <td>
                     <span class={`status-pill status--${r.status}`}>
-                      {STATUS_LABEL[r.status] ?? r.status}
+                      {statusLabel(r.status)}
                     </span>
                   </td>
                 </tr>

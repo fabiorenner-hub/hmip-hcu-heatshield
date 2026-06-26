@@ -20,6 +20,7 @@ import { LineChart } from '../lineChart.js';
 import { Portal } from '../portal.js';
 import { Icon } from '../icons.js';
 import { formatSignal } from '../../format.js';
+import { t } from '../../i18n.js';
 import type { DashboardSnapshot } from '../../types.js';
 
 const DASH = '–';
@@ -113,21 +114,21 @@ function useTrendSparklines(seconds = 21600): TrendSparklines {
   return data;
 }
 
-/** Comfort label for an indoor average temperature (German). */
+/** Comfort label for an indoor average temperature. */
 function comfortLabel(avg: number | null): string {
   if (avg === null) {
-    return 'warte auf Daten';
+    return t('warte auf Daten', 'waiting for data');
   }
   if (avg < 20) {
-    return 'kühl';
+    return t('kühl', 'cool');
   }
   if (avg <= 24) {
-    return 'komfortabel';
+    return t('komfortabel', 'comfortable');
   }
   if (avg <= 26) {
-    return 'leicht warm';
+    return t('leicht warm', 'slightly warm');
   }
-  return 'zu warm';
+  return t('zu warm', 'too warm');
 }
 
 /** PV power card with self-use %, a sparkline and the PV-Sonnenindex ring. */
@@ -145,7 +146,7 @@ export function PvPowerCard(props: {
   return (
     <section class="kpi-card kpi-card--pv" data-testid="card-pv">
       <header class="kpi-card__head">
-        <span class="kpi-card__title">PV-Leistung</span>
+        <span class="kpi-card__title">{t('PV-Leistung', 'PV power')}</span>
         <Icon name="pv" size={18} class="kpi-card__icon" />
       </header>
       <div class="kpi-card__value" data-testid="card-pv-value">
@@ -153,22 +154,22 @@ export function PvPowerCard(props: {
       </div>
       {showSelfUse && (
         <p class="kpi-card__selfuse" data-testid="card-pv-selfuse">
-          {Math.round((selfUse as number) * 100)} % Eigenverbrauch
+          {Math.round((selfUse as number) * 100)} % {t('Eigenverbrauch', 'self-use')}
         </p>
       )}
       {history.length >= 2 && (
-        <Sparkline values={history} color={PV_COLOR} testId="pv-sparkline" label="PV-Leistung" unit="kW" />
+        <Sparkline values={history} color={PV_COLOR} testId="pv-sparkline" label={t('PV-Leistung', 'PV power')} unit="kW" />
       )}
       <dl class="kpi-card__meta">
         <div>
-          <dt>PV-Sonnenindex</dt>
+          <dt>{t('PV-Sonnenindex', 'PV sun index')}</dt>
           <dd data-testid="card-pv-index">
             {idx === undefined ? DASH : `${Math.round(idx * 100)} %`}
           </dd>
         </div>
         {todayKwh !== undefined && Number.isFinite(todayKwh) && (
           <div>
-            <dt>Heute</dt>
+            <dt>{t('Heute', 'Today')}</dt>
             <dd data-testid="card-pv-today">{Math.round(todayKwh * 10) / 10} kWh</dd>
           </div>
         )}
@@ -231,8 +232,8 @@ function Sparkline(props: {
       <button
         type="button"
         class="sparkline-expand"
-        title={`${props.label} vergrößern`}
-        aria-label={`${props.label} vergrößern`}
+        title={`${props.label} ${t('vergrößern', 'enlarge')}`}
+        aria-label={`${props.label} ${t('vergrößern', 'enlarge')}`}
         onClick={(): void => setOpen(true)}
       >
         {svg}
@@ -253,12 +254,12 @@ function Sparkline(props: {
               <header class="chart-modal__head">
                 <span class="chart-modal__title">
                   {props.label}
-                  <span class="chart-modal__subtitle">Verlauf (zuletzt)</span>
+                  <span class="chart-modal__subtitle">{t('Verlauf (zuletzt)', 'History (recent)')}</span>
                 </span>
                 <button
                   type="button"
                   class="chart-modal__close"
-                  aria-label="Schließen"
+                  aria-label={t('Schließen', 'Close')}
                   onClick={(): void => setOpen(false)}
                 >
                   ×
@@ -296,18 +297,18 @@ export function IndoorTemperatureCard(props: {
       : null;
   const peak = props.snapshot.indoorPeakTempC ?? null;
   const peakText =
-    peak !== null && Number.isFinite(peak) ? ` (Peak: ${Math.round(peak)} °C)` : '';
+    peak !== null && Number.isFinite(peak) ? ` (${t('Peak', 'Peak')}: ${Math.round(peak)} °C)` : '';
   return (
     <section class="kpi-card" data-testid="card-indoor">
       <header class="kpi-card__head">
-        <span class="kpi-card__title">Innentemperatur</span>
+        <span class="kpi-card__title">{t('Innentemperatur', 'Indoor temperature')}</span>
         <Icon name="haus" size={18} class="kpi-card__icon" />
       </header>
       <div class="kpi-card__value" data-testid="card-indoor-value">
         {avg === null ? DASH : `${avg} °C`}
       </div>
       {history.length >= 2 && (
-        <Sparkline values={history} color={INDOOR_COLOR} testId="indoor-sparkline" label="Innentemperatur" unit="°C" />
+        <Sparkline values={history} color={INDOOR_COLOR} testId="indoor-sparkline" label={t('Innentemperatur', 'Indoor temperature')} unit="°C" />
       )}
       <p class="kpi-card__hint" data-testid="card-indoor-comfort">
         {comfortLabel(avg)}
@@ -328,12 +329,12 @@ export function OutdoorTemperatureCard(props: {
   const forecastMax = props.snapshot.signals?.forecastMaxTemp?.value ?? null;
   const forecastText =
     forecastMax !== null && Number.isFinite(forecastMax)
-      ? `Forecast: ${Math.round(forecastMax)} °C`
+      ? `${t('Prognose', 'Forecast')}: ${Math.round(forecastMax)} °C`
       : null;
   const hasCompare =
     v !== null && Number.isFinite(v) && internet !== null && Number.isFinite(internet);
   const compareText = hasCompare
-    ? `Lokaler Sensor ${Math.round((v as number) * 10) / 10} °C · Wetterdienst ${
+    ? `${t('Lokaler Sensor', 'Local sensor')} ${Math.round((v as number) * 10) / 10} °C · ${t('Wetterdienst', 'Weather service')} ${
         Math.round((internet as number) * 10) / 10
       } °C`
     : null;
@@ -341,24 +342,24 @@ export function OutdoorTemperatureCard(props: {
     <section
       class="kpi-card"
       data-testid="card-outdoor"
-      title={compareText ?? 'Lokaler Sensor bevorzugt; Internet-Wert im Vergleich'}
+      title={compareText ?? t('Lokaler Sensor bevorzugt; Internet-Wert im Vergleich', 'Local sensor preferred; internet value for comparison')}
     >
       <header class="kpi-card__head">
-        <span class="kpi-card__title">Außentemperatur</span>
+        <span class="kpi-card__title">{t('Außentemperatur', 'Outdoor temperature')}</span>
         <Icon name="thermometer" size={18} class="kpi-card__icon" />
       </header>
       <div class="kpi-card__value" data-testid="card-outdoor-value">
         {v === null ? DASH : `${formatSignal(v, '°C')}`}
       </div>
       {history.length >= 2 && (
-        <Sparkline values={history} color={OUTDOOR_COLOR} testId="outdoor-sparkline" label="Außentemperatur" unit="°C" />
+        <Sparkline values={history} color={OUTDOOR_COLOR} testId="outdoor-sparkline" label={t('Außentemperatur', 'Outdoor temperature')} unit="°C" />
       )}
       <p class="kpi-card__hint" data-testid="card-outdoor-compare">
         {compareText !== null
           ? compareText
           : out?.state === 'fresh'
-            ? 'aktuell'
-            : 'warte auf Daten'}
+            ? t('aktuell', 'current')
+            : t('warte auf Daten', 'waiting for data')}
         {forecastText !== null ? ` (${forecastText})` : ''}
       </p>
     </section>
@@ -373,7 +374,7 @@ export function SunPositionCard(props: {
   return (
     <section class="kpi-card kpi-card--sun" data-testid="card-sun">
       <header class="kpi-card__head">
-        <span class="kpi-card__title">Sonnenstand</span>
+        <span class="kpi-card__title">{t('Sonnenstand', 'Sun position')}</span>
         <Icon name="sonne" size={18} class="kpi-card__icon" />
       </header>
       <div class="kpi-card__sunplot">
@@ -419,7 +420,7 @@ export function HeatIndexCard(props: { value0to10: number | null }): JSX.Element
   return (
     <section class="kpi-card kpi-card--heatindex" data-testid="card-heatindex">
       <header class="kpi-card__head">
-        <span class="kpi-card__title">Hitze-Index</span>
+        <span class="kpi-card__title">{t('Hitze-Index', 'Heat index')}</span>
         <Icon name="flamme" size={18} class="kpi-card__icon" />
       </header>
       <svg
@@ -427,7 +428,7 @@ export function HeatIndexCard(props: { value0to10: number | null }): JSX.Element
         viewBox={`0 0 ${size} ${size}`}
         data-testid="heatindex-ring"
         role="img"
-        aria-label={`Hitze-Index ${v === null ? 'unbekannt' : clamped}`}
+        aria-label={`${t('Hitze-Index', 'Heat index')} ${v === null ? t('unbekannt', 'unknown') : clamped}`}
       >
         <path
           d={arcPath(0, 1)}

@@ -16,6 +16,7 @@
 import { h, type JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
+import { t, locale } from '../i18n.js';
 import { Portal } from './portal.js';
 
 export interface ChartPoint {
@@ -63,8 +64,8 @@ function niceBounds(min: number, max: number): { lo: number; hi: number } {
   return { lo: min - pad, hi: max + pad };
 }
 
-function fmtTime(t: number): string {
-  return new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+function fmtTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function fmtVal(v: number, unit: string): string {
@@ -106,7 +107,7 @@ export function LineChart(props: LineChartProps): JSX.Element {
   if (allPoints.length === 0) {
     return (
       <div ref={ref} class="line-chart line-chart--empty" data-testid="line-chart-empty">
-        <p>Noch keine Verlaufsdaten.</p>
+        <p>{t('Noch keine Verlaufsdaten.', 'No history data yet.')}</p>
       </div>
     );
   }
@@ -316,7 +317,7 @@ export function LineChart(props: LineChartProps): JSX.Element {
             {s.label}
           </span>
         ))}
-        {unit !== '' && <span class="line-chart__unit">in {unit}</span>}
+        {unit !== '' && <span class="line-chart__unit">{t('in', 'in')} {unit}</span>}
       </figcaption>
     </figure>
   );
@@ -338,8 +339,8 @@ export function ExpandableChart(
       <button
         type="button"
         class="chart-expand__btn"
-        aria-label={`${title} vergrößern`}
-        title="Vergrößern"
+        aria-label={t(`${title} vergrößern`, `Enlarge ${title}`)}
+        title={t('Vergrößern', 'Enlarge')}
         onClick={(): void => setOpen(true)}
       >
         ⤢
@@ -366,7 +367,7 @@ export function ExpandableChart(
                 <button
                   type="button"
                   class="chart-modal__close"
-                  aria-label="Schließen"
+                  aria-label={t('Schließen', 'Close')}
                   onClick={(): void => setOpen(false)}
                 >
                   ×

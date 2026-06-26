@@ -13,6 +13,7 @@ import { h, type JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 
 import { ExpandableChart, type ChartSeries } from '../lineChart.js';
+import { t } from '../../i18n.js';
 
 interface HourRow {
   t: number;
@@ -157,33 +158,33 @@ export function WeatherCharts(props: {
 
   const tempSeries: ChartSeries[] = useMemo(() => {
     const out: ChartSeries[] = [];
-    out.push(...lineSeries('Temperatur', '#f59e0b', (r) => r.temp));
-    out.push(...lineSeries('Gefühlt', '#fb7185', (r) => r.apparent));
+    out.push(...lineSeries(t('Temperatur', 'Temperature'), '#f59e0b', (r) => r.temp));
+    out.push(...lineSeries(t('Gefühlt', 'Apparent'), '#fb7185', (r) => r.apparent));
     return out;
   }, [window]);
 
   const windSeries: ChartSeries[] = useMemo(() => {
     const out: ChartSeries[] = [];
-    out.push(...lineSeries('Wind', '#38bdf8', (r) => r.wind));
-    out.push(...lineSeries('Böen', '#818cf8', (r) => r.gust));
+    out.push(...lineSeries(t('Wind', 'Wind'), '#38bdf8', (r) => r.wind));
+    out.push(...lineSeries(t('Böen', 'Gusts'), '#818cf8', (r) => r.gust));
     return out;
   }, [window]);
 
-  const precipSeries = useMemo(() => lineSeries('Niederschlag', '#0ea5e9', (r) => r.precip), [window]);
-  const probSeries = useMemo(() => lineSeries('Wahrscheinlichkeit', '#6366f1', (r) => r.prob), [window]);
-  const cloudSeries = useMemo(() => lineSeries('Bewölkung', '#94a3b8', (r) => r.cloud), [window]);
-  const pressureSeries = useMemo(() => lineSeries('Luftdruck', '#a78bfa', (r) => r.pressure), [window]);
-  const humiditySeries = useMemo(() => lineSeries('Luftfeuchte', '#22d3ee', (r) => r.humidity), [window]);
-  const uvSeries = useMemo(() => lineSeries('UV-Index', '#f97316', (r) => r.uv), [window]);
-  const radiationSeries = useMemo(() => lineSeries('Globalstrahlung', '#facc15', (r) => r.radiation), [window]);
+  const precipSeries = useMemo(() => lineSeries(t('Niederschlag', 'Precipitation'), '#0ea5e9', (r) => r.precip), [window]);
+  const probSeries = useMemo(() => lineSeries(t('Wahrscheinlichkeit', 'Probability'), '#6366f1', (r) => r.prob), [window]);
+  const cloudSeries = useMemo(() => lineSeries(t('Bewölkung', 'Cloud cover'), '#94a3b8', (r) => r.cloud), [window]);
+  const pressureSeries = useMemo(() => lineSeries(t('Luftdruck', 'Air pressure'), '#a78bfa', (r) => r.pressure), [window]);
+  const humiditySeries = useMemo(() => lineSeries(t('Luftfeuchte', 'Humidity'), '#22d3ee', (r) => r.humidity), [window]);
+  const uvSeries = useMemo(() => lineSeries(t('UV-Index', 'UV index'), '#f97316', (r) => r.uv), [window]);
+  const radiationSeries = useMemo(() => lineSeries(t('Globalstrahlung', 'Global radiation'), '#facc15', (r) => r.radiation), [window]);
 
   const dailyTempSeries: ChartSeries[] = useMemo(() => {
     const days = data?.daily ?? [];
     const max = days.filter((d) => d.tMax !== null).map((d) => ({ t: d.t, v: d.tMax as number }));
     const min = days.filter((d) => d.tMin !== null).map((d) => ({ t: d.t, v: d.tMin as number }));
     const out: ChartSeries[] = [];
-    if (max.length >= 2) out.push({ label: 'Max', color: '#f59e0b', points: max });
-    if (min.length >= 2) out.push({ label: 'Min', color: '#38bdf8', points: min });
+    if (max.length >= 2) out.push({ label: t('Max', 'Max'), color: '#f59e0b', points: max });
+    if (min.length >= 2) out.push({ label: t('Min', 'Min'), color: '#38bdf8', points: min });
     return out;
   }, [data]);
 
@@ -204,7 +205,7 @@ export function WeatherCharts(props: {
           {...(withNow ? { nowT: now } : {})}
         />
       ) : (
-        <p class="module-panel__hint">Keine Daten.</p>
+        <p class="module-panel__hint">{t('Keine Daten.', 'No data.')}</p>
       )}
     </article>
   );
@@ -212,7 +213,7 @@ export function WeatherCharts(props: {
   return (
     <div class="weather-charts" data-testid="weather-charts">
       <header class="weather-charts__head">
-        <h2 class="forecast-section__title">Wettervorhersage · Diagramme</h2>
+        <h2 class="forecast-section__title">{t('Wettervorhersage · Diagramme', 'Weather forecast · charts')}</h2>
         <div class="weather-charts__ranges" role="tablist">
           {HOUR_RANGES.map((r) => (
             <button
@@ -231,20 +232,20 @@ export function WeatherCharts(props: {
       </header>
 
       {error && data === null && (
-        <p class="module-panel__hint">Vorhersagedaten konnten nicht geladen werden.</p>
+        <p class="module-panel__hint">{t('Vorhersagedaten konnten nicht geladen werden.', 'Forecast data could not be loaded.')}</p>
       )}
 
       <div class="weather-charts__grid">
-        {chart('Temperatur & gefühlt', tempSeries, '°C', 'wchart-temp')}
-        {chart('Niederschlag', precipSeries, 'mm', 'wchart-precip')}
-        {chart('Regenwahrscheinlichkeit', probSeries, '%', 'wchart-prob')}
-        {chart('Bewölkung', cloudSeries, '%', 'wchart-cloud')}
-        {chart('Wind & Böen', windSeries, 'km/h', 'wchart-wind')}
-        {chart('Globalstrahlung', radiationSeries, 'W/m²', 'wchart-radiation')}
-        {chart('UV-Index', uvSeries, '', 'wchart-uv')}
-        {chart('Luftdruck', pressureSeries, 'hPa', 'wchart-pressure')}
-        {chart('Luftfeuchte', humiditySeries, '%', 'wchart-humidity')}
-        {chart('Temperatur · 7 Tage (Min/Max)', dailyTempSeries, '°C', 'wchart-daily-temp', false)}
+        {chart(t('Temperatur & gefühlt', 'Temperature & apparent'), tempSeries, '°C', 'wchart-temp')}
+        {chart(t('Niederschlag', 'Precipitation'), precipSeries, 'mm', 'wchart-precip')}
+        {chart(t('Regenwahrscheinlichkeit', 'Rain probability'), probSeries, '%', 'wchart-prob')}
+        {chart(t('Bewölkung', 'Cloud cover'), cloudSeries, '%', 'wchart-cloud')}
+        {chart(t('Wind & Böen', 'Wind & gusts'), windSeries, 'km/h', 'wchart-wind')}
+        {chart(t('Globalstrahlung', 'Global radiation'), radiationSeries, 'W/m²', 'wchart-radiation')}
+        {chart(t('UV-Index', 'UV index'), uvSeries, '', 'wchart-uv')}
+        {chart(t('Luftdruck', 'Air pressure'), pressureSeries, 'hPa', 'wchart-pressure')}
+        {chart(t('Luftfeuchte', 'Humidity'), humiditySeries, '%', 'wchart-humidity')}
+        {chart(t('Temperatur · 7 Tage (Min/Max)', 'Temperature · 7 days (min/max)'), dailyTempSeries, '°C', 'wchart-daily-temp', false)}
       </div>
     </div>
   );

@@ -8,6 +8,7 @@
 import { h, type JSX } from 'preact';
 
 import { compassLabel } from '../format.js';
+import { t } from '../i18n.js';
 
 interface Props {
   value: number;
@@ -26,6 +27,21 @@ const POINTS: ReadonlyArray<{ deg: number; label: string }> = [
   { deg: 270, label: 'W' },
   { deg: 315, label: 'NW' },
 ];
+
+/** Bilingual display text for a compass point (the German label drives test ids). */
+function pointDisplay(label: string): string {
+  const en: Record<string, string> = {
+    N: 'N',
+    NO: 'NE',
+    O: 'E',
+    SO: 'SE',
+    S: 'S',
+    SW: 'SW',
+    W: 'W',
+    NW: 'NW',
+  };
+  return t(label, en[label] ?? label);
+}
 
 export function CompassPicker(props: Props): JSX.Element {
   const size = props.size ?? 120;
@@ -80,7 +96,7 @@ export function CompassPicker(props: Props): JSX.Element {
                   if (props.disabled !== true) props.onChange(p.deg);
                 }}
               >
-                {p.label}
+                {pointDisplay(p.label)}
               </text>
             </g>
           );

@@ -7,6 +7,8 @@
  * which is what the user reads off the HMIP app / device label.
  */
 
+import { t } from './i18n.js';
+
 export interface DeviceLike {
   deviceId: string;
   friendlyName?: string;
@@ -30,11 +32,12 @@ export function deviceLabel(d: DeviceLike): string {
   return `Gerät ${tail}`;
 }
 
-/** Compass label for an orientation in degrees (0 = N, clockwise). */
+/** Compass label for an orientation in degrees (0 = N, clockwise). Bilingual. */
 export function compassLabel(deg: number): string {
-  const dirs = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+  const de = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+  const en = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   const idx = Math.round((((deg % 360) + 360) % 360) / 45) % 8;
-  return dirs[idx] ?? 'S';
+  return t(de[idx] ?? 'S', en[idx] ?? 'S');
 }
 
 /** Format a cached feature value for compact display. */

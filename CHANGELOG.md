@@ -3,6 +3,54 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 1.18.0
+
+- **Premium-UI-Politur (Audit-getrieben).** Eine zentrale Normalisierungs-Schicht
+  vereinheitlicht das Design: gleiche Karten-Radien, Schatten und Abstände, eine
+  klare Typo-Skala (h1/h2/h3 + Karten-Titel) und einheitliche Form-Elemente
+  (Eingaben, Buttons, Chips/Badges). Bewusste Formen (Pills, Segment-Schalter,
+  runde Icon-Buttons, Toggles) bleiben erhalten.
+- **Lesbarkeit.** Zu kleine Mikro-Beschriftungen (8.5–10.5 px) auf eine
+  lesbare Mindestgröße (11 px) angehoben.
+- **Mobile-Fix.** Breite Tabellen (Quellen-Mapping, Diagnose, Automatik-Kaskade)
+  sprengen auf schmalen Screens nicht mehr das Layout, sondern scrollen sauber
+  horizontal innerhalb ihrer Karte.
+
+## 1.17.2
+
+- **Wetter-Tab kompakter.** Der Wind sitzt jetzt als kompakte Zeile (Windrose
+  horizontal + Ausblick) über dem Regenradar — über die volle Breite und nur so
+  hoch wie nötig. Das **Regenradar** liegt darunter über die ganze Breite. Die
+  zuvor leere Fläche neben/unter der Windrose ist weg.
+- **Fix: Pflanzentyp übersetzt.** Auf den Bewässerungs-Zonenkarten wurde der
+  Pflanzentyp als roher Wert (`lawn`, `hedge`, …) angezeigt; er erscheint jetzt
+  lokalisiert (Rasen, Hecke, …) — auch in der deutschen Version.
+
+## 1.17.1
+
+- **Einheitlicher Dark-Look.** Mehrere Bereiche trugen noch helle Stilreste aus
+  einem früheren Design (weiße Karten/Buttons mit dunkler Schrift): die
+  **Lern-Vorschläge** (Live), der **Geräte-Suche**-Status (Räume, Quellen,
+  Assistent), die **Szenen-Buttons** und **Übernehmen**-Schaltfläche der
+  Steuerung sowie **Sicherung importieren** in der Diagnose. Alle nutzen jetzt
+  die dunkle Token-Palette (Karten, Ränder, semantische Status-Töne) und passen
+  zum Premium-Dark-Look der übrigen Oberfläche.
+
+## 1.17.0
+
+- **Mehrsprachigkeit (Deutsch / English).** Das komplette Dashboard ist jetzt
+  zweisprachig. Die Sprache folgt automatisch der Browsersprache (Deutsch als
+  Fallback) und lässt sich unter **Einstellungen → Darstellung & Sprache** pro
+  Gerät fest auf **AUTO / Deutsch / English** stellen.
+- **Vollständig übersetzt.** Alle Tabs, Diagramme, Empfehlungen, Modus- und
+  Entscheidungs-Texte der Engine sowie Hinweise. Zahlen folgen dem jeweiligen
+  Sprachformat (Dezimaltrennzeichen); 24-h-Zeit und °C bleiben Standard.
+- **Benachrichtigungssprache.** Telegram-Nachrichten haben eine eigene,
+  installationsweite Sprachwahl (Standard Deutsch) in den Einstellungen.
+- **Windrose** vergrößert und überarbeitet (inkl. Bewölkungsanzeige).
+- **Ambient-Hintergrund-Schalter** von der Kopfzeile in die Einstellungen
+  verschoben.
+
 ## 1.16.8
 
 - **Update-Hinweis aus GitHub.** Das Plugin prüft die GitHub-Releases auf eine

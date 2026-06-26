@@ -1400,6 +1400,7 @@ describe('GET /api/config — token masking', () => {
       morningBriefLocalTime: '07:30',
       dailySummaryLocalTime: '21:00',
       dailySummaryEnabled: false,
+      language: 'de',
       events: { ventilate: true, open: true, close: true, weather: true },
       forecastUpdates: { enabled: false, everyHours: 3 },
     };

@@ -516,8 +516,8 @@ h3 {
 }
 
 .room-card__contact-clear:hover {
-  background: #fee2e2;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.18);
+  color: var(--color-danger);
 }
 
 .room-card > header {
@@ -866,9 +866,10 @@ h3 {
 
 .recommendation-panel {
   margin-top: 24px;
-  padding: 16px;
-  border-radius: 10px;
-  background: var(--color-surface, #f6f7fa);
+  padding: var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-card-border);
 }
 
 .recommendation-panel h3 {
@@ -887,20 +888,20 @@ h3 {
 
 .recommendation-panel__item {
   padding: 12px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius);
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .recommendation-panel__item--warn {
-  border-left: 4px solid #d6a700;
+  border-left: 4px solid var(--color-warn);
 }
 
 .recommendation-panel__item--info {
-  border-left: 4px solid #1c7fd6;
+  border-left: 4px solid var(--color-info);
 }
 
 .recommendation-panel__title {
@@ -926,7 +927,7 @@ h3 {
 .recommendation-panel__error {
   margin: 0;
   font-size: 12px;
-  color: #b30021;
+  color: var(--color-danger);
 }
 
 .recommendation-panel__actions {
@@ -948,21 +949,21 @@ h3 {
 }
 
 .discovery-status--ok {
-  background: #ecfdf5;
-  border-color: #6ee7b7;
-  color: #065f46;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #86efac;
 }
 
 .discovery-status--warn {
-  background: #fffbeb;
-  border-color: #fcd34d;
-  color: #92400e;
+  background: rgba(240, 179, 0, 0.12);
+  border-color: rgba(240, 179, 0, 0.4);
+  color: #fcd34d;
 }
 
 .discovery-status--error {
-  background: #fef2f2;
-  border-color: #fca5a5;
-  color: #991b1b;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
 }
 
 .discovery-status strong {
@@ -995,27 +996,27 @@ h3 {
 }
 
 .discovery-status__hist code {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.06);
   padding: 0 0.3em;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .discovery-status__type {
-  color: #6b7280;
+  color: var(--color-faint);
 }
 
 .discovery-status__name {
-  color: #374151;
+  color: var(--color-muted);
 }
 
 
 .discovery-status__shutters--none {
-  color: #991b1b;
+  color: var(--color-danger);
   font-weight: 500;
 }
 
 .discovery-status__shutters--ok {
-  color: #065f46;
+  color: var(--color-success);
 }
 
 
@@ -1029,15 +1030,15 @@ h3 {
 }
 
 .discovery-status__inventory > li {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 5px;
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm);
   padding: 0.4rem 0.55rem;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .discovery-status__devid {
   font-size: 0.85em;
-  color: #6b7280;
+  color: var(--color-faint);
 }
 
 .discovery-status__features {
@@ -1048,23 +1049,23 @@ h3 {
 }
 
 .discovery-status__feature {
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
-  border-radius: 3px;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: var(--radius-sm);
   padding: 0 0.35em;
   font-family: monospace;
   font-size: 0.85em;
-  color: #3730a3;
+  color: #bfdbfe;
 }
 
 
 .discovery-status__raw--drop {
-  color: #991b1b;
+  color: #fca5a5;
   font-weight: 600;
 }
 
 .discovery-status__raw--ok {
-  color: #374151;
+  color: var(--color-muted);
 }
 
 
@@ -1325,16 +1326,21 @@ h3 {
 }
 
 .tab-rooms__preset-btn {
-  background: linear-gradient(180deg, #eef4ff 0%, #dce8ff 100%);
-  border: 1px solid #93b4f5;
-  color: #1e3a8a;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  color: #bfdbfe;
   border-radius: 999px;
   padding: 0.32rem 0.8rem;
   cursor: pointer;
   font-size: 0.9em;
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(30, 58, 138, 0.12);
+  box-shadow: var(--shadow-1);
   transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.tab-rooms__preset-btn:hover {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: var(--color-info);
 }
 
 .tab-rooms__preset-btn small {
@@ -1866,12 +1872,18 @@ input::placeholder {
 
 .control-panel__scene-btn {
   padding: 0.4rem 0.9rem;
-  border: 1px solid #93b4f5;
+  border: 1px solid rgba(59, 130, 246, 0.45);
   border-radius: 999px;
-  background: linear-gradient(180deg, #eef4ff 0%, #dce8ff 100%);
-  color: #1e3a8a;
+  background: rgba(59, 130, 246, 0.14);
+  color: #bfdbfe;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.control-panel__scene-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: var(--color-info);
 }
 
 .control-panel__scene-btn:disabled {
@@ -1909,14 +1921,15 @@ input::placeholder {
 
 .control-panel__apply {
   padding: 0.3rem 0.7rem;
-  border: 1px solid var(--color-card-border, #cbd5e1);
-  border-radius: 8px;
-  background: #f1f5f9;
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-text);
   cursor: pointer;
 }
 
 .control-panel__error {
-  color: #dc2626;
+  color: var(--color-danger);
   font-size: 0.85rem;
 }
 
@@ -1935,9 +1948,10 @@ input::placeholder {
 .diag-backup__import {
   display: inline-block;
   padding: 0.4rem 0.9rem;
-  border: 1px solid var(--color-card-border, #cbd5e1);
-  border-radius: 8px;
-  background: #f1f5f9;
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-text);
   cursor: pointer;
 }
 
@@ -5620,35 +5634,46 @@ details[open] > .help-section__title::before {
 /* ===================================================================
    Wetter tab — DWD warnings, rain radar (Leaflet/RainViewer), windrose.
    =================================================================== */
-.weather-grid {
+/* Wind block: compact, full-width row above the rain radar. The rose (dial +
+   readouts laid out horizontally) takes the bulk; the outlook sits beside it.
+   Height stays only as tall as the content needs — no stretching to match the
+   radar anymore. */
+.weather-wind {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 300px);
   gap: var(--sp-3);
-  margin-top: var(--sp-3);
+  margin: var(--sp-3) 0;
   align-items: stretch;
 }
-.weather-grid__side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  min-width: 0;
+.weather-wind .windrose-card .windrose__body {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-2);
 }
-/* Wind rose grows to match the radar's height; its content centres in the
-   extra space so the card never looks half-empty. */
-.weather-grid__side .windrose-card {
-  flex: 1 1 auto;
+.weather-wind .windrose__dial {
+  width: clamp(84px, 22%, 120px);
 }
-.weather-grid__side .windrose-card .windrose__body {
+.weather-wind .windrose__readout {
   flex: 1;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
-@media (max-width: 860px) {
-  .weather-grid {
-    grid-template-columns: 1fr;
-    align-items: start;
+@media (min-width: 1100px) {
+  .weather-wind .windrose__readout {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-  .weather-grid__side .windrose-card {
-    flex: 0 0 auto;
+}
+@media (max-width: 720px) {
+  .weather-wind {
+    grid-template-columns: 1fr;
+  }
+  .weather-wind .windrose__body {
+    flex-direction: column;
+  }
+  .weather-wind .windrose__dial {
+    width: clamp(120px, 48%, 170px);
   }
 }
 
@@ -5849,17 +5874,21 @@ details[open] > .help-section__title::before {
 }
 .windrose__body {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: var(--sp-3);
-  margin-top: 6px;
+  margin-top: var(--sp-2);
 }
 .windrose__dial {
   flex: 0 0 auto;
-  width: 104px;
-  height: 104px;
+  width: clamp(150px, 64%, 210px);
+  height: auto;
+  aspect-ratio: 1 / 1;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35));
 }
 .windrose__ring {
-  fill: rgba(255, 255, 255, 0.03);
+  fill: radial-gradient(circle, rgba(56, 189, 248, 0.06), transparent 70%);
+  fill: rgba(255, 255, 255, 0.025);
   stroke: var(--color-card-border-strong);
   stroke-width: 1;
 }
@@ -5869,41 +5898,54 @@ details[open] > .help-section__title::before {
 }
 .windrose__tick {
   stroke: var(--color-faint);
-  stroke-width: 1.4;
+  stroke-width: 1.2;
 }
 .windrose__card-label {
   fill: var(--color-muted);
-  font-size: 8px;
+  font-size: 8.5px;
   font-weight: 700;
 }
 .windrose__card-label--n {
   fill: var(--color-accent-strong);
+  font-size: 10px;
 }
 .windrose__needle-line {
   stroke: var(--color-accent);
-  stroke-width: 3;
+  stroke-width: 3.5;
   stroke-linecap: round;
 }
 .windrose__needle-head {
   fill: var(--color-accent-strong);
+  filter: drop-shadow(0 0 4px var(--color-accent));
 }
 .windrose__hub {
   fill: var(--color-text);
 }
 .windrose__readout {
-  flex: 1;
+  width: 100%;
   margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+.windrose__readout > div {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
 }
 .windrose__readout dt {
-  font-size: 11px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--color-faint);
 }
 .windrose__readout dd {
   margin: 0;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -6384,7 +6426,9 @@ details[open] > .help-section__title::before {
 }
 .irr-plan__del {
   border: 1px solid #f8717155; background: #f8717122; color: #f87171;
-  border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-weight: 700;
+  border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-weight: 700; font-size: 14px;
+  align-self: center; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1; padding: 0;
 }
 .irr-plan__del:hover { background: #f8717133; }
 .irr-plan__add {
@@ -6473,3 +6517,171 @@ details[open] > .help-section__title::before {
 .help-group__row { display: flex; flex-direction: column; gap: 1px; }
 .help-group__row dt { font-size: 13px; font-weight: 700; color: var(--color-text); margin: 0; }
 .help-group__row dd { margin: 0; font-size: 12px; color: var(--color-muted); line-height: 1.4; }
+
+/* Segmented control (Darstellung & Sprache: language / notification language) */
+.seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  margin-top: var(--sp-2);
+}
+.seg__btn {
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg__btn:hover:not(:disabled) { color: var(--color-text); }
+.seg__btn--active {
+  background: var(--color-accent, #38bdf8);
+  color: #0b1120;
+}
+.seg__btn:disabled { opacity: 0.5; cursor: default; }
+
+
+/* ===================================================================
+   PREMIUM NORMALIZATION LAYER (audit-driven, 1.18.0)
+   Appended last on purpose: enforces one consistent design language for
+   radii, shadows, spacing, typography, controls and tables across every tab
+   so the UI reads as a single, modern, premium product. Scoped selectors keep
+   intentional shapes (pills, segmented controls, round icon buttons, toggles).
+   =================================================================== */
+
+/* --- Typography scale: predictable heading rhythm ------------------ */
+.app__main h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.module-panel__card > h2,
+.module-panel__card > h3,
+.radar__head h2,
+.windrose-card > h3,
+.wind-outlook > h3,
+.trend-card > h3,
+.kpi-card__title {
+  font-size: 1.02rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  margin: 0 0 var(--sp-2);
+}
+
+/* --- Cards: one radius, one elevation, one border ------------------ */
+.module-panel__card,
+.settings-hub__card,
+.radar,
+.dwd-warnings {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+}
+
+/* --- Form controls: identical shape everywhere -------------------- */
+.tab-rules__field input,
+.tab-rules__field select,
+.tab-sources__field input,
+.tab-sources__field select,
+.tab-rules__notifications input,
+.tab-rules__notifications select,
+.irr-zone-edit__name,
+input[type='text'],
+input[type='password'],
+input[type='number'],
+select,
+textarea {
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: 0.92rem;
+  min-height: 36px;
+}
+
+/* --- Buttons: unify the rectangular action buttons (keep pills,
+   segmented controls, round icon buttons and toggles untouched). ---- */
+.irr-btn,
+.tab-history__ranges button,
+.tab-history__range--active,
+.diag-backup__import,
+.diag-backup__row button,
+.control-panel__apply,
+.tab-sources__actions button,
+.gardena-config button,
+.tab-rules__telegram-test button,
+.wizard__nav button,
+.houseimg__btn,
+.logs-debug button,
+.updates-banner button {
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-4);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Chips / badges: consistent pill shape + size. */
+.module-panel__badge,
+.reason-chip,
+.irr-zone__badge,
+.action-chip {
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+}
+
+/* --- Minimum legible font sizes (premium ≠ squint). Intentional
+   micro-labels are nudged up to a readable floor. ------------------- */
+.room-badge__floor,
+.room-badge__roomname,
+.room-badge__pct,
+.twin-score__label,
+.facade-card__dir,
+.discovery-status__devid,
+.discovery-status__fval,
+.discovery-status__type,
+.irr-gauge__lbl,
+.automation-status__decided-label,
+.auto-tech__table th,
+.radar__legend {
+  font-size: 11px !important;
+}
+
+/* --- Responsive tables: never push the page wider than the viewport.
+   On narrow screens the table scrolls horizontally inside its own box. */
+.tab-sources__table,
+.diag-table,
+.auto-tech__table,
+.window-table {
+  width: 100%;
+}
+@media (max-width: 720px) {
+  .tab-sources__table,
+  .diag-table,
+  .auto-tech__table,
+  .window-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  .tab-sources__table thead,
+  .diag-table thead,
+  .auto-tech__table thead {
+    /* keep header aligned with the scrolling body */
+    width: max-content;
+    min-width: 100%;
+  }
+}
+
+/* --- Section spacing rhythm: even vertical cadence between blocks --- */
+.module-panel > .module-panel__card,
+.module-panel > .forecast-section,
+.module-panel > .weather-wind,
+.module-panel > .tab-history__verlauf {
+  margin-bottom: var(--sp-4);
+}

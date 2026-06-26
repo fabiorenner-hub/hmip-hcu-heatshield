@@ -24,11 +24,13 @@ import { useConfig } from '../hooks/useConfig.js';
 import { AutomationStatusCard } from '../components/dashboard/analysisRail.js';
 import { AutomationTechnical } from '../components/dashboard/automationTechnical.js';
 import { snapshot } from '../store.js';
+import { t } from '../i18n.js';
 
 interface SliderSpec {
   /** Dot-separated path into `Rules`, e.g. `comfort.maxIndoorTempC`. */
   path: string;
-  label: string;
+  labelDe: string;
+  labelEn: string;
   min: number;
   max: number;
   step: number;
@@ -38,33 +40,41 @@ interface SliderSpec {
 }
 
 const SLIDERS: SliderSpec[] = [
-  { path: 'comfort.maxIndoorTempC', label: 'Komfort · max. Innentemperatur', min: 22, max: 28, step: 0.5, unit: '°C' },
-  { path: 'comfort.preShadeTempC', label: 'Komfort · Vor-Beschattung ab', min: 21, max: 26, step: 0.5, unit: '°C' },
-  { path: 'comfort.vacationOffsetC', label: 'Komfort · Urlaubs-Absenkung', min: 0, max: 2, step: 0.1, unit: '°C' },
-  { path: 'automation.controlIntervalSeconds', label: 'Automatik · Zyklusintervall', min: 180, max: 3600, step: 60, unit: 's' },
-  { path: 'automation.minSecondsBetweenMoves', label: 'Automatik · Mindestpause zwischen Fahrten', min: 300, max: 21600, step: 300, unit: 's' },
-  { path: 'automation.minPositionDeltaPct', label: 'Automatik · Mindest-Positionsänderung', min: 5, max: 30, step: 1, unit: '%' },
-  { path: 'sun.minElevationDeg', label: 'Sonne · Mindesthöhe', min: 0, max: 15, step: 1, unit: '°' },
-  { path: 'storm.thresholdMs', label: 'Sturm · Schwelle', min: 10, max: 20, step: 0.1, unit: 'km/h', scale: 3.6 },
-  { path: 'nightCooling.deltaC', label: 'Nachtkühlung · Delta', min: 0.5, max: 3, step: 0.1, unit: '°C' },
+  { path: 'comfort.maxIndoorTempC', labelDe: 'Komfort · max. Innentemperatur', labelEn: 'Comfort · max. indoor temperature', min: 22, max: 28, step: 0.5, unit: '°C' },
+  { path: 'comfort.preShadeTempC', labelDe: 'Komfort · Vor-Beschattung ab', labelEn: 'Comfort · pre-shading from', min: 21, max: 26, step: 0.5, unit: '°C' },
+  { path: 'comfort.vacationOffsetC', labelDe: 'Komfort · Urlaubs-Absenkung', labelEn: 'Comfort · vacation offset', min: 0, max: 2, step: 0.1, unit: '°C' },
+  { path: 'automation.controlIntervalSeconds', labelDe: 'Automatik · Zyklusintervall', labelEn: 'Automation · cycle interval', min: 180, max: 3600, step: 60, unit: 's' },
+  { path: 'automation.minSecondsBetweenMoves', labelDe: 'Automatik · Mindestpause zwischen Fahrten', labelEn: 'Automation · cooldown between moves', min: 300, max: 21600, step: 300, unit: 's' },
+  { path: 'automation.minPositionDeltaPct', labelDe: 'Automatik · Mindest-Positionsänderung', labelEn: 'Automation · min. position change', min: 5, max: 30, step: 1, unit: '%' },
+  { path: 'sun.minElevationDeg', labelDe: 'Sonne · Mindesthöhe', labelEn: 'Sun · minimum elevation', min: 0, max: 15, step: 1, unit: '°' },
+  { path: 'storm.thresholdMs', labelDe: 'Sturm · Schwelle', labelEn: 'Storm · threshold', min: 10, max: 20, step: 0.1, unit: 'km/h', scale: 3.6 },
+  { path: 'nightCooling.deltaC', labelDe: 'Nachtkühlung · Delta', labelEn: 'Night cooling · delta', min: 0.5, max: 3, step: 0.1, unit: '°C' },
   // Smart-shading (PV-geführte Wärmelast & Hysterese).
-  { path: 'heatLoad.pvWeight', label: 'Wärmelast · PV-Gewicht', min: 0, max: 1, step: 0.05, unit: '' },
-  { path: 'heatLoad.tempWeight', label: 'Wärmelast · Temp-Gewicht', min: 0, max: 1, step: 0.05, unit: '' },
-  { path: 'heatLoad.trendWeight', label: 'Wärmelast · Trend-Gewicht', min: 0, max: 1, step: 0.05, unit: '' },
-  { path: 'heatLoad.activateThreshold', label: 'Beschattung · Aktivierungsschwelle', min: 0, max: 1, step: 0.05, unit: '' },
-  { path: 'heatLoad.releaseThreshold', label: 'Beschattung · Deaktivierungsschwelle', min: 0, max: 1, step: 0.05, unit: '' },
-  { path: 'heatLoad.releaseHoldMinutes', label: 'Beschattung · Mindesthaltezeit', min: 0, max: 180, step: 5, unit: 'min' },
-  { path: 'heatLoad.trendWindowHours', label: 'Trend · Zeitfenster', min: 0.5, max: 12, step: 0.5, unit: 'h' },
+  { path: 'heatLoad.pvWeight', labelDe: 'Wärmelast · PV-Gewicht', labelEn: 'Heat load · PV weight', min: 0, max: 1, step: 0.05, unit: '' },
+  { path: 'heatLoad.tempWeight', labelDe: 'Wärmelast · Temp-Gewicht', labelEn: 'Heat load · temp weight', min: 0, max: 1, step: 0.05, unit: '' },
+  { path: 'heatLoad.trendWeight', labelDe: 'Wärmelast · Trend-Gewicht', labelEn: 'Heat load · trend weight', min: 0, max: 1, step: 0.05, unit: '' },
+  { path: 'heatLoad.activateThreshold', labelDe: 'Beschattung · Aktivierungsschwelle', labelEn: 'Shading · activation threshold', min: 0, max: 1, step: 0.05, unit: '' },
+  { path: 'heatLoad.releaseThreshold', labelDe: 'Beschattung · Deaktivierungsschwelle', labelEn: 'Shading · release threshold', min: 0, max: 1, step: 0.05, unit: '' },
+  { path: 'heatLoad.releaseHoldMinutes', labelDe: 'Beschattung · Mindesthaltezeit', labelEn: 'Shading · minimum hold time', min: 0, max: 180, step: 5, unit: 'min' },
+  { path: 'heatLoad.trendWindowHours', labelDe: 'Trend · Zeitfenster', labelEn: 'Trend · time window', min: 0.5, max: 12, step: 0.5, unit: 'h' },
 ];
 
 const PROFILES: ProfileName[] = ['conservative', 'standard', 'aggressive', 'custom'];
 
-const PROFILE_LABELS: Record<ProfileName, string> = {
-  conservative: 'Konservativ',
-  standard: 'Standard',
-  aggressive: 'Aggressiv',
-  custom: 'Benutzerdefiniert',
-};
+function profileLabel(p: ProfileName): string {
+  switch (p) {
+    case 'conservative':
+      return t('Konservativ', 'Conservative');
+    case 'standard':
+      return t('Standard', 'Standard');
+    case 'aggressive':
+      return t('Aggressiv', 'Aggressive');
+    case 'custom':
+      return t('Benutzerdefiniert', 'Custom');
+    default:
+      return p;
+  }
+}
 
 const DEBOUNCE_MS = 300;
 
@@ -153,7 +163,7 @@ export function RulesTab(): JSX.Element {
           setProbe({ mode: json.mode, windows: json.windowDecisions });
           setProbeError(null);
         } catch (err) {
-          setProbeError(err instanceof Error ? err.message : 'unknown error');
+          setProbeError(err instanceof Error ? err.message : t('Unbekannter Fehler', 'Unknown error'));
         }
       })();
     }, DEBOUNCE_MS);
@@ -219,8 +229,8 @@ export function RulesTab(): JSX.Element {
   if (draftConfig === null) {
     return (
       <section class="tab-rules" data-testid="tab-rules">
-        <h2>Regeln und Schwellen</h2>
-        <p>Konfiguration wird geladen…</p>
+        <h2>{t('Regeln und Schwellen', 'Rules and thresholds')}</h2>
+        <p>{t('Konfiguration wird geladen…', 'Loading configuration…')}</p>
       </section>
     );
   }
@@ -231,19 +241,19 @@ export function RulesTab(): JSX.Element {
     const win = draftConfig.windows.find((w) => w.id === windowId);
     const tail = `…${windowId.slice(-4)}`;
     if (win === undefined) {
-      return `Fenster (${tail})`;
+      return t(`Fenster (${tail})`, `Window (${tail})`);
     }
     const room = draftConfig.rooms.find((r) => r.id === win.roomId);
-    const roomName = room?.name ?? 'Ohne Raum';
-    return `${roomName} – Rollladen (${tail})`;
+    const roomName = room?.name ?? t('Ohne Raum', 'No room');
+    return t(`${roomName} – Rollladen (${tail})`, `${roomName} – shutter (${tail})`);
   };
 
   return (
     <section class="tab-rules" data-testid="tab-rules">
       <header class="tab-rules__header">
-        <h2>Regeln und Schwellen</h2>
+        <h2>{t('Regeln und Schwellen', 'Rules and thresholds')}</h2>
         <span class="tab-rules__autosave" data-testid="rules-autosave">
-          {cfg.loading.value ? 'Speichert…' : 'Automatisch gespeichert'}
+          {cfg.loading.value ? t('Speichert…', 'Saving…') : t('Automatisch gespeichert', 'Auto-saved')}
         </span>
       </header>
 
@@ -266,7 +276,7 @@ export function RulesTab(): JSX.Element {
             data-testid={`rules-profile-${p}`}
             onClick={(): void => handleProfile(p)}
           >
-            {PROFILE_LABELS[p]}
+            {profileLabel(p)}
           </button>
         ))}
       </div>
@@ -278,7 +288,7 @@ export function RulesTab(): JSX.Element {
           return (
             <div class="tab-rules__slider-row" key={s.path} data-testid={`rules-slider-row-${s.path}`}>
               <label>
-                <span>{s.label}</span>
+                <span>{t(s.labelDe, s.labelEn)}</span>
                 <input
                   type="range"
                   min={s.min}
@@ -300,7 +310,7 @@ export function RulesTab(): JSX.Element {
               </label>
               {reference !== undefined && Math.abs(reference - value) > 1e-6 && (
                 <small class="tab-rules__slider-ref">
-                  preset {Math.round(reference * (s.scale ?? 1) * 10) / 10}
+                  {t('Vorgabe', 'preset')} {Math.round(reference * (s.scale ?? 1) * 10) / 10}
                   {s.unit}
                 </small>
               )}
@@ -310,7 +320,7 @@ export function RulesTab(): JSX.Element {
       </div>
 
       <section class="tab-rules__advanced" data-testid="rules-advanced">
-        <h3>Automatik-Erweiterungen</h3>
+        <h3>{t('Automatik-Erweiterungen', 'Automation extensions')}</h3>
 
         <label class="tab-rules__check">
           <input
@@ -336,8 +346,10 @@ export function RulesTab(): JSX.Element {
             }}
           />
           <span>
-            Nachts inaktiv: zwischen Sonnenuntergang und Sonnenaufgang keine
-            automatischen Rollladenfahrten (Sturm bleibt aktiv)
+            {t(
+              'Nachts inaktiv: zwischen Sonnenuntergang und Sonnenaufgang keine automatischen Rollladenfahrten (Sturm bleibt aktiv)',
+              'Inactive at night: no automatic shutter moves between sunset and sunrise (storm stays active)',
+            )}
           </span>
         </label>
 
@@ -365,12 +377,14 @@ export function RulesTab(): JSX.Element {
             }}
           />
           <span>
-            Ruhezeit: in einem festen Zeitfenster keine automatischen Fahrten
-            (Sturm bleibt aktiv)
+            {t(
+              'Ruhezeit: in einem festen Zeitfenster keine automatischen Fahrten (Sturm bleibt aktiv)',
+              'Quiet hours: no automatic moves within a fixed time window (storm stays active)',
+            )}
           </span>
         </label>
         <label class="tab-rules__field">
-          <span>Ruhezeit von … Uhr</span>
+          <span>{t('Ruhezeit von … Uhr', 'Quiet hours from … o\'clock')}</span>
           <input
             type="number"
             min={0}
@@ -401,7 +415,7 @@ export function RulesTab(): JSX.Element {
           />
         </label>
         <label class="tab-rules__field">
-          <span>… bis … Uhr</span>
+          <span>{t('… bis … Uhr', '… to … o\'clock')}</span>
           <input
             type="number"
             min={0}
@@ -452,10 +466,10 @@ export function RulesTab(): JSX.Element {
               );
             }}
           />
-          <span>Winter-Isolierung (Rollläden schließen in kalten Nächten)</span>
+          <span>{t('Winter-Isolierung (Rollläden schließen in kalten Nächten)', 'Winter insulation (shutters close on cold nights)')}</span>
         </label>
         <label class="tab-rules__field">
-          <span>Isolieren nur bei Außentemperatur ≤ … °C</span>
+          <span>{t('Isolieren nur bei Außentemperatur ≤ … °C', 'Insulate only when outdoor temperature ≤ … °C')}</span>
           <input
             type="number"
             min={-20}
@@ -482,7 +496,7 @@ export function RulesTab(): JSX.Element {
           />
         </label>
         <label class="tab-rules__field">
-          <span>Schließgrad zur Isolierung (%)</span>
+          <span>{t('Schließgrad zur Isolierung (%)', 'Closing level for insulation (%)')}</span>
           <input
             type="number"
             min={0}
@@ -524,25 +538,25 @@ export function RulesTab(): JSX.Element {
               );
             }}
           />
-          <span>Lern-Empfehlungen automatisch übernehmen</span>
+          <span>{t('Lern-Empfehlungen automatisch übernehmen', 'Apply learning recommendations automatically')}</span>
         </label>
       </section>
 
       <aside class="tab-rules__probe" data-testid="rules-probe">
-        <h3>Live-Vorschau</h3>
+        <h3>{t('Live-Vorschau', 'Live preview')}</h3>
         {probeError !== null && <p class="tab-rules__error">{probeError}</p>}
         {probe === null && probeError === null && (
-          <p class="tab-rules__hint">Einen Regler bewegen für eine Vorschau.</p>
+          <p class="tab-rules__hint">{t('Einen Regler bewegen für eine Vorschau.', 'Move a slider for a preview.')}</p>
         )}
         {probe !== null && (
           <Fragment>
             <p>
-              Modus: <strong data-testid="rules-probe-mode">{probe.mode}</strong>
+              {t('Modus:', 'Mode:')} <strong data-testid="rules-probe-mode">{probe.mode}</strong>
             </p>
             <ul data-testid="rules-probe-windows">
               {probe.windows.map((w) => (
                 <li key={w.windowId}>
-                  {probeWindowLabel(w.windowId)}: Ziel {(w.finalTarget * 100).toFixed(0)}%
+                  {probeWindowLabel(w.windowId)}: {t('Ziel', 'target')} {(w.finalTarget * 100).toFixed(0)}%
                 </li>
               ))}
             </ul>
@@ -556,7 +570,7 @@ export function RulesTab(): JSX.Element {
         </div>
       )}
       {cfg.saveOk.value && (
-        <p class="tab-rules__ok" data-testid="rules-save-ok">Gespeichert.</p>
+        <p class="tab-rules__ok" data-testid="rules-save-ok">{t('Gespeichert.', 'Saved.')}</p>
       )}
     </section>
   );

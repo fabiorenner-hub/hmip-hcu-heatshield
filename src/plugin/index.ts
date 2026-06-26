@@ -207,6 +207,18 @@ const MODE_LABELS_DE: Record<string, string> = {
   MAINTENANCE: 'Wartung',
 };
 
+/** English FSM mode labels for Telegram replies (notification language EN). */
+const MODE_LABELS_EN: Record<string, string> = {
+  NORMAL: 'Normal',
+  SUMMER_WATCH: 'Summer watch',
+  ACTIVE_HEAT_PROTECTION: 'Active heat protection',
+  HEATWAVE: 'Heatwave',
+  NIGHT_COOLING: 'Night cooling',
+  STORM: 'Storm',
+  VACATION: 'Vacation',
+  MAINTENANCE: 'Maintenance',
+};
+
 interface BootEnv {
   readonly dataDir: string;
   readonly port: number | null;
@@ -516,6 +528,7 @@ class HeatShieldBoot {
       store: this.messageStore,
       telegram: config.notifications.telegram,
       events: config.notifications.events,
+      language: config.notifications.language,
       logger: this.logBuffer.asLogger,
     });
     this.morningBrief = new MorningBriefScheduler({
@@ -1428,7 +1441,7 @@ class HeatShieldBoot {
     try {
       await this.morningBrief.maybeSend(this.notifications, () => {
         const body = this.buildForecastText(now);
-        return body === null ? null : { title: 'Wetter heute', body };
+        return body === null ? null : { title: this.nt('Wetter heute', 'Weather today'), body };
       });
     } catch (err) {
       this.logBuffer.append('warn', 'morning brief failed', {
@@ -1460,7 +1473,7 @@ class HeatShieldBoot {
     try {
       const msg = await this.notifications.emit(
         'weather',
-        'Wetter-Update',
+        this.nt('Wetter-Update', 'Weather update'),
         body,
         'weather',
       );
@@ -1487,7 +1500,7 @@ class HeatShieldBoot {
     try {
       const sent = await this.dailySummary.maybeSend(this.notifications, () => {
         const body = this.buildDailySummaryText(now);
-        return body === null ? null : { title: 'Tagesrückblick', body };
+        return body === null ? null : { title: this.nt('Tagesrückblick', 'Daily summary'), body };
       });
       if (sent) {
         this.events.emit('event', {
@@ -1502,6 +1515,22 @@ class HeatShieldBoot {
     }
   }
 
+  /**
+   * Notification-language helper: pick the German or English variant based on
+   * `config.notifications.language` (default German). Used for all server-side
+   * notification/Telegram text so the installation-wide setting takes effect.
+   */
+  private nt(de: string, en: string): string {
+    return this.config.notifications.language === 'en' ? en : de;
+  }
+
+  /** Localized FSM mode label for notification text. */
+  private modeLabelNt(mode: string): string {
+    return this.config.notifications.language === 'en'
+      ? (MODE_LABELS_EN[mode] ?? mode)
+      : (MODE_LABELS_DE[mode] ?? mode);
+  }
+
   /** Build the evening daily-summary body, or null when no data is available. */
   private buildDailySummaryText(now: Date): string | null {
     const mode = this.runtime.lastMode ?? 'NORMAL';
@@ -1511,27 +1540,46 @@ class HeatShieldBoot {
       dec?.windowDecisions.filter((d) => d.finalTarget >= 0.5).length ?? 0;
     const total = this.config.windows.length;
     const parts: string[] = [
-      `Modus: ${MODE_LABELS_DE[mode] ?? mode}.`,
-      `Gefühlte Wärme: ${Math.round(hl.load01 * 100)} %` +
-        (hl.feelsLikeC !== null ? ` (≈ ${Math.round(hl.feelsLikeC)} °C).` : '.'),
+      this.nt(`Modus: ${this.modeLabelNt(mode)}.`, `Mode: ${this.modeLabelNt(mode)}.`),
+      this.nt(
+        `Gefühlte Wärme: ${Math.round(hl.load01 * 100)} %` +
+          (hl.feelsLikeC !== null ? ` (≈ ${Math.round(hl.feelsLikeC)} °C).` : '.'),
+        `Perceived heat: ${Math.round(hl.load01 * 100)} %` +
+          (hl.feelsLikeC !== null ? ` (≈ ${Math.round(hl.feelsLikeC)} °C).` : '.'),
+      ),
     ];
     if (total > 0) {
-      parts.push(`${shaded}/${total} Fenster aktuell verschattet.`);
+      parts.push(
+        this.nt(
+          `${shaded}/${total} Fenster aktuell verschattet.`,
+          `${shaded}/${total} windows currently shaded.`,
+        ),
+      );
     }
     const outdoor = this.effectiveOutdoorC(now);
     if (outdoor !== null) {
-      parts.push(`Aktuell ${Math.round(outdoor)} °C draußen.`);
+      parts.push(this.nt(`Aktuell ${Math.round(outdoor)} °C draußen.`, `Currently ${Math.round(outdoor)} °C outside.`));
     }
     // Automatic moves accumulated today (per-room learning accumulator).
     let movesToday = 0;
     for (const acc of this.learnAccum.values()) {
       movesToday += acc.moves;
     }
-    parts.push(`${movesToday} automatische Rollladenfahrt(en) heute.`);
+    parts.push(
+      this.nt(
+        `${movesToday} automatische Rollladenfahrt(en) heute.`,
+        `${movesToday} automatic shutter move(s) today.`,
+      ),
+    );
     // Indoor peak today.
     const peak = this.runtime.state.indoorPeak;
     if (peak !== null && Number.isFinite(peak.peakC)) {
-      parts.push(`Innen-Tagespeak ${Math.round(peak.peakC * 10) / 10} °C.`);
+      parts.push(
+        this.nt(
+          `Innen-Tagespeak ${Math.round(peak.peakC * 10) / 10} °C.`,
+          `Indoor daily peak ${Math.round(peak.peakC * 10) / 10} °C.`,
+        ),
+      );
     }
     // Self-learning + calibration adjustments currently in effect.
     const tuned = Array.from(this.learnedModels.values()).filter(
@@ -1542,7 +1590,10 @@ class HeatShieldBoot {
     ).length;
     if (tuned > 0 || calibrated > 0) {
       parts.push(
-        `Gelernt: ${tuned} Komfort- und ${calibrated} Trägheits-Anpassung(en) aktiv.`,
+        this.nt(
+          `Gelernt: ${tuned} Komfort- und ${calibrated} Trägheits-Anpassung(en) aktiv.`,
+          `Learned: ${tuned} comfort and ${calibrated} inertia adjustment(s) active.`,
+        ),
       );
     }
     return parts.join(' ');
@@ -1579,8 +1630,11 @@ class HeatShieldBoot {
         this.rebuildNotifications();
         const msg = await this.notifications.emit(
           'weather',
-          'Lernen: Einstellungen angepasst',
-          `${applied} Empfehlung(en) automatisch übernommen.`,
+          this.nt('Lernen: Einstellungen angepasst', 'Learning: settings adjusted'),
+          this.nt(
+            `${applied} Empfehlung(en) automatisch übernommen.`,
+            `${applied} recommendation(s) applied automatically.`,
+          ),
           'weather',
         );
         this.events.emit('event', {
@@ -1631,7 +1685,10 @@ class HeatShieldBoot {
         this.healthAlerted.add(cfg.id);
         const label = this.windowLabel(cfg.id) ?? cfg.id;
         offending.push(
-          `${label} (Soll ${Math.round(commanded * 100)} %, aktuell ${Math.round(cur * 100)} %)`,
+          this.nt(
+            `${label} (Soll ${Math.round(commanded * 100)} %, aktuell ${Math.round(cur * 100)} %)`,
+            `${label} (target ${Math.round(commanded * 100)} %, current ${Math.round(cur * 100)} %)`,
+          ),
         );
       } else if (!off && this.healthAlerted.has(cfg.id)) {
         this.healthAlerted.delete(cfg.id);
@@ -1643,13 +1700,20 @@ class HeatShieldBoot {
     }
     const body =
       offending.length === 1
-        ? `${offending[0]} reagiert nicht. Bitte prüfen (Motor blockiert oder Gerät offline?).`
-        : `${offending.length} Rollläden reagieren nicht: ${offending.join('; ')}. ` +
-          'Bitte prüfen (Motor blockiert oder Gerät offline?).';
+        ? this.nt(
+            `${offending[0]} reagiert nicht. Bitte prüfen (Motor blockiert oder Gerät offline?).`,
+            `${offending[0]} is not responding. Please check (motor blocked or device offline?).`,
+          )
+        : this.nt(
+            `${offending.length} Rollläden reagieren nicht: ${offending.join('; ')}. ` +
+              'Bitte prüfen (Motor blockiert oder Gerät offline?).',
+            `${offending.length} shutters are not responding: ${offending.join('; ')}. ` +
+              'Please check (motor blocked or device offline?).',
+          );
     try {
       const msg = await this.notifications.emit(
         'close',
-        'Rollladen reagiert nicht',
+        this.nt('Rollladen reagiert nicht', 'Shutter not responding'),
         body,
         'close',
       );
@@ -1702,8 +1766,11 @@ class HeatShieldBoot {
       if (!this.stormAlerted) {
         this.stormAlerted = true;
         await emit(
-          '🌩 Sturmwarnung',
-          'Sturmschutz aktiv – außenliegende Rollläden werden zum Schutz aufgefahren.',
+          this.nt('🌩 Sturmwarnung', '🌩 Storm warning'),
+          this.nt(
+            'Sturmschutz aktiv – außenliegende Rollläden werden zum Schutz aufgefahren.',
+            'Storm protection active – exterior shutters are being raised for protection.',
+          ),
         );
       }
     } else {
@@ -1725,8 +1792,11 @@ class HeatShieldBoot {
       const name = this.config.rooms.find((r) => r.id === warmestId)?.name ?? warmestId;
       await once(
         'indoor-extreme',
-        '🔥 Innenraum sehr heiß',
-        `${name} bei ${Math.round(warmestC * 10) / 10} °C (kritisch ab ${warmestCritC} °C). Beschattung läuft auf Maximum.`,
+        this.nt('🔥 Innenraum sehr heiß', '🔥 Indoor very hot'),
+        this.nt(
+          `${name} bei ${Math.round(warmestC * 10) / 10} °C (kritisch ab ${warmestCritC} °C). Beschattung läuft auf Maximum.`,
+          `${name} at ${Math.round(warmestC * 10) / 10} °C (critical from ${warmestCritC} °C). Shading is at maximum.`,
+        ),
       );
     }
 
@@ -1735,8 +1805,11 @@ class HeatShieldBoot {
     if (outdoor !== null && outdoor >= 35) {
       await once(
         'outdoor-extreme',
-        '🌡 Extreme Außenhitze',
-        `Außen ${Math.round(outdoor * 10) / 10} °C. Fenster und Rollläden tagsüber geschlossen halten.`,
+        this.nt('🌡 Extreme Außenhitze', '🌡 Extreme outdoor heat'),
+        this.nt(
+          `Außen ${Math.round(outdoor * 10) / 10} °C. Fenster und Rollläden tagsüber geschlossen halten.`,
+          `Outdoor ${Math.round(outdoor * 10) / 10} °C. Keep windows and shutters closed during the day.`,
+        ),
       );
     }
 
@@ -1745,8 +1818,11 @@ class HeatShieldBoot {
     if (uv !== null && uv >= 8) {
       await once(
         'uv-high',
-        '☀️ Hoher UV-Index',
-        `UV-Index ${Math.round(uv * 10) / 10}. Direkte Sonne meiden; die Beschattung schützt Räume und Möbel.`,
+        this.nt('☀️ Hoher UV-Index', '☀️ High UV index'),
+        this.nt(
+          `UV-Index ${Math.round(uv * 10) / 10}. Direkte Sonne meiden; die Beschattung schützt Räume und Möbel.`,
+          `UV index ${Math.round(uv * 10) / 10}. Avoid direct sun; shading protects rooms and furniture.`,
+        ),
       );
     }
 
@@ -1767,8 +1843,11 @@ class HeatShieldBoot {
       if (worst !== null) {
         await once(
           'severe-weather',
-          '⛈ Unwetter erwartet',
-          `Der Wetterdienst meldet ${weatherCodeLabel(worst)} in den nächsten Stunden. Bei Sturm fahren die Rollläden automatisch zum Schutz auf.`,
+          this.nt('⛈ Unwetter erwartet', '⛈ Severe weather expected'),
+          this.nt(
+            `Der Wetterdienst meldet ${weatherCodeLabel(worst)} in den nächsten Stunden. Bei Sturm fahren die Rollläden automatisch zum Schutz auf.`,
+            `The weather service reports ${weatherCodeLabel(worst)} in the next few hours. In a storm the shutters automatically raise for protection.`,
+          ),
         );
       }
     }
@@ -1784,16 +1863,16 @@ class HeatShieldBoot {
     }
     const parts: string[] = [];
     if (fc.ok) {
-      parts.push(`Heute bis ${Math.round(fc.value)} °C erwartet.`);
+      parts.push(this.nt(`Heute bis ${Math.round(fc.value)} °C erwartet.`, `Up to ${Math.round(fc.value)} °C expected today.`));
     }
     if (outdoor !== null) {
-      parts.push(`Aktuell ${Math.round(outdoor)} °C draußen.`);
+      parts.push(this.nt(`Aktuell ${Math.round(outdoor)} °C draußen.`, `Currently ${Math.round(outdoor)} °C outside.`));
     }
     const pvKw = this.resolvePvKw(now);
     if (pvKw !== null) {
-      parts.push(`PV-Leistung ${pvKw.toFixed(1)} kW.`);
+      parts.push(this.nt(`PV-Leistung ${pvKw.toFixed(1)} kW.`, `PV power ${pvKw.toFixed(1)} kW.`));
     }
-    parts.push('Tipp: morgens lüften, solange es kühl ist.');
+    parts.push(this.nt('Tipp: morgens lüften, solange es kühl ist.', 'Tip: air in the morning while it is still cool.'));
     return parts.join(' ');
   }
 
@@ -1807,9 +1886,13 @@ class HeatShieldBoot {
         const mode = this.runtime.lastMode ?? 'NORMAL';
         const hl = this.computeHeatLoad(now);
         const lines: string[] = [
-          `🛡 Modus: ${MODE_LABELS_DE[mode] ?? mode}`,
-          `Gefühlte Wärme: ${Math.round(hl.load01 * 100)} %` +
-            (hl.feelsLikeC !== null ? ` (≈ ${Math.round(hl.feelsLikeC)} °C)` : ''),
+          this.nt(`🛡 Modus: ${this.modeLabelNt(mode)}`, `🛡 Mode: ${this.modeLabelNt(mode)}`),
+          this.nt(
+            `Gefühlte Wärme: ${Math.round(hl.load01 * 100)} %` +
+              (hl.feelsLikeC !== null ? ` (≈ ${Math.round(hl.feelsLikeC)} °C)` : ''),
+            `Perceived heat: ${Math.round(hl.load01 * 100)} %` +
+              (hl.feelsLikeC !== null ? ` (≈ ${Math.round(hl.feelsLikeC)} °C)` : ''),
+          ),
         ];
         const dec = this.runtime.lastDecision;
         for (const w of this.config.windows) {
@@ -1818,26 +1901,32 @@ class HeatShieldBoot {
           const target =
             dec?.windowDecisions.find((d) => d.windowId === w.id)?.finalTarget ?? null;
           lines.push(
-            `• ${this.windowLabel(w.id) ?? w.id}: aktuell ${pct(cur)} → Ziel ${pct(target)}`,
+            this.nt(
+              `• ${this.windowLabel(w.id) ?? w.id}: aktuell ${pct(cur)} → Ziel ${pct(target)}`,
+              `• ${this.windowLabel(w.id) ?? w.id}: current ${pct(cur)} → target ${pct(target)}`,
+            ),
           );
         }
         if (this.config.windows.length === 0) {
-          lines.push('(keine Fenster konfiguriert)');
+          lines.push(this.nt('(keine Fenster konfiguriert)', '(no windows configured)'));
         }
         return lines.join('\n');
       },
       forecastText: (): string =>
-        this.buildForecastText(new Date()) ?? 'Keine Wetterdaten verfügbar.',
+        this.buildForecastText(new Date()) ??
+        this.nt('Keine Wetterdaten verfügbar.', 'No weather data available.'),
       roomsText: (): string => {
         const now = new Date();
         const ctx: SourceContext = { hcu: this.cache, fusion: this.fusionSolar, openMeteo: this.openMeteo, now };
         if (this.config.rooms.length === 0) {
-          return 'Keine Räume konfiguriert.';
+          return this.nt('Keine Räume konfiguriert.', 'No rooms configured.');
         }
-        const lines = ['🌡 Räume:'];
+        const lines = [this.nt('🌡 Räume:', '🌡 Rooms:')];
         for (const r of this.config.rooms) {
           const res = resolveSignal(r.signals.indoorTemp, ctx);
-          lines.push(`• ${r.name}: ${res.ok ? `${res.value.toFixed(1)} °C` : '– (kein Sensor)'}`);
+          lines.push(
+            `• ${r.name}: ${res.ok ? `${res.value.toFixed(1)} °C` : this.nt('– (kein Sensor)', '– (no sensor)')}`,
+          );
         }
         return lines.join('\n');
       },
@@ -1854,8 +1943,8 @@ class HeatShieldBoot {
         };
         this.persistAndReevaluate();
         return minutes === null
-          ? 'Automatik pausiert bis Mitternacht. ⏸'
-          : `Automatik für ${minutes} min pausiert. ⏸`;
+          ? this.nt('Automatik pausiert bis Mitternacht. ⏸', 'Automation paused until midnight. ⏸')
+          : this.nt(`Automatik für ${minutes} min pausiert. ⏸`, `Automation paused for ${minutes} min. ⏸`);
       },
       resume: (): string => {
         this.runtime.state.userIntent = {
@@ -1864,7 +1953,7 @@ class HeatShieldBoot {
           pauseUntil: null,
         };
         this.persistAndReevaluate();
-        return 'Automatik wieder aktiv. ▶';
+        return this.nt('Automatik wieder aktiv. ▶', 'Automation active again. ▶');
       },
       setVacation: (on): string => {
         this.runtime.state.userIntent = {
@@ -1872,15 +1961,20 @@ class HeatShieldBoot {
           vacation: on,
         };
         this.persistAndReevaluate();
-        return on ? 'Urlaubsmodus an. ✈' : 'Urlaubsmodus aus.';
+        return on
+          ? this.nt('Urlaubsmodus an. ✈', 'Vacation mode on. ✈')
+          : this.nt('Urlaubsmodus aus.', 'Vacation mode off.');
       },
       setAutomation: (on): string => {
         void this.applyConfigChange((c) => {
           c.automationEnabled = on;
         });
         return on
-          ? 'Master-Automatik an. ✅'
-          : 'Master-Automatik aus (Positionen werden gehalten).';
+          ? this.nt('Master-Automatik an. ✅', 'Master automation on. ✅')
+          : this.nt(
+              'Master-Automatik aus (Positionen werden gehalten).',
+              'Master automation off (positions are held).',
+            );
       },
       setParam: (key, value): string => this.applySetParam(key, value),
     };
@@ -1923,13 +2017,13 @@ class HeatShieldBoot {
     return true;
   }
 
-  /** Map a /set key+value onto a config change. Returns a German reply. */
+  /** Map a /set key+value onto a config change. Returns a localized reply. */
   private applySetParam(key: string, value: string): string {
     const keys =
-      'morgenzeit HH:MM Â· aktivierung 0–1 Â· deaktivierung 0–1 Â· haltezeit <min> Â· ' +
-      'pvgewicht 0–1 Â· pvmax <kWp> Â· forecast an|aus Â· forecaststunden 1–24';
+      'morgenzeit HH:MM · aktivierung 0–1 · deaktivierung 0–1 · haltezeit <min> · ' +
+      'pvgewicht 0–1 · pvmax <kWp> · forecast an|aus · forecaststunden 1–24';
     if (key === 'hilfe' || key === 'help' || key === '') {
-      return `Verfügbare Einstellungen:\n${keys}`;
+      return this.nt(`Verfügbare Einstellungen:\n${keys}`, `Available settings:\n${keys}`);
     }
     const num = Number.parseFloat(value.replace(',', '.'));
     const lower = value.trim().toLowerCase();
@@ -1943,68 +2037,98 @@ class HeatShieldBoot {
     switch (key) {
       case 'morgenzeit':
         if (!/^([01]\d|2[0-3]):[0-5]\d$/u.test(value.trim())) {
-          return 'Bitte Uhrzeit als HH:MM angeben, z. B. /set morgenzeit 07:30.';
+          return this.nt(
+            'Bitte Uhrzeit als HH:MM angeben, z. B. /set morgenzeit 07:30.',
+            'Please provide the time as HH:MM, e.g. /set morgenzeit 07:30.',
+          );
         }
         ok = this.applyConfigChange((c) => {
           c.notifications.morningBriefLocalTime = value.trim();
         });
-        label = `Morgen-Briefing-Zeit = ${value.trim()}`;
+        label = this.nt(
+          `Morgen-Briefing-Zeit = ${value.trim()}`,
+          `Morning brief time = ${value.trim()}`,
+        );
         break;
       case 'aktivierung':
-        if (!Number.isFinite(num) || num < 0 || num > 1) return 'Wert 0–1 angeben.';
+        if (!Number.isFinite(num) || num < 0 || num > 1)
+          return this.nt('Wert 0–1 angeben.', 'Provide a value 0–1.');
         ok = this.applyConfigChange((c) => {
           c.rules.heatLoad.activateThreshold = num;
         });
-        label = `Aktivierungsschwelle = ${num}`;
+        label = this.nt(`Aktivierungsschwelle = ${num}`, `Activation threshold = ${num}`);
         break;
       case 'deaktivierung':
-        if (!Number.isFinite(num) || num < 0 || num > 1) return 'Wert 0–1 angeben.';
+        if (!Number.isFinite(num) || num < 0 || num > 1)
+          return this.nt('Wert 0–1 angeben.', 'Provide a value 0–1.');
         ok = this.applyConfigChange((c) => {
           c.rules.heatLoad.releaseThreshold = num;
         });
-        label = `Deaktivierungsschwelle = ${num}`;
+        label = this.nt(`Deaktivierungsschwelle = ${num}`, `Release threshold = ${num}`);
         break;
       case 'haltezeit':
-        if (!Number.isFinite(num) || num < 0) return 'Minuten ≥ 0 angeben.';
+        if (!Number.isFinite(num) || num < 0)
+          return this.nt('Minuten ≥ 0 angeben.', 'Provide minutes ≥ 0.');
         ok = this.applyConfigChange((c) => {
           c.rules.heatLoad.releaseHoldMinutes = Math.round(num);
         });
-        label = `Mindesthaltezeit = ${Math.round(num)} min`;
+        label = this.nt(
+          `Mindesthaltezeit = ${Math.round(num)} min`,
+          `Minimum hold time = ${Math.round(num)} min`,
+        );
         break;
       case 'pvgewicht':
-        if (!Number.isFinite(num) || num < 0) return 'Wert ≥ 0 angeben.';
+        if (!Number.isFinite(num) || num < 0)
+          return this.nt('Wert ≥ 0 angeben.', 'Provide a value ≥ 0.');
         ok = this.applyConfigChange((c) => {
           c.rules.heatLoad.pvWeight = num;
         });
-        label = `PV-Gewicht = ${num}`;
+        label = this.nt(`PV-Gewicht = ${num}`, `PV weight = ${num}`);
         break;
       case 'pvmax':
-        if (!Number.isFinite(num) || num <= 0) return 'Wert > 0 (kWp) angeben.';
+        if (!Number.isFinite(num) || num <= 0)
+          return this.nt('Wert > 0 (kWp) angeben.', 'Provide a value > 0 (kWp).');
         ok = this.applyConfigChange((c) => {
           c.fusionSolar.pvPeakKwp = num;
         });
-        label = `PV-Spitzenleistung (volle Sonne) = ${num} kWp`;
+        label = this.nt(
+          `PV-Spitzenleistung (volle Sonne) = ${num} kWp`,
+          `PV peak power (full sun) = ${num} kWp`,
+        );
         break;
       case 'forecast':
-        if (onoff === null) return 'Bitte „an" oder „aus" angeben.';
+        if (onoff === null) return this.nt('Bitte „an" oder „aus" angeben.', 'Please provide "an" or "aus".');
         ok = this.applyConfigChange((c) => {
           c.notifications.forecastUpdates.enabled = onoff;
         });
-        label = `Forecast-Updates = ${onoff ? 'an' : 'aus'}`;
+        label = this.nt(
+          `Forecast-Updates = ${onoff ? 'an' : 'aus'}`,
+          `Forecast updates = ${onoff ? 'on' : 'off'}`,
+        );
         break;
       case 'forecaststunden':
-        if (!Number.isFinite(num) || num < 1 || num > 24) return 'Wert 1–24 angeben.';
+        if (!Number.isFinite(num) || num < 1 || num > 24)
+          return this.nt('Wert 1–24 angeben.', 'Provide a value 1–24.');
         ok = this.applyConfigChange((c) => {
           c.notifications.forecastUpdates.everyHours = Math.round(num);
         });
-        label = `Forecast-Intervall = ${Math.round(num)} h`;
+        label = this.nt(
+          `Forecast-Intervall = ${Math.round(num)} h`,
+          `Forecast interval = ${Math.round(num)} h`,
+        );
         break;
       default:
-        return `Unbekannte Einstellung „${key}".\nVerfügbar:\n${keys}`;
+        return this.nt(
+          `Unbekannte Einstellung „${key}".\nVerfügbar:\n${keys}`,
+          `Unknown setting "${key}".\nAvailable:\n${keys}`,
+        );
     }
     return ok
       ? `✅ ${label}`
-      : 'Konnte die Einstellung nicht speichern (ungültiger Wert).';
+      : this.nt(
+          'Konnte die Einstellung nicht speichern (ungültiger Wert).',
+          'Could not save the setting (invalid value).',
+        );
   }
 
   private telegramOffsetPath(): string {
@@ -2082,6 +2206,7 @@ class HeatShieldBoot {
       store: this.messageStore,
       telegram: this.config.notifications.telegram,
       events: this.config.notifications.events,
+      language: this.config.notifications.language,
       logger: this.logBuffer.asLogger,
     });
     this.morningBrief = new MorningBriefScheduler({
@@ -2424,7 +2549,10 @@ class HeatShieldBoot {
       sendTestNotification: async () => {
         return sendTelegram(
           this.config.notifications.telegram,
-          'Heat Shield: Test-Nachricht ✅ Deine Telegram-Anbindung funktioniert.',
+          this.nt(
+            'Heat Shield: Test-Nachricht ✅ Deine Telegram-Anbindung funktioniert.',
+            'Heat Shield: test message ✅ Your Telegram connection works.',
+          ),
         );
       },
       getLearningSnapshot: () => this.buildLearningSnapshot(),

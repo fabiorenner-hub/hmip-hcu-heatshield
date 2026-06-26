@@ -11,6 +11,7 @@
 
 import { h, type JSX } from 'preact';
 
+import { t, tServer } from '../i18n.js';
 import type { LearningRecommendation } from '../hooks/useLearning.js';
 
 export interface RecommendationBannerProps {
@@ -36,13 +37,13 @@ export function RecommendationBanner(
         💡
       </span>
       <div class="recommendation-banner__body">
-        <strong>{warnRecs[0]?.title ?? 'Empfehlung'}</strong>
+        <strong>{tServer(warnRecs[0]?.title) || t('Empfehlung', 'Recommendation')}</strong>
         <span> — </span>
-        <span>{warnRecs[0]?.message ?? ''}</span>
+        <span>{tServer(warnRecs[0]?.message)}</span>
         {warnRecs.length > 1 && (
           <span class="recommendation-banner__more">
             {' '}
-            (+{warnRecs.length - 1} weitere)
+            (+{warnRecs.length - 1} {t('weitere', 'more')})
           </span>
         )}
       </div>

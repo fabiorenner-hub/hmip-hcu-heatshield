@@ -1,12 +1,10 @@
 /**
- * Heat Shield — irrigation zones panel (Bewässerung tab).
+ * Heat Shield — irrigation zones panel (Bewässerung / Irrigation tab).
  *
- * Renders the ET-based irrigation state from the snapshot's `irrigation`
- * block: global KPIs (Modus, ET₀, Regen, PV-Überschuss, Automatik), a
- * day-ahead plan (welches Ventil wann/wie lange), and per-zone cards with a
- * soil-moisture / available-water gauge, water-balance figures, the next
- * watering forecast, the learned calibration, the decision "why", a manual
- * duration picker (Bewässern 5–60 min) and a soil calibration control.
+ * Global KPIs, an editable day-ahead plan (drag-to-move timeline + list) and
+ * per-zone cards (gauge, water balance, forecast, learned calibration, the
+ * decision "why", a duration picker and a soil calibration control). Fully
+ * bilingual via `t` / `tServer`.
  */
 
 import { Fragment, h, type JSX } from 'preact';
@@ -26,18 +24,39 @@ import {
   stopIrrigationZone,
   updatePlanEntry,
 } from '../../hooks/useControl.js';
+import { t, tServer, fmtNum, fmtTime, locale } from '../../i18n.js';
 
-const MODE_LABEL: Record<string, string> = {
-  off: 'Aus',
-  eco: 'Eco',
-  normal: 'Normal',
-  heat: 'Hitze',
-  vacation: 'Urlaub',
-  establishment: 'Anwuchs',
-};
+function modeLabel(mode: string): string {
+  switch (mode) {
+    case 'off': return t('Aus', 'Off');
+    case 'eco': return 'Eco';
+    case 'normal': return t('Normal', 'Normal');
+    case 'heat': return t('Hitze', 'Heat');
+    case 'vacation': return t('Urlaub', 'Vacation');
+    case 'establishment': return t('Anwuchs', 'Establishment');
+    default: return mode;
+  }
+}
+
+/** Localized plant-type label for the zone badge (mirrors the settings tab). */
+function plantLabel(plant: string): string {
+  switch (plant) {
+    case 'lawn': return t('Rasen', 'Lawn');
+    case 'bed': return t('Beet', 'Bed');
+    case 'hedge': return t('Hecke', 'Hedge');
+    case 'vegetable': return t('Gemüse', 'Vegetables');
+    case 'pot': return t('Topf', 'Pot');
+    case 'tree': return t('Baum/Strauch', 'Tree/shrub');
+    default: return plant;
+  }
+}
 
 /** Manual watering durations offered by the picker (minutes). */
 const DURATIONS_MIN = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60] as const;
+
+function n1(v: number): string {
+  return fmtNum(v, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
 
 function fmtMinutes(seconds: number): string {
   if (seconds <= 0) return '0 min';
@@ -48,10 +67,10 @@ function fmtMinutes(seconds: number): string {
 }
 
 function fmtEta(hours: number | null): string {
-  if (hours === null) return '> 3 Tage';
-  if (hours <= 1) return 'in ≤ 1 h';
-  if (hours < 24) return `in ${Math.round(hours)} h`;
-  return `in ${Math.round(hours / 24)} Tg`;
+  if (hours === null) return t('> 3 Tage', '> 3 days');
+  if (hours <= 1) return t('in ≤ 1 h', 'in ≤ 1 h');
+  if (hours < 24) return t(`in ${Math.round(hours)} h`, `in ${Math.round(hours)} h`);
+  return t(`in ${Math.round(hours / 24)} Tg`, `in ${Math.round(hours / 24)} d`);
 }
 
 function gaugeColor(pct: number): string {
@@ -90,73 +109,66 @@ function ZoneCard(props: { zone: IrrigationZoneView }): JSX.Element {
     <article class="irr-zone" data-testid={`irr-zone-${z.id}`}>
       <header class="irr-zone__head">
         <h3>{z.name}</h3>
-        <span class={`irr-zone__badge irr-zone__badge--${z.priority}`}>{z.plant}</span>
+        <span class={`irr-zone__badge irr-zone__badge--${z.priority}`}>{plantLabel(z.plant)}</span>
       </header>
 
       <div class="irr-zone__body">
         <div class="irr-gauge" style={{ '--g': `${gaugePct}%`, '--gc': gaugeColor(gaugePct) }}>
           <span class="irr-gauge__val">{Math.round(gaugePct)}%</span>
-          <span class="irr-gauge__lbl">{moisture !== null ? 'Bodenfeuchte' : 'Verfügbar'}</span>
+          <span class="irr-gauge__lbl">{moisture !== null ? t('Bodenfeuchte', 'Soil moisture') : t('Verfügbar', 'Available')}</span>
         </div>
         <dl class="irr-zone__facts">
           <div>
-            <dt>Defizit</dt>
-            <dd>{z.depletionMm.toFixed(1)} / {z.rawMm.toFixed(0)} mm</dd>
+            <dt>{t('Defizit', 'Deficit')}</dt>
+            <dd>{n1(z.depletionMm)} / {fmtNum(z.rawMm, { maximumFractionDigits: 0 })} mm</dd>
           </div>
           <div>
-            <dt>Bedarf heute</dt>
-            <dd>{z.dailyNeedMm.toFixed(1)} mm</dd>
+            <dt>{t('Bedarf heute', 'Demand today')}</dt>
+            <dd>{n1(z.dailyNeedMm)} mm</dd>
           </div>
           <div>
-            <dt>Nächste Gabe</dt>
+            <dt>{t('Nächste Gabe', 'Next watering')}</dt>
             <dd>{fmtEta(z.hoursUntilNext)}</dd>
           </div>
           <div>
-            <dt>Heute bewässert</dt>
+            <dt>{t('Heute bewässert', 'Watered today')}</dt>
             <dd>{fmtMinutes(z.dailySecondsUsed)}</dd>
           </div>
           <div>
-            <dt>Zeitfenster</dt>
+            <dt>{t('Zeitfenster', 'Window')}</dt>
             <dd>
               {z.windowStartHour === z.windowEndHour
                 ? '24 h'
-                : `${z.windowStartHour}–${z.windowEndHour} Uhr`}
+                : `${z.windowStartHour}–${z.windowEndHour} ${t('Uhr', 'h')}`}
             </dd>
           </div>
           <div>
-            <dt>Offen bis</dt>
-            <dd>
-              {z.openUntilTs === null
-                ? '–'
-                : new Date(z.openUntilTs).toLocaleTimeString('de-DE', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-            </dd>
+            <dt>{t('Offen bis', 'Open until')}</dt>
+            <dd>{z.openUntilTs === null ? '–' : fmtTime(z.openUntilTs)}</dd>
           </div>
         </dl>
       </div>
 
       <p class={`irr-zone__why${z.blockedBy !== null ? ' irr-zone__why--blocked' : ''}`}>
-        {z.valveOn === true ? '💧 bewässert gerade · ' : ''}
-        {z.nextActionLabel}
+        {z.valveOn === true ? `💧 ${t('bewässert gerade', 'watering now')} · ` : ''}
+        {tServer(z.nextActionLabel)}
       </p>
 
       {z.learned.emitterFault && (
-        <p class="irr-zone__fault">⚠ {z.learned.note}</p>
+        <p class="irr-zone__fault">⚠ {tServer(z.learned.note)}</p>
       )}
       {!z.learned.emitterFault && z.learned.sampleDays > 0 && (
         <p class="irr-zone__learn">
-          gelernt: Kc×{z.learned.kcFactor.toFixed(2)} · Abgabe×{z.learned.precipRateFactor.toFixed(2)} ({z.learned.sampleDays} Tg)
+          {t('gelernt', 'learned')}: Kc×{z.learned.kcFactor.toFixed(2)} · {t('Abgabe', 'output')}×{z.learned.precipRateFactor.toFixed(2)} ({z.learned.sampleDays} {t('Tg', 'd')})
         </p>
       )}
 
       {z.forecastPoints.length > 1 && (
         <div class="irr-zone__spark-wrap">
-          <span class="irr-zone__sparklbl">Bodenwasser-Prognose · 3 Tage</span>
+          <span class="irr-zone__sparklbl">{t('Bodenwasser-Prognose · 3 Tage', 'Soil-water forecast · 3 days')}</span>
           <svg class="irr-spark" viewBox="0 0 100 24" preserveAspectRatio="none" role="img"
-            aria-label="Prognose des verfügbaren Bodenwassers über die nächsten 3 Tage">
-            <title>Verfügbares Bodenwasser (Prognose, nächste ~3 Tage)</title>
+            aria-label={t('Prognose des verfügbaren Bodenwassers über die nächsten 3 Tage', 'Forecast of available soil water over the next 3 days')}>
+            <title>{t('Verfügbares Bodenwasser (Prognose, nächste ~3 Tage)', 'Available soil water (forecast, next ~3 days)')}</title>
             <polyline
               points={z.forecastPoints
                 .map((p, i) => {
@@ -176,7 +188,7 @@ function ZoneCard(props: { zone: IrrigationZoneView }): JSX.Element {
       {picking ? (
         <div class="irr-zone__picker" data-testid={`irr-picker-${z.id}`}>
           <label class="irr-zone__picker-lbl">
-            <span>Dauer</span>
+            <span>{t('Dauer', 'Duration')}</span>
             <select
               value={String(durationMin)}
               onChange={(e): void =>
@@ -190,17 +202,17 @@ function ZoneCard(props: { zone: IrrigationZoneView }): JSX.Element {
           </label>
           <div class="irr-zone__picker-actions">
             <button type="button" class="irr-btn" disabled={busy} onClick={() => void startWatering()}>
-              Start
+              {t('Start', 'Start')}
             </button>
             <button type="button" class="irr-btn irr-btn--ghost" onClick={() => setPicking(false)}>
-              Abbrechen
+              {t('Abbrechen', 'Cancel')}
             </button>
           </div>
         </div>
       ) : calibrating ? (
         <div class="irr-zone__picker" data-testid={`irr-calib-${z.id}`}>
           <label class="irr-zone__picker-lbl">
-            <span>Boden jetzt: {Math.round(calPct)} % verfügbar</span>
+            <span>{t(`Boden jetzt: ${Math.round(calPct)} % verfügbar`, `Soil now: ${Math.round(calPct)} % available`)}</span>
             <input
               type="range"
               min={0}
@@ -214,10 +226,10 @@ function ZoneCard(props: { zone: IrrigationZoneView }): JSX.Element {
           </label>
           <div class="irr-zone__picker-actions">
             <button type="button" class="irr-btn" disabled={busy} onClick={() => void applyCalibration()}>
-              Übernehmen
+              {t('Übernehmen', 'Apply')}
             </button>
             <button type="button" class="irr-btn irr-btn--ghost" onClick={() => setCalibrating(false)}>
-              Abbrechen
+              {t('Abbrechen', 'Cancel')}
             </button>
           </div>
         </div>
@@ -232,7 +244,7 @@ function ZoneCard(props: { zone: IrrigationZoneView }): JSX.Element {
               setPicking(true);
             }}
           >
-            Bewässern
+            {t('Bewässern', 'Water')}
           </button>
           <button
             type="button"
@@ -240,7 +252,7 @@ function ZoneCard(props: { zone: IrrigationZoneView }): JSX.Element {
             disabled={busy || !z.hasValve || z.valveOn !== true}
             onClick={() => void act(() => stopIrrigationZone(z.id))}
           >
-            Stopp
+            {t('Stopp', 'Stop')}
           </button>
           <button
             type="button"
@@ -248,19 +260,19 @@ function ZoneCard(props: { zone: IrrigationZoneView }): JSX.Element {
             disabled={busy}
             onClick={() => void act(() => skipIrrigationZone(z.id))}
           >
-            Heute aus
+            {t('Heute aus', 'Skip today')}
           </button>
           <button
             type="button"
             class="irr-btn irr-btn--ghost"
             disabled={busy}
-            title="Modellierten Bodenwasser-Stand auf den tatsächlichen Wert setzen"
+            title={t('Modellierten Bodenwasser-Stand auf den tatsächlichen Wert setzen', 'Set the modeled soil-water level to the actual value')}
             onClick={() => {
               setCalPct(z.availablePct);
               setCalibrating(true);
             }}
           >
-            Kalibrieren
+            {t('Kalibrieren', 'Calibrate')}
           </button>
         </div>
       )}
@@ -292,15 +304,15 @@ function dayLabel(dateKey: string): string {
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const today = key(now);
   const tmrw = key(new Date(now.getTime() + 86_400_000));
-  if (dateKey === today) return 'Heute';
-  if (dateKey === tmrw) return 'Morgen';
-  const [y, m, d] = dateKey.split('-').map((n) => Number.parseInt(n, 10));
+  if (dateKey === today) return t('Heute', 'Today');
+  if (dateKey === tmrw) return t('Morgen', 'Tomorrow');
+  const [y, m, d] = dateKey.split('-').map((s) => Number.parseInt(s, 10));
   const dt = new Date(y as number, (m as number) - 1, d as number);
-  return dt.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' });
+  return dt.toLocaleDateString(locale(), { weekday: 'long', day: '2-digit', month: '2-digit' });
 }
 
 function hhmm(tsIso: string): string {
-  return new Date(tsIso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return fmtTime(tsIso);
 }
 
 /** A single day's draggable timeline track. */
@@ -320,7 +332,6 @@ function TimelineDay(props: {
     const el = trackRef.current;
     if (el === null) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    // Cache the track geometry once — avoids a layout reflow on every move.
     const rect = el.getBoundingClientRect();
     const pointerMin = snap(((e.clientX - rect.left) / rect.width) * 1440);
     const cur = localMinutes(entry.startTs);
@@ -376,15 +387,7 @@ function TimelineDay(props: {
   );
 }
 
-/**
- * Editable day-ahead plan: per-entry drag-to-move on a 24 h timeline, plus a
- * precise list (time, duration, on/off, delete) and an add row. Entries are
- * seeded from the forecast and executed by the engine at their time.
- *
- * Edits apply optimistically to a local copy so the UI updates instantly
- * (the server snapshot only refreshes on its next poll); the local copy is
- * dropped again once a fresh snapshot has had time to catch up.
- */
+/** Editable day-ahead plan (drag timeline + list + add row), optimistic. */
 function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: IrrigationZoneView[] }): JSX.Element {
   const [addZone, setAddZone] = useState('');
   const [addTime, setAddTime] = useState('06:00');
@@ -393,7 +396,6 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
   const [local, setLocal] = useState<IrrigationPlanEntryView[] | null>(null);
   const lastEdit = useRef(0);
 
-  // Adopt the authoritative server plan once our optimistic window elapsed.
   useEffect(() => {
     if (Date.now() - lastEdit.current > 2500) setLocal(null);
   }, [props.plan]);
@@ -405,7 +407,10 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
     setLocal(next);
     void op.then((ok) => {
       if (!ok) {
-        setErr('Überschneidung – es darf nie mehr als ein Ventil gleichzeitig offen sein.');
+        setErr(t(
+          'Überschneidung – es darf nie mehr als ein Ventil gleichzeitig offen sein.',
+          'Overlap – never more than one valve open at a time.',
+        ));
         setLocal(null);
       } else {
         setErr(null);
@@ -427,7 +432,7 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
     applyLocal(next, updatePlanEntry(id, { startTs }));
   };
   const setTime = (entry: IrrigationPlanEntryView, value: string): void => {
-    const [h, m] = value.split(':').map((n) => Number.parseInt(n, 10));
+    const [h, m] = value.split(':').map((s) => Number.parseInt(s, 10));
     if (!Number.isFinite(h) || !Number.isFinite(m)) return;
     const startTs = tsWithMinutes(entry.startTs, (h as number) * 60 + (m as number));
     const next = plan.map((e) => (e.id === entry.id ? { ...e, startTs, source: 'manual' as const } : e));
@@ -448,10 +453,10 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
   const doAdd = (): void => {
     const zoneId = addZone !== '' ? addZone : (props.zones[0]?.id ?? '');
     if (zoneId === '') return;
-    const [h, m] = addTime.split(':').map((n) => Number.parseInt(n, 10));
+    const [h, m] = addTime.split(':').map((s) => Number.parseInt(s, 10));
     const now = new Date();
     let start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h as number, m as number, 0, 0);
-    if (start.getTime() <= now.getTime()) start = new Date(start.getTime() + 86_400_000); // next occurrence
+    if (start.getTime() <= now.getTime()) start = new Date(start.getTime() + 86_400_000);
     const startTs = start.toISOString();
     const zoneName = props.zones.find((z) => z.id === zoneId)?.name ?? zoneId;
     const temp: IrrigationPlanEntryView = {
@@ -467,7 +472,6 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
     applyLocal([...plan, temp], addPlanEntry(zoneId, startTs, addDur));
   };
 
-  // Group entries by local day, sorted.
   const byDay = new Map<string, IrrigationPlanEntryView[]>();
   for (const e of [...plan].sort((a, b) => Date.parse(a.startTs) - Date.parse(b.startTs))) {
     const k = dayKeyOf(e.startTs);
@@ -477,14 +481,16 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
 
   return (
     <article class="module-panel__card irr-plan" data-testid="irr-plan">
-      <h3>Bewässerungsplan · verschiebbar</h3>
+      <h3>{t('Bewässerungsplan · verschiebbar', 'Irrigation plan · draggable')}</h3>
       {err !== null && (
         <p class="irr-plan__err" data-testid="irr-plan-err">{err}</p>
       )}
       {plan.length === 0 ? (
         <p class="module-panel__hint">
-          Keine Bewässerung geplant – der Boden hat genug Reserve. Du kannst unten
-          einen Eintrag manuell hinzufügen.
+          {t(
+            'Keine Bewässerung geplant – der Boden hat genug Reserve. Du kannst unten einen Eintrag manuell hinzufügen.',
+            'No watering planned – the soil has enough reserve. You can add an entry manually below.',
+          )}
         </p>
       ) : (
         <Fragment>
@@ -496,7 +502,7 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
               .sort((a, b) => Date.parse(a.startTs) - Date.parse(b.startTs))
               .map((e) => (
                 <li key={e.id} class="irr-plan__item" data-testid={`irr-plan-item-${e.id}`}>
-                  <label class="irr-plan__chk" title="Aktiv">
+                  <label class="irr-plan__chk" title={t('Aktiv', 'Active')}>
                     <input
                       type="checkbox"
                       checked={e.enabled}
@@ -506,7 +512,7 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
                   <span class="irr-plan__zone">
                     {e.zoneName}
                     {e.done ? ' ✓' : ''}
-                    {e.source === 'auto' ? ' · auto' : ''}
+                    {e.source === 'auto' ? t(' · auto', ' · auto') : ''}
                   </span>
                   <input
                     class="irr-plan__time"
@@ -528,7 +534,7 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
                   <button
                     type="button"
                     class="irr-plan__del"
-                    title="Eintrag löschen"
+                    title={t('Eintrag löschen', 'Delete entry')}
                     onClick={(): void => del(e.id)}
                   >
                     ✕
@@ -541,7 +547,7 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
 
       <div class="irr-plan__add" data-testid="irr-plan-add">
         <select value={addZone} onChange={(e): void => setAddZone((e.currentTarget as HTMLSelectElement).value)}>
-          <option value="">Zone wählen…</option>
+          <option value="">{t('Zone wählen…', 'Choose zone…')}</option>
           {props.zones.map((z) => (
             <option key={z.id} value={z.id}>{z.name}</option>
           ))}
@@ -552,13 +558,14 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
             <option key={m} value={String(m)}>{m} min</option>
           ))}
         </select>
-        <button type="button" class="irr-btn" onClick={doAdd}>+ Eintrag</button>
+        <button type="button" class="irr-btn" onClick={doAdd}>{t('+ Eintrag', '+ Entry')}</button>
       </div>
 
       <p class="module-panel__hint irr-plan__note">
-        Blöcke per Drag verschieben oder Zeit/Dauer unten setzen. Auto-Einträge
-        kommen aus dem Forecast; sobald du sie änderst, bleiben sie fix. Es ist
-        immer nur ein Ventil gleichzeitig offen.
+        {t(
+          'Blöcke per Drag verschieben oder Zeit/Dauer unten setzen. Auto-Einträge kommen aus dem Forecast; sobald du sie änderst, bleiben sie fix. Es ist immer nur ein Ventil gleichzeitig offen.',
+          'Drag blocks to move them, or set time/duration below. Auto entries come from the forecast; once you edit one it stays fixed. Only one valve is ever open at a time.',
+        )}
       </p>
     </article>
   );
@@ -576,33 +583,38 @@ export function IrrigationZones(props: { info: IrrigationInfo }): JSX.Element {
   return (
     <section class="irrigation-zones" data-testid="irrigation-zones">
       <header class="irrigation-zones__head">
-        <h2>Bewässerung · Zonen</h2>
+        <h2>{t('Bewässerung · Zonen', 'Irrigation · Zones')}</h2>
         <span class={`irr-mode irr-mode--${i.mode}`}>
-          {i.autoMode ? 'Auto · ' : ''}
-          {MODE_LABEL[i.mode] ?? i.mode}
+          {i.autoMode ? `${t('Auto', 'Auto')} · ` : ''}
+          {modeLabel(i.mode)}
         </span>
       </header>
 
       <div class="irr-kpis">
-        {kpi('ET₀ heute', i.et0TodayMm === null ? '–' : `${i.et0TodayMm.toFixed(1)} mm`, 'irr-kpi-et0')}
-        {kpi('Regen heute', i.rainTodayMm === null ? '–' : `${i.rainTodayMm.toFixed(1)} mm`, 'irr-kpi-rain')}
-        {kpi('Regen-Prognose', i.rainForecastMm === null ? '–' : `${i.rainForecastMm.toFixed(1)} mm`, 'irr-kpi-rainfc')}
-        {kpi('PV-Überschuss', i.pvSurplusKw === null ? '–' : `${i.pvSurplusKw.toFixed(1)} kW`, 'irr-kpi-pv')}
-        {kpi('Heute gesamt', fmtMinutes(i.totalSecondsUsedToday), 'irr-kpi-total')}
-        {kpi('Automatik', i.enabled ? 'an' : 'aus', 'irr-kpi-auto')}
+        {kpi('ET₀ ' + t('heute', 'today'), i.et0TodayMm === null ? '–' : `${n1(i.et0TodayMm)} mm`, 'irr-kpi-et0')}
+        {kpi(t('Regen heute', 'Rain today'), i.rainTodayMm === null ? '–' : `${n1(i.rainTodayMm)} mm`, 'irr-kpi-rain')}
+        {kpi(t('Regen-Prognose', 'Rain forecast'), i.rainForecastMm === null ? '–' : `${n1(i.rainForecastMm)} mm`, 'irr-kpi-rainfc')}
+        {kpi(t('PV-Überschuss', 'PV surplus'), i.pvSurplusKw === null ? '–' : `${n1(i.pvSurplusKw)} kW`, 'irr-kpi-pv')}
+        {kpi(t('Heute gesamt', 'Total today'), fmtMinutes(i.totalSecondsUsedToday), 'irr-kpi-total')}
+        {kpi(t('Automatik', 'Automatic'), i.enabled ? t('an', 'on') : t('aus', 'off'), 'irr-kpi-auto')}
       </div>
 
       {!i.enabled && (
         <p class="module-panel__hint">
-          Automatische Bewässerung ist <strong>aus</strong>. Du kannst Zonen manuell
-          steuern; aktiviere die Automatik mit dem Schalter oben.
+          {t('Automatische Bewässerung ist aus.', 'Automatic irrigation is off.')}{' '}
+          {t(
+            'Du kannst Zonen manuell steuern; aktiviere die Automatik mit dem Schalter oben.',
+            'You can control zones manually; enable automation with the switch above.',
+          )}
         </p>
       )}
 
       {i.zones.length === 0 ? (
         <p class="module-panel__hint">
-          Noch keine Zonen angelegt. Lege unter Einstellungen → Bewässerung Zonen an
-          und ordne ihnen je ein Gardena-Ventil (und optional einen Bodenfeuchte-Sensor) zu.
+          {t(
+            'Noch keine Zonen angelegt. Lege unter Einstellungen → Bewässerung Zonen an und ordne ihnen je ein Gardena-Ventil (und optional einen Bodenfeuchte-Sensor) zu.',
+            'No zones yet. Create zones under Settings → Irrigation and assign each a Gardena valve (and optionally a soil-moisture sensor).',
+          )}
         </p>
       ) : (
         <Fragment>

@@ -28,6 +28,7 @@ import { Fragment, h, type JSX } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import type { Mode } from '../types.js';
+import { t } from '../i18n.js';
 
 // ---------------------------------------------------------------------------
 // Wire types — kept inline so the SPA bundle does not import server types.
@@ -248,10 +249,10 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
     <section
       class="diag-decisions"
       data-testid="diag-decisions"
-      aria-label="Decision records"
+      aria-label={t('Entscheidungs-Protokoll', 'Decision records')}
     >
       <header class="diag-section__header">
-        <h3>Entscheidungs-Protokoll</h3>
+        <h3>{t('Entscheidungs-Protokoll', 'Decision records')}</h3>
         <div class="diag-decisions__controls">
           <label class="diag-decisions__slider">
             <span>
@@ -276,7 +277,7 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
             />
           </label>
           <label>
-            Mode:{' '}
+            {t('Modus', 'Mode')}:{' '}
             <select
               data-testid="diag-decisions-filter-mode"
               value={props.filter.mode}
@@ -288,7 +289,7 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
                 });
               }}
             >
-              <option value="ALL">all</option>
+              <option value="ALL">{t('alle', 'all')}</option>
               {ALL_MODES.map((m) => (
                 <option key={m} value={m}>
                   {m}
@@ -297,7 +298,7 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
             </select>
           </label>
           <label>
-            Window:{' '}
+            {t('Fenster', 'Window')}:{' '}
             <input
               type="text"
               data-testid="diag-decisions-filter-window"
@@ -310,7 +311,7 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
             />
           </label>
           <label>
-            BlockedBy:{' '}
+            {t('Blockiert von', 'BlockedBy')}:{' '}
             <select
               data-testid="diag-decisions-filter-blocked"
               value={props.filter.blockedBy}
@@ -323,8 +324,8 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
                 props.onFilter({ ...props.filter, blockedBy: blocked });
               }}
             >
-              <option value="ALL">all</option>
-              <option value="NONE">none (free)</option>
+              <option value="ALL">{t('alle', 'all')}</option>
+              <option value="NONE">{t('keine (frei)', 'none (free)')}</option>
               {ALL_BLOCKED.map((b) => (
                 <option key={b} value={b}>
                   {b}
@@ -339,7 +340,7 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
               props.onReload();
             }}
           >
-            Neu laden
+            {t('Neu laden', 'Reload')}
           </button>
           <button
             type="button"
@@ -349,7 +350,7 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
               exportDecisionsAsJson(filtered);
             }}
           >
-            JSON Export
+            {t('JSON-Export', 'JSON export')}
           </button>
         </div>
       </header>
@@ -361,18 +362,18 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
       )}
       {props.loading && (
         <p class="diag-hint" data-testid="diag-decisions-loading">
-          Wird geladen…
+          {t('Wird geladen…', 'Loading…')}
         </p>
       )}
 
       <table class="diag-table" data-testid="diag-decisions-table">
         <thead>
           <tr>
-            <th>Time</th>
-            <th>Cycle</th>
-            <th>Mode</th>
-            <th>Windows</th>
-            <th>Blocked</th>
+            <th>{t('Zeit', 'Time')}</th>
+            <th>{t('Zyklus', 'Cycle')}</th>
+            <th>{t('Modus', 'Mode')}</th>
+            <th>{t('Fenster', 'Windows')}</th>
+            <th>{t('Blockiert', 'Blocked')}</th>
           </tr>
         </thead>
         <tbody data-testid="diag-decisions-rows">
@@ -399,7 +400,7 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
             <tr>
               <td colSpan={5}>
                 <em data-testid="diag-decisions-empty">
-                  Keine Einträge für den aktuellen Filter.
+                  {t('Keine Einträge für den aktuellen Filter.', 'No entries for the current filter.')}
                 </em>
               </td>
             </tr>
@@ -407,9 +408,9 @@ function DecisionsSection(props: DecisionsSectionProps): JSX.Element {
         </tbody>
       </table>
       <p class="diag-decisions__footer">
-        Showing{' '}
-        <strong data-testid="diag-decisions-count">{filtered.length}</strong> of{' '}
-        {props.records.length} loaded.
+        {t('Zeige', 'Showing')}{' '}
+        <strong data-testid="diag-decisions-count">{filtered.length}</strong> {t('von', 'of')}{' '}
+        {props.records.length} {t('geladen.', 'loaded.')}
       </p>
     </section>
   );
@@ -503,10 +504,10 @@ function ConnectLogSection(props: ConnectLogSectionProps): JSX.Element {
     <section
       class="diag-connect-log"
       data-testid="diag-connect-log"
-      aria-label="Connect log"
+      aria-label={t('Connect-Protokoll', 'Connect log')}
     >
       <header class="diag-section__header">
-        <h3>Connect-Protokoll</h3>
+        <h3>{t('Connect-Protokoll', 'Connect log')}</h3>
         <div class="diag-connect-log__controls">
           <label>
             Level:{' '}
@@ -517,7 +518,7 @@ function ConnectLogSection(props: ConnectLogSectionProps): JSX.Element {
                 props.onLevelFilter((e.currentTarget as HTMLSelectElement).value);
               }}
             >
-              <option value="ALL">all</option>
+              <option value="ALL">{t('alle', 'all')}</option>
               {ALL_LEVELS.map((l) => (
                 <option key={l} value={l}>
                   {l}
@@ -534,7 +535,7 @@ function ConnectLogSection(props: ConnectLogSectionProps): JSX.Element {
                 props.onLive((e.currentTarget as HTMLInputElement).checked);
               }}
             />{' '}
-            Live (10s)
+            {t('Live (10s)', 'Live (10s)')}
           </label>
           <button
             type="button"
@@ -543,14 +544,14 @@ function ConnectLogSection(props: ConnectLogSectionProps): JSX.Element {
               props.onReload();
             }}
           >
-            Neu laden
+            {t('Neu laden', 'Reload')}
           </button>
         </div>
       </header>
 
       {props.state.unavailable && (
         <p class="diag-hint" data-testid="diag-connect-log-unavailable">
-          Connect-API-Protokoll noch nicht verbunden.
+          {t('Connect-API-Protokoll noch nicht verbunden.', 'Connect API log not connected yet.')}
         </p>
       )}
       {props.state.error !== null && (
@@ -560,17 +561,17 @@ function ConnectLogSection(props: ConnectLogSectionProps): JSX.Element {
       )}
       {props.state.loading && !props.live && (
         <p class="diag-hint" data-testid="diag-connect-log-loading">
-          Wird geladen…
+          {t('Wird geladen…', 'Loading…')}
         </p>
       )}
 
       <table class="diag-table" data-testid="diag-connect-log-table">
         <thead>
           <tr>
-            <th>Time</th>
-            <th>Level</th>
-            <th>Message</th>
-            <th>Ctx</th>
+            <th>{t('Zeit', 'Time')}</th>
+            <th>{t('Level', 'Level')}</th>
+            <th>{t('Nachricht', 'Message')}</th>
+            <th>{t('Kontext', 'Ctx')}</th>
           </tr>
         </thead>
         <tbody data-testid="diag-connect-log-rows">
@@ -594,7 +595,7 @@ function ConnectLogSection(props: ConnectLogSectionProps): JSX.Element {
               <tr>
                 <td colSpan={4}>
                   <em data-testid="diag-connect-log-empty">
-                    No log entries.
+                    {t('Keine Protokolleinträge.', 'No log entries.')}
                   </em>
                 </td>
               </tr>
@@ -667,14 +668,14 @@ function ProbeSection(): JSX.Element {
     <section
       class="diag-probe"
       data-testid="diag-probe"
-      aria-label="Probelauf"
+      aria-label={t('Probelauf', 'Dry run')}
     >
       <header class="diag-section__header">
-        <h3>Probelauf jetzt</h3>
+        <h3>{t('Probelauf jetzt', 'Dry run now')}</h3>
       </header>
       <p class="diag-hint">
-        Runs one synthetic engine cycle without dispatching{' '}
-        <code>setShutterLevel</code> to any HMIP shutter (steering rule).
+        {t('Rechnet einen synthetischen Engine-Zyklus, ohne', 'Runs one synthetic engine cycle without dispatching')}{' '}
+        <code>setShutterLevel</code> {t('an einen HMIP-Rollladen zu senden (Steering-Regel).', 'to any HMIP shutter (steering rule).')}
       </p>
       <button
         type="button"
@@ -684,12 +685,12 @@ function ProbeSection(): JSX.Element {
           void runProbe();
         }}
       >
-        {state.loading ? 'Läuft…' : 'Probelauf starten'}
+        {state.loading ? t('Läuft…', 'Running…') : t('Probelauf starten', 'Start dry run')}
       </button>
 
       {state.unavailable && (
         <p class="diag-hint" data-testid="diag-probe-unavailable">
-          Probelauf noch nicht verfügbar.
+          {t('Probelauf noch nicht verfügbar.', 'Dry run not available yet.')}
         </p>
       )}
       {state.error !== null && (
@@ -701,10 +702,10 @@ function ProbeSection(): JSX.Element {
       {state.result !== null && (
         <Fragment>
           <p>
-            Mode:{' '}
+            {t('Modus', 'Mode')}:{' '}
             <strong data-testid="diag-probe-mode">{state.result.mode}</strong>
             {'  '}
-            <small>cycle {state.result.cycleId}</small>
+            <small>{t('Zyklus', 'cycle')} {state.result.cycleId}</small>
           </p>
           <ul data-testid="diag-probe-windows">
             {state.result.windowDecisions.map((w) => (
@@ -715,7 +716,7 @@ function ProbeSection(): JSX.Element {
                 <strong>{w.windowId}</strong>: finalTarget ={' '}
                 {(w.finalTarget * 100).toFixed(0)}%
                 {w.blockedBy !== undefined && (
-                  <span> (blocked: {w.blockedBy})</span>
+                  <span> ({t('blockiert', 'blocked')}: {w.blockedBy})</span>
                 )}
               </li>
             ))}
@@ -765,7 +766,7 @@ export function DiagnosticsTab(): JSX.Element {
 
   return (
     <section class="tab-diagnostics" data-testid="tab-diagnostics">
-      <h2>Diagnose</h2>
+      <h2>{t('Diagnose', 'Diagnostics')}</h2>
 
       <DecisionsSection
         records={decisions.records}
@@ -807,11 +808,11 @@ function SettingsBackup(): JSX.Element {
   const [status, setStatus] = useState<string | null>(null);
 
   const onExport = async (): Promise<void> => {
-    setStatus('Exportiere…');
+    setStatus(t('Exportiere…', 'Exporting…'));
     try {
       const res = await fetch('/api/config', { headers: { Accept: 'application/json' } });
       if (!res.ok) {
-        setStatus(`Fehler: HTTP ${res.status}`);
+        setStatus(t(`Fehler: HTTP ${res.status}`, `Error: HTTP ${res.status}`));
         return;
       }
       const text = await res.text();
@@ -825,14 +826,14 @@ function SettingsBackup(): JSX.Element {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setStatus('Exportiert.');
+      setStatus(t('Exportiert.', 'Exported.'));
     } catch (err) {
-      setStatus(`Fehler: ${err instanceof Error ? err.message : 'unbekannt'}`);
+      setStatus(t(`Fehler: ${err instanceof Error ? err.message : 'unbekannt'}`, `Error: ${err instanceof Error ? err.message : 'unknown'}`));
     }
   };
 
   const onImport = async (file: File): Promise<void> => {
-    setStatus('Importiere…');
+    setStatus(t('Importiere…', 'Importing…'));
     try {
       const text = await file.text();
       const parsed = JSON.parse(text) as unknown;
@@ -842,24 +843,24 @@ function SettingsBackup(): JSX.Element {
         body: JSON.stringify(parsed),
       });
       if (res.ok) {
-        setStatus('Importiert und gespeichert. ✅');
+        setStatus(t('Importiert und gespeichert. ✅', 'Imported and saved. ✅'));
       } else {
         const body = (await res.json().catch(() => null)) as
           | { error?: { message?: string } }
           | null;
-        setStatus(`Abgelehnt: ${body?.error?.message ?? `HTTP ${res.status}`}`);
+        setStatus(t(`Abgelehnt: ${body?.error?.message ?? `HTTP ${res.status}`}`, `Rejected: ${body?.error?.message ?? `HTTP ${res.status}`}`));
       }
     } catch (err) {
-      setStatus(`Ungültige Datei: ${err instanceof Error ? err.message : 'unbekannt'}`);
+      setStatus(t(`Ungültige Datei: ${err instanceof Error ? err.message : 'unbekannt'}`, `Invalid file: ${err instanceof Error ? err.message : 'unknown'}`));
     }
   };
 
   const onExportFull = async (): Promise<void> => {
-    setStatus('Erstelle Voll-Backup…');
+    setStatus(t('Erstelle Voll-Backup…', 'Creating full backup…'));
     try {
       const res = await fetch('/api/backup', { headers: { Accept: 'application/json' } });
       if (!res.ok) {
-        setStatus(`Fehler: HTTP ${res.status}`);
+        setStatus(t(`Fehler: HTTP ${res.status}`, `Error: HTTP ${res.status}`));
         return;
       }
       const text = await res.text();
@@ -873,14 +874,14 @@ function SettingsBackup(): JSX.Element {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setStatus('Voll-Backup exportiert.');
+      setStatus(t('Voll-Backup exportiert.', 'Full backup exported.'));
     } catch (err) {
-      setStatus(`Fehler: ${err instanceof Error ? err.message : 'unbekannt'}`);
+      setStatus(t(`Fehler: ${err instanceof Error ? err.message : 'unbekannt'}`, `Error: ${err instanceof Error ? err.message : 'unknown'}`));
     }
   };
 
   const onImportFull = async (file: File): Promise<void> => {
-    setStatus('Stelle Voll-Backup wieder her…');
+    setStatus(t('Stelle Voll-Backup wieder her…', 'Restoring full backup…'));
     try {
       const text = await file.text();
       const parsed = JSON.parse(text) as unknown;
@@ -890,21 +891,21 @@ function SettingsBackup(): JSX.Element {
         body: JSON.stringify(parsed),
       });
       if (res.ok) {
-        setStatus('Backup wiederhergestellt (Config + Lerndaten). ✅');
+        setStatus(t('Backup wiederhergestellt (Config + Lerndaten). ✅', 'Backup restored (config + learning data). ✅'));
       } else {
         const body = (await res.json().catch(() => null)) as
           | { error?: { message?: string } }
           | null;
-        setStatus(`Abgelehnt: ${body?.error?.message ?? `HTTP ${res.status}`}`);
+        setStatus(t(`Abgelehnt: ${body?.error?.message ?? `HTTP ${res.status}`}`, `Rejected: ${body?.error?.message ?? `HTTP ${res.status}`}`));
       }
     } catch (err) {
-      setStatus(`Ungültige Datei: ${err instanceof Error ? err.message : 'unbekannt'}`);
+      setStatus(t(`Ungültige Datei: ${err instanceof Error ? err.message : 'unbekannt'}`, `Invalid file: ${err instanceof Error ? err.message : 'unknown'}`));
     }
   };
 
   return (
     <section class="diag-backup" data-testid="diag-backup">
-      <h3>Sichern / wiederherstellen</h3>
+      <h3>{t('Sichern / wiederherstellen', 'Backup / restore')}</h3>
       <div class="diag-backup__row">
         <button
           type="button"
@@ -913,10 +914,10 @@ function SettingsBackup(): JSX.Element {
             void onExport();
           }}
         >
-          Konfiguration exportieren
+          {t('Konfiguration exportieren', 'Export configuration')}
         </button>
         <label class="diag-backup__import">
-          Konfiguration importieren …
+          {t('Konfiguration importieren …', 'Import configuration …')}
           <input
             type="file"
             accept="application/json,.json"
@@ -940,10 +941,10 @@ function SettingsBackup(): JSX.Element {
             void onExportFull();
           }}
         >
-          Voll-Backup exportieren (inkl. Lerndaten)
+          {t('Voll-Backup exportieren (inkl. Lerndaten)', 'Export full backup (incl. learning data)')}
         </button>
         <label class="diag-backup__import">
-          Voll-Backup wiederherstellen …
+          {t('Voll-Backup wiederherstellen …', 'Restore full backup …')}
           <input
             type="file"
             accept="application/json,.json"
@@ -964,11 +965,10 @@ function SettingsBackup(): JSX.Element {
         )}
       </div>
       <p class="diag-backup__hint">
-        Das Voll-Backup enthält Konfiguration, gelernte Beschattungs-Effekte
-        (<code>learning.ndjson</code>) und die thermische Kalibrierung
-        (<code>calibration.ndjson</code>) in einer Datei. Der Telegram-Bot-Token
-        wird maskiert exportiert; beim Wiederherstellen bleibt der aktuell
-        gespeicherte Token erhalten.
+        {t(
+          'Das Voll-Backup enthält Konfiguration, gelernte Beschattungs-Effekte (learning.ndjson) und die thermische Kalibrierung (calibration.ndjson) in einer Datei. Der Telegram-Bot-Token wird maskiert exportiert; beim Wiederherstellen bleibt der aktuell gespeicherte Token erhalten.',
+          'The full backup contains the configuration, learned shading effects (learning.ndjson) and the thermal calibration (calibration.ndjson) in a single file. The Telegram bot token is exported masked; on restore the currently stored token is preserved.',
+        )}
       </p>
     </section>
   );

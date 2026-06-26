@@ -50,10 +50,52 @@ interface MessageTemplate {
   enabledKey: keyof NotificationEvents;
 }
 
-function templateFor(event: ShadingEvent): MessageTemplate {
+/** Notification language (installation-wide; default German). */
+export type NotificationLang = 'de' | 'en';
+
+function templateFor(event: ShadingEvent, lang: NotificationLang): MessageTemplate {
   const where = event.label !== undefined && event.label.length > 0
     ? ` (${event.label})`
     : '';
+  if (lang === 'en') {
+    switch (event.kind) {
+      case 'shade.activated':
+        return {
+          kind: 'close',
+          title: 'Heat protection active',
+          body: `The shutter${where} is closing to protect against heat.`,
+          enabledKey: 'close',
+        };
+      case 'shade.released':
+        return {
+          kind: 'open',
+          title: 'Shutter opening',
+          body: `No direct sun anymore – the shutter${where} is opening again.`,
+          enabledKey: 'open',
+        };
+      case 'venting.suggested':
+        return {
+          kind: 'ventilate',
+          title: 'Airing recommended',
+          body: `It is cooler outside – now would be a good moment to air${where}.`,
+          enabledKey: 'ventilate',
+        };
+      case 'window.opened':
+        return {
+          kind: 'ventilate',
+          title: 'Airing detected',
+          body: `Window${where} opened – automation pauses for this window until it is closed again.`,
+          enabledKey: 'ventilate',
+        };
+      case 'window.closed':
+        return {
+          kind: 'info',
+          title: 'Window closed',
+          body: `Window${where} closed – shading control is active again.`,
+          enabledKey: 'ventilate',
+        };
+    }
+  }
   switch (event.kind) {
     case 'shade.activated':
       return {
@@ -99,6 +141,8 @@ export interface NotificationServiceDeps {
   telegram: TelegramConfig;
   /** Per-event enable toggles. */
   events: NotificationEvents;
+  /** Notification language (installation-wide). Defaults to German. */
+  language?: NotificationLang;
   /** Injectable clock. Defaults to `() => new Date()`. */
   now?: () => Date;
   /** Injectable id generator. Defaults to `randomUUID`. */
@@ -121,6 +165,8 @@ export class NotificationService {
 
   private readonly events: NotificationEvents;
 
+  private readonly language: NotificationLang;
+
   private readonly now: () => Date;
 
   private readonly idGen: () => string;
@@ -138,6 +184,7 @@ export class NotificationService {
     this.store = deps.store;
     this.telegram = deps.telegram;
     this.events = deps.events;
+    this.language = deps.language ?? 'de';
     this.now = deps.now ?? ((): Date => new Date());
     this.idGen = deps.idGen ?? ((): string => randomUUID());
     this.telegramOptions = deps.telegramOptions;
@@ -180,7 +227,7 @@ export class NotificationService {
     const created: Message[] = [];
     for (const kind of order) {
       const group = byKind.get(kind)!;
-      const tpl = templateFor(group[0]!);
+      const tpl = templateFor(group[0]!, this.language);
       if (!this.events[tpl.enabledKey]) {
         continue;
       }
@@ -210,13 +257,42 @@ export class NotificationService {
     group: readonly ShadingEvent[],
   ): { title: string; body: string } {
     if (group.length === 1) {
-      const tpl = templateFor(group[0]!);
+      const tpl = templateFor(group[0]!, this.language);
       return { title: tpl.title, body: tpl.body };
     }
     const labels = group
       .map((e) => (e.label !== undefined && e.label.length > 0 ? e.label : e.windowId))
       .join(', ');
     const n = group.length;
+    if (this.language === 'en') {
+      switch (kind) {
+        case 'shade.activated':
+          return {
+            title: 'Heat protection active',
+            body: `${n} shutters are closing to protect against heat: ${labels}.`,
+          };
+        case 'shade.released':
+          return {
+            title: 'Shutters opening',
+            body: `No direct sun anymore – ${n} shutters are opening again: ${labels}.`,
+          };
+        case 'venting.suggested':
+          return {
+            title: 'Airing recommended',
+            body: `It is cooler outside – air now (${n} rooms): ${labels}.`,
+          };
+        case 'window.opened':
+          return {
+            title: 'Airing detected',
+            body: `${n} windows opened – automation pauses there until they are closed again: ${labels}.`,
+          };
+        case 'window.closed':
+          return {
+            title: 'Windows closed',
+            body: `${n} windows closed – shading control is active again: ${labels}.`,
+          };
+      }
+    }
     switch (kind) {
       case 'shade.activated':
         return {

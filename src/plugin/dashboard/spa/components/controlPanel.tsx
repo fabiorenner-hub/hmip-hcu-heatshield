@@ -11,17 +11,32 @@ import { useState } from 'preact/hooks';
 
 import { useControl } from '../hooks/useControl.js';
 import { windowDisplayName } from '../format.js';
+import { t } from '../i18n.js';
 import type { DashboardSnapshotWindow } from '../types.js';
 
 export interface ControlPanelProps {
   windows: DashboardSnapshotWindow[];
 }
 
-const SCENES: ReadonlyArray<{ label: string; level01: number; testId: string }> = [
-  { label: 'Alle auf', level01: 0, testId: 'scene-open' },
-  { label: 'Halbschatten', level01: 0.5, testId: 'scene-half' },
-  { label: 'Alle zu', level01: 1, testId: 'scene-close' },
+const SCENES: ReadonlyArray<{ level01: number; testId: string }> = [
+  { level01: 0, testId: 'scene-open' },
+  { level01: 0.5, testId: 'scene-half' },
+  { level01: 1, testId: 'scene-close' },
 ];
+
+/** Bilingual label for a scene button by its (technical) test id. */
+function sceneLabel(testId: string): string {
+  switch (testId) {
+    case 'scene-open':
+      return t('Alle auf', 'All up');
+    case 'scene-half':
+      return t('Halbschatten', 'Half shade');
+    case 'scene-close':
+      return t('Alle zu', 'All down');
+    default:
+      return testId;
+  }
+}
 
 export function ControlPanel(props: ControlPanelProps): JSX.Element {
   const control = useControl();
@@ -40,7 +55,7 @@ export function ControlPanel(props: ControlPanelProps): JSX.Element {
   return (
     <section class="control-panel" data-testid="control-panel">
       <header class="control-panel__head">
-        <h3>Manuelle Steuerung</h3>
+        <h3>{t('Manuelle Steuerung', 'Manual control')}</h3>
         {control.busy.value && <span class="control-panel__busy">…</span>}
       </header>
 
@@ -56,14 +71,14 @@ export function ControlPanel(props: ControlPanelProps): JSX.Element {
               void control.applyScene(ids, s.level01);
             }}
           >
-            {s.label}
+            {sceneLabel(s.testId)}
           </button>
         ))}
       </div>
 
       {control.lastError.value !== null && (
         <p class="control-panel__error" data-testid="control-error">
-          Fehler: {control.lastError.value}
+          {t('Fehler', 'Error')}: {control.lastError.value}
         </p>
       )}
 
@@ -95,13 +110,13 @@ export function ControlPanel(props: ControlPanelProps): JSX.Element {
                   void control.setShutter(w.id, p / 100);
                 }}
               >
-                Fahren
+                {t('Fahren', 'Move')}
               </button>
             </li>
           );
         })}
         {props.windows.length === 0 && (
-          <li class="control-panel__empty">Keine Fenster konfiguriert.</li>
+          <li class="control-panel__empty">{t('Keine Fenster konfiguriert.', 'No windows configured.')}</li>
         )}
       </ul>
     </section>

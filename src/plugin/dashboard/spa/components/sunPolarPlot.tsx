@@ -30,6 +30,8 @@
 
 import { h, type JSX } from 'preact';
 
+import { t } from '../i18n.js';
+
 const SIZE = 320;
 const CENTER = SIZE / 2;
 const RADIUS = SIZE / 2 - 16;
@@ -88,7 +90,7 @@ export function SunPolarPlot(props: SunPolarPlotProps): JSX.Element {
       class="sun-polar"
       viewBox={`0 0 ${SIZE} ${SIZE}`}
       role="img"
-      aria-label="Sun polar plot"
+      aria-label={t('Sonnenstand-Polardiagramm', 'Sun polar plot')}
       data-testid="sun-polar"
     >
       {/* Horizon + altitude rings (30°, 60°, 90°-from-zenith). */}
@@ -105,10 +107,10 @@ export function SunPolarPlot(props: SunPolarPlotProps): JSX.Element {
       <circle cx={CENTER} cy={CENTER} r={RADIUS * (1 / 3)} fill="none" stroke="#3a4a5c" stroke-width={0.5} />
 
       {/* Cardinal labels. */}
-      <text x={CENTER} y={16} text-anchor="middle" fill="#cbd5e1" font-size="10">N</text>
-      <text x={SIZE - 6} y={CENTER + 4} text-anchor="end" fill="#cbd5e1" font-size="10">E</text>
-      <text x={CENTER} y={SIZE - 4} text-anchor="middle" fill="#cbd5e1" font-size="10">S</text>
-      <text x={6} y={CENTER + 4} text-anchor="start" fill="#cbd5e1" font-size="10">W</text>
+      <text x={CENTER} y={16} text-anchor="middle" fill="#cbd5e1" font-size="10">{t('N', 'N')}</text>
+      <text x={SIZE - 6} y={CENTER + 4} text-anchor="end" fill="#cbd5e1" font-size="10">{t('O', 'E')}</text>
+      <text x={CENTER} y={SIZE - 4} text-anchor="middle" fill="#cbd5e1" font-size="10">{t('S', 'S')}</text>
+      <text x={6} y={CENTER + 4} text-anchor="start" fill="#cbd5e1" font-size="10">{t('W', 'W')}</text>
 
       {/* Shadow wedge (cast opposite the sun; longer when the sun is low). */}
       {shadow !== null && (

@@ -18,6 +18,7 @@ export default defineConfig({
     ],
     environment: 'node',
     globals: false,
+    setupFiles: ['tests/setup/i18n-de.ts'],
     reporters: ['default'],
     coverage: {
       provider: 'v8',

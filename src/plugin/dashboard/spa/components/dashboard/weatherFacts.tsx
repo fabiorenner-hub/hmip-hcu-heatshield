@@ -9,6 +9,8 @@
 import { h, type JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
+import { t, fmtNum, locale } from '../../i18n.js';
+
 interface Facts {
   uv: number | null;
   humidity: number | null;
@@ -26,11 +28,15 @@ function hhmm(iso: string | null): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? '–'
-    : d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    : d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function mm(v: number): string {
+  return `${fmtNum(v, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`;
 }
 
 export function WeatherFacts(props: {
@@ -113,33 +119,31 @@ export function WeatherFacts(props: {
 
   return (
     <article class="weather-facts module-panel__card" data-testid="weather-facts">
-      <h3>Aktuelle Werte</h3>
+      <h3>{t('Aktuelle Werte', 'Current values')}</h3>
       <div class="weather-facts__grid">
-        {fact('UV-Index', f?.uv === null || f?.uv === undefined ? '–' : `${Math.round(f.uv)}`, 'wfact-uv')}
+        {fact(t('UV-Index', 'UV index'), f?.uv === null || f?.uv === undefined ? '–' : `${Math.round(f.uv)}`, 'wfact-uv')}
         {fact(
-          'Niederschlag jetzt',
-          f?.precipNow === null || f?.precipNow === undefined ? '–' : `${f.precipNow.toFixed(1)} mm`,
+          t('Niederschlag jetzt', 'Precipitation now'),
+          f?.precipNow === null || f?.precipNow === undefined ? '–' : mm(f.precipNow),
           'wfact-precip-now',
         )}
         {fact(
-          'Niederschlag heute',
-          f?.precipToday === null || f?.precipToday === undefined
-            ? '–'
-            : `${f.precipToday.toFixed(1)} mm`,
+          t('Niederschlag heute', 'Precipitation today'),
+          f?.precipToday === null || f?.precipToday === undefined ? '–' : mm(f.precipToday),
           'wfact-precip-today',
         )}
         {fact(
-          'Luftdruck',
+          t('Luftdruck', 'Air pressure'),
           f?.pressure === null || f?.pressure === undefined ? '–' : `${Math.round(f.pressure)} hPa`,
           'wfact-pressure',
         )}
         {fact(
-          'Luftfeuchte',
+          t('Luftfeuchte', 'Humidity'),
           f?.humidity === null || f?.humidity === undefined ? '–' : `${Math.round(f.humidity)} %`,
           'wfact-humidity',
         )}
-        {fact('Sonnenaufgang', hhmm(f?.sunrise ?? null), 'wfact-sunrise')}
-        {fact('Sonnenuntergang', hhmm(f?.sunset ?? null), 'wfact-sunset')}
+        {fact(t('Sonnenaufgang', 'Sunrise'), hhmm(f?.sunrise ?? null), 'wfact-sunrise')}
+        {fact(t('Sonnenuntergang', 'Sunset'), hhmm(f?.sunset ?? null), 'wfact-sunset')}
       </div>
     </article>
   );

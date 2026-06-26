@@ -11,6 +11,8 @@
 import { h, type JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
+import { t } from '../../i18n.js';
+
 interface WindState {
   speedMs: number | null;
   gustMs: number | null;
@@ -19,10 +21,16 @@ interface WindState {
 }
 
 const CARDINALS = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'] as const;
+const CARDINALS_EN = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
 
+function cardinalIdx(deg: number): number {
+  return Math.round((((deg % 360) + 360) % 360) / 45) % 8;
+}
+
+/** Localized cardinal abbreviation for a degree value (DE: N/NO/O/SO, EN: N/NE/E/SE). */
 function cardinal(deg: number): string {
-  const idx = Math.round(((deg % 360) + 360) % 360 / 45) % 8;
-  return CARDINALS[idx]!;
+  const idx = cardinalIdx(deg);
+  return t(CARDINALS[idx]!, CARDINALS_EN[idx]!);
 }
 
 function beaufort(ms: number): number {
@@ -98,9 +106,9 @@ export function WindRose(props: {
 
   return (
     <article class="windrose-card module-panel__card" data-testid="windrose">
-      <h3>Wind &amp; Windrichtung</h3>
+      <h3>{t('Wind & Windrichtung', 'Wind & wind direction')}</h3>
       <div class="windrose__body">
-        <svg class="windrose__dial" viewBox="0 0 100 100" role="img" aria-label="Windrose">
+        <svg class="windrose__dial" viewBox="0 0 100 100" role="img" aria-label={t('Windrose', 'Wind rose')}>
           <circle class="windrose__ring" cx={cx} cy={cy} r={r} />
           <circle class="windrose__ring windrose__ring--inner" cx={cx} cy={cy} r={r * 0.66} />
           {CARDINALS.map((c, i) => {
@@ -115,7 +123,7 @@ export function WindRose(props: {
                 y={ly}
                 text-anchor="middle"
               >
-                {c}
+                {t(c, CARDINALS_EN[i]!)}
               </text>
             );
           })}
@@ -138,29 +146,29 @@ export function WindRose(props: {
         </svg>
         <dl class="windrose__readout">
           <div>
-            <dt>Richtung</dt>
+            <dt>{t('Richtung', 'Direction')}</dt>
             <dd data-testid="windrose-dir">
               {dir === null ? '–' : `${cardinal(dir)} (${Math.round(dir)}°)`}
             </dd>
           </div>
           <div>
-            <dt>Geschwindigkeit</dt>
+            <dt>{t('Geschwindigkeit', 'Speed')}</dt>
             <dd>
               {speed === null ? '–' : `${Math.round(speed)} km/h`}
               {speed !== null && <span class="windrose__bft"> · {beaufort(speed / 3.6)} Bft</span>}
             </dd>
           </div>
           <div>
-            <dt>Böen</dt>
+            <dt>{t('Böen', 'Gusts')}</dt>
             <dd>{gust === null ? '–' : `${Math.round(gust)} km/h`}</dd>
           </div>
           <div>
-            <dt>Bewölkung</dt>
+            <dt>{t('Bewölkung', 'Cloud cover')}</dt>
             <dd data-testid="windrose-cloud">{cloud === null ? '–' : `${Math.round(cloud)} %`}</dd>
           </div>
         </dl>
       </div>
-      {error && <p class="windrose__error">Winddaten konnten nicht geladen werden.</p>}
+      {error && <p class="windrose__error">{t('Winddaten konnten nicht geladen werden.', 'Wind data could not be loaded.')}</p>}
     </article>
   );
 }

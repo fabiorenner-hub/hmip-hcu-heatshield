@@ -10,6 +10,8 @@
 import { h, type JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
+import { t } from '../../i18n.js';
+
 interface Outlook {
   gustTodayMax: number | null;
   gustTomorrowMax: number | null;
@@ -17,10 +19,12 @@ interface Outlook {
 }
 
 const CARDINALS = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'] as const;
+const CARDINALS_EN = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
 
+/** Localized cardinal abbreviation for a degree value (DE: N/NO/O/SO, EN: N/NE/E/SE). */
 function cardinal(deg: number): string {
   const idx = Math.round((((deg % 360) + 360) % 360) / 45) % 8;
-  return CARDINALS[idx]!;
+  return t(CARDINALS[idx]!, CARDINALS_EN[idx]!);
 }
 
 function num(v: unknown): number | null {
@@ -83,23 +87,23 @@ export function WindOutlook(props: {
 
   return (
     <article class="module-panel__card wind-outlook" data-testid="wind-outlook">
-      <h3>Wind-Ausblick</h3>
+      <h3>{t('Wind-Ausblick', 'Wind outlook')}</h3>
       {row(
-        'Böen heute (max)',
+        t('Böen heute (max)', 'Gusts today (max)'),
         o?.gustTodayMax === null || o?.gustTodayMax === undefined
           ? '–'
           : `${Math.round(o.gustTodayMax)} km/h`,
         'wind-outlook-gust-today',
       )}
       {row(
-        'Böen morgen (max)',
+        t('Böen morgen (max)', 'Gusts tomorrow (max)'),
         o?.gustTomorrowMax === null || o?.gustTomorrowMax === undefined
           ? '–'
           : `${Math.round(o.gustTomorrowMax)} km/h`,
         'wind-outlook-gust-tomorrow',
       )}
       {row(
-        'Hauptrichtung heute',
+        t('Hauptrichtung heute', 'Dominant direction today'),
         o?.domDirToday === null || o?.domDirToday === undefined
           ? '–'
           : `${cardinal(o.domDirToday)} (${Math.round(o.domDirToday)}°)`,

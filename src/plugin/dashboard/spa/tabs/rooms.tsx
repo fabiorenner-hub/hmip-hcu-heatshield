@@ -43,19 +43,20 @@ import {
   PRIORITY_LABELS,
   WINDOW_TYPE_LABELS,
 } from '../format.js';
+import { t } from '../i18n.js';
 
 const PRIORITIES: Room['priority'][] = ['very_high', 'high', 'medium', 'low'];
 
 /** Compass directions for the window orientation selector (0=N … clockwise). */
-const COMPASS_OPTIONS: ReadonlyArray<{ deg: number; label: string }> = [
-  { deg: 0, label: 'Nord' },
-  { deg: 45, label: 'Nordost' },
-  { deg: 90, label: 'Ost' },
-  { deg: 135, label: 'Südost' },
-  { deg: 180, label: 'Süd' },
-  { deg: 225, label: 'Südwest' },
-  { deg: 270, label: 'West' },
-  { deg: 315, label: 'Nordwest' },
+const COMPASS_OPTIONS: ReadonlyArray<{ deg: number; labelDe: string; labelEn: string }> = [
+  { deg: 0, labelDe: 'Nord', labelEn: 'North' },
+  { deg: 45, labelDe: 'Nordost', labelEn: 'Northeast' },
+  { deg: 90, labelDe: 'Ost', labelEn: 'East' },
+  { deg: 135, labelDe: 'Südost', labelEn: 'Southeast' },
+  { deg: 180, labelDe: 'Süd', labelEn: 'South' },
+  { deg: 225, labelDe: 'Südwest', labelEn: 'Southwest' },
+  { deg: 270, labelDe: 'West', labelEn: 'West' },
+  { deg: 315, labelDe: 'Nordwest', labelEn: 'Northwest' },
 ];
 
 /** Snap an arbitrary orientation to the nearest 45° compass option. */
@@ -73,7 +74,8 @@ function nearestCompassDeg(deg: number): number {
  * one-click button. Rooms are otherwise free-form (any name/floor).
  */
 interface RoomPreset {
-  name: string;
+  nameDe: string;
+  nameEn: string;
   floor: string;
   priority: Room['priority'];
 }
@@ -87,15 +89,15 @@ interface RoomPreset {
 const FLOOR_PRESETS: readonly string[] = ['KG', 'EG', 'OG', 'DG'];
 
 const ROOM_PRESETS: readonly RoomPreset[] = [
-  { name: 'Schlafzimmer', floor: 'OG', priority: 'very_high' },
-  { name: 'Arbeitszimmer', floor: 'OG', priority: 'high' },
-  { name: 'Gästezimmer', floor: 'OG', priority: 'medium' },
-  { name: 'Badezimmer', floor: 'OG', priority: 'medium' },
-  { name: 'Küche', floor: 'EG', priority: 'low' },
-  { name: 'Garderobe', floor: 'EG', priority: 'low' },
-  { name: 'Flur', floor: 'EG', priority: 'low' },
-  { name: 'Wohnzimmer', floor: 'EG', priority: 'high' },
-  { name: 'Keller', floor: 'KG', priority: 'low' },
+  { nameDe: 'Schlafzimmer', nameEn: 'Bedroom', floor: 'OG', priority: 'very_high' },
+  { nameDe: 'Arbeitszimmer', nameEn: 'Study', floor: 'OG', priority: 'high' },
+  { nameDe: 'Gästezimmer', nameEn: 'Guest room', floor: 'OG', priority: 'medium' },
+  { nameDe: 'Badezimmer', nameEn: 'Bathroom', floor: 'OG', priority: 'medium' },
+  { nameDe: 'Küche', nameEn: 'Kitchen', floor: 'EG', priority: 'low' },
+  { nameDe: 'Garderobe', nameEn: 'Cloakroom', floor: 'EG', priority: 'low' },
+  { nameDe: 'Flur', nameEn: 'Hallway', floor: 'EG', priority: 'low' },
+  { nameDe: 'Wohnzimmer', nameEn: 'Living room', floor: 'EG', priority: 'high' },
+  { nameDe: 'Keller', nameEn: 'Basement', floor: 'KG', priority: 'low' },
 ];
 
 /**
@@ -399,10 +401,11 @@ export function RoomsTab(): JSX.Element {
     touchedRef.current = true;
     setDraftRooms((prev) => {
       const existing = new Set(prev.map((r) => r.id));
-      const id = newRoomId(preset.name, existing);
+      const name = t(preset.nameDe, preset.nameEn);
+      const id = newRoomId(name, existing);
       const newRoom: Room = {
         id,
-        name: preset.name,
+        name,
         floor: preset.floor,
         priority: preset.priority,
         targets: { ...DEFAULT_TARGETS },
@@ -537,7 +540,7 @@ export function RoomsTab(): JSX.Element {
   return (
     <section class="tab-rooms" data-testid="tab-rooms">
       <header class="tab-rooms__header">
-        <h2>Räume und Fenster</h2>
+        <h2>{t('Räume und Fenster', 'Rooms and windows')}</h2>
         <div class="tab-rooms__actions">
           <button
             type="button"
@@ -546,17 +549,17 @@ export function RoomsTab(): JSX.Element {
               void runDiscovery();
             }}
           >
-            {discovery.discovering.value ? 'Suche läuft…' : 'Geräte suchen'}
+            {discovery.discovering.value ? t('Suche läuft…', 'Searching…') : t('Geräte suchen', 'Discover devices')}
           </button>
           <button
             type="button"
             data-testid="rooms-add"
             onClick={handleAddRoom}
           >
-            Raum hinzufügen
+            {t('Raum hinzufügen', 'Add room')}
           </button>
           <span class="tab-rooms__autosave" data-testid="rooms-autosave">
-            {cfg.loading.value ? 'Speichert…' : 'Automatisch gespeichert'}
+            {cfg.loading.value ? t('Speichert…', 'Saving…') : t('Automatisch gespeichert', 'Auto-saved')}
           </span>
         </div>
       </header>
@@ -564,17 +567,17 @@ export function RoomsTab(): JSX.Element {
       <DiscoveryStatus discovery={discovery} />
 
       <div class="tab-rooms__presets" data-testid="rooms-presets">
-        <span class="tab-rooms__presets-label">Schnell anlegen:</span>
+        <span class="tab-rooms__presets-label">{t('Schnell anlegen:', 'Quick add:')}</span>
         {ROOM_PRESETS.map((p) => (
           <button
-            key={p.name}
+            key={p.nameDe}
             type="button"
             class="tab-rooms__preset-btn"
-            data-testid={`rooms-preset-${p.name}`}
-            title={`${p.floor} · Priorität ${p.priority}`}
+            data-testid={`rooms-preset-${p.nameDe}`}
+            title={t(`${p.floor} · Priorität ${p.priority}`, `${p.floor} · priority ${p.priority}`)}
             onClick={(): void => handleAddPreset(p)}
           >
-            + {p.name} <small>({p.floor})</small>
+            + {t(p.nameDe, p.nameEn)} <small>({p.floor})</small>
           </button>
         ))}
       </div>
@@ -602,7 +605,7 @@ export function RoomsTab(): JSX.Element {
 
       {cfg.saveOk.value && (
         <p class="tab-rooms__ok" data-testid="rooms-save-ok">
-          Konfiguration gespeichert.
+          {t('Konfiguration gespeichert.', 'Configuration saved.')}
         </p>
       )}
 
@@ -613,7 +616,7 @@ export function RoomsTab(): JSX.Element {
           onSubmit={handleAddRoomSubmit}
         >
           <label>
-            Id
+            {t('Id', 'ID')}
             <input
               data-testid="rooms-add-id"
               value={addForm.id}
@@ -623,7 +626,7 @@ export function RoomsTab(): JSX.Element {
             />
           </label>
           <label>
-            Name
+            {t('Name', 'Name')}
             <input
               data-testid="rooms-add-name"
               value={addForm.name}
@@ -633,10 +636,10 @@ export function RoomsTab(): JSX.Element {
             />
           </label>
           <label>
-            Stockwerk
+            {t('Stockwerk', 'Floor')}
             <input
               data-testid="rooms-add-floor"
-              placeholder="z.B. OG / EG / KG"
+              placeholder={t('z.B. OG / EG / KG', 'e.g. OG / EG / KG')}
               value={addForm.floor}
               onInput={(e): void =>
                 setAddForm({ ...addForm, floor: (e.currentTarget as HTMLInputElement).value })
@@ -644,7 +647,7 @@ export function RoomsTab(): JSX.Element {
             />
           </label>
           <label>
-            Priorität
+            {t('Priorität', 'Priority')}
             <select
               data-testid="rooms-add-priority"
               value={addForm.priority}
@@ -685,13 +688,13 @@ export function RoomsTab(): JSX.Element {
             </label>
           ))}
           <div class="tab-rooms__add-form-actions">
-            <button type="submit" data-testid="rooms-add-submit">Hinzufügen</button>
+            <button type="submit" data-testid="rooms-add-submit">{t('Hinzufügen', 'Add')}</button>
             <button
               type="button"
               data-testid="rooms-add-cancel"
               onClick={(): void => setAddForm(INITIAL_ADD_ROOM_FORM)}
             >
-              Abbrechen
+              {t('Abbrechen', 'Cancel')}
             </button>
           </div>
         </form>
@@ -699,10 +702,10 @@ export function RoomsTab(): JSX.Element {
 
       <div class="tab-rooms__grid">
         <div class="tab-rooms__col">
-          <h3>Räume</h3>
+          <h3>{t('Räume', 'Rooms')}</h3>
           {draftRooms.length === 0 && (
             <p class="tab-rooms__hint">
-              Noch keine Räume. „Raum hinzufügen" oder ein Preset oben nutzen.
+              {t('Noch keine Räume. „Raum hinzufügen" oder ein Preset oben nutzen.', 'No rooms yet. Use "Add room" or a preset above.')}
             </p>
           )}
           {draftRooms.map((room) => (
@@ -743,16 +746,18 @@ export function RoomsTab(): JSX.Element {
             onDragLeave={onDragLeaveRoom}
             onDrop={onDropUnassigned}
           >
-            Hierher ziehen, um die Zuweisung aufzuheben
+            {t('Hierher ziehen, um die Zuweisung aufzuheben', 'Drag here to remove the assignment')}
           </div>
         </div>
 
         <div class="tab-rooms__col">
-          <h3>Gefundene Rollläden ({discoveredShutters.length})</h3>
+          <h3>{t('Gefundene Rollläden', 'Discovered shutters')} ({discoveredShutters.length})</h3>
           {discoveredShutters.length === 0 ? (
             <p class="tab-rooms__hint" data-testid="rooms-discover-empty">
-              „Geräte suchen" ausführen, um HMIP-Rollläden (Geräte mit
-              shutterLevel-Feature) auf der HCU zu finden.
+              {t(
+                '„Geräte suchen" ausführen, um HMIP-Rollläden (Geräte mit shutterLevel-Feature) auf der HCU zu finden.',
+                'Run "Discover devices" to find HMIP shutters (devices with a shutterLevel feature) on the HCU.',
+              )}
             </p>
           ) : (
             <ul class="tab-rooms__device-list">
@@ -761,7 +766,7 @@ export function RoomsTab(): JSX.Element {
                 const label =
                   assignedRoomId === undefined ||
                   assignedRoomId === VIRTUAL_UNASSIGNED_ROOM_ID
-                    ? 'Nicht zugewiesen'
+                    ? t('Nicht zugewiesen', 'Unassigned')
                     : roomNameById.get(assignedRoomId) ?? assignedRoomId;
                 return (
                   <li
@@ -771,19 +776,20 @@ export function RoomsTab(): JSX.Element {
                     onDragStart={(e): void => onDragStart(e as DragEvent, d.deviceId)}
                   >
                     <strong>{deviceLabel(d)}</strong>
-                    <small>Raum: {label}</small>
+                    <small>{t('Raum:', 'Room:')} {label}</small>
                   </li>
                 );
               })}
             </ul>
           )}
 
-          <h3>Temperatur-Sensoren ({discovery.temperatureSources.value.length})</h3>
+          <h3>{t('Temperatur-Sensoren', 'Temperature sensors')} ({discovery.temperatureSources.value.length})</h3>
           {discovery.temperatureSources.value.length === 0 ? (
             <p class="tab-rooms__hint" data-testid="rooms-tempsensors-empty">
-              „Geräte suchen" ausführen, um Thermostate/Sensoren (mit
-              actualTemperature-Feature) zu finden. Auf eine Raumkarte ziehen,
-              um sie als Innentemperatur-Quelle zu setzen.
+              {t(
+                '„Geräte suchen" ausführen, um Thermostate/Sensoren (mit actualTemperature-Feature) zu finden. Auf eine Raumkarte ziehen, um sie als Innentemperatur-Quelle zu setzen.',
+                'Run "Discover devices" to find thermostats/sensors (with an actualTemperature feature). Drag onto a room card to set it as the indoor-temperature source.',
+              )}
             </p>
           ) : (
             <ul class="tab-rooms__device-list">
@@ -795,18 +801,19 @@ export function RoomsTab(): JSX.Element {
                   onDragStart={(e): void => onDragStartTempSensor(e as DragEvent, d.deviceId)}
                 >
                   <strong>{deviceLabel(d)}</strong>
-                  <small>Auf Raum ziehen → Innentemperatur</small>
+                  <small>{t('Auf Raum ziehen → Innentemperatur', 'Drag onto a room → indoor temperature')}</small>
                 </li>
               ))}
             </ul>
           )}
 
-          <h3>Fensterkontakte ({discovery.contactSources.value.length})</h3>
+          <h3>{t('Fensterkontakte', 'Window contacts')} ({discovery.contactSources.value.length})</h3>
           {discovery.contactSources.value.length === 0 ? (
             <p class="tab-rooms__hint" data-testid="rooms-contacts-empty">
-              „Geräte suchen" ausführen, um Fensterkontakte (mit
-              windowState-Feature) zu finden. Auf einen Rollladen ziehen, um
-              ihn als Fenstersensor für die Lüften-Erkennung zuzuweisen.
+              {t(
+                '„Geräte suchen" ausführen, um Fensterkontakte (mit windowState-Feature) zu finden. Auf einen Rollladen ziehen, um ihn als Fenstersensor für die Lüften-Erkennung zuzuweisen.',
+                'Run "Discover devices" to find window contacts (with a windowState feature). Drag onto a shutter to assign it as the window sensor for ventilation detection.',
+              )}
             </p>
           ) : (
             <ul class="tab-rooms__device-list">
@@ -818,7 +825,7 @@ export function RoomsTab(): JSX.Element {
                   onDragStart={(e): void => onDragStartContact(e as DragEvent, d.deviceId)}
                 >
                   <strong>{deviceLabel(d)}</strong>
-                  <small>Auf einen Rollladen ziehen → Fensterkontakt</small>
+                  <small>{t('Auf einen Rollladen ziehen → Fensterkontakt', 'Drag onto a shutter → window contact')}</small>
                 </li>
               ))}
             </ul>
@@ -871,7 +878,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
     indoorDeviceId !== undefined
       ? indoorMeta !== undefined
         ? deviceLabel(indoorMeta)
-        : `Sensor (…${indoorDeviceId.slice(-4)})`
+        : t(`Sensor (…${indoorDeviceId.slice(-4)})`, `Sensor (…${indoorDeviceId.slice(-4)})`)
       : null;
   return (
     <article
@@ -897,14 +904,14 @@ function RoomCard(props: RoomCardProps): JSX.Element {
           <span class="room-card__floor">{room.floor}</span>
         )}
         <label class="room-card__floor-edit">
-          <span class="room-card__floor-label">Stockwerk</span>
+          <span class="room-card__floor-label">{t('Stockwerk', 'Floor')}</span>
           <input
             class="room-card__floor-input"
             type="text"
             list={`floor-presets-${room.id}`}
             data-testid={`room-card-floor-${room.id}`}
             placeholder="KG / EG / OG / DG …"
-            aria-label={`Stockwerk für ${room.name}`}
+            aria-label={t(`Stockwerk für ${room.name}`, `Floor for ${room.name}`)}
             value={room.floor ?? ''}
             onInput={(e): void =>
               props.onChangeFloor((e.currentTarget as HTMLInputElement).value)
@@ -921,8 +928,8 @@ function RoomCard(props: RoomCardProps): JSX.Element {
           type="button"
           class="room-card__delete"
           data-testid={`room-card-delete-${room.id}`}
-          title="Raum löschen"
-          aria-label={`Raum ${room.name} löschen`}
+          title={t('Raum löschen', 'Delete room')}
+          aria-label={t(`Raum ${room.name} löschen`, `Delete room ${room.name}`)}
           onClick={(): void => props.onDelete()}
         >
           ✕
@@ -937,9 +944,9 @@ function RoomCard(props: RoomCardProps): JSX.Element {
         ))}
       </dl>
       <div class="room-card__schedule" data-testid={`room-card-schedule-${room.id}`}>
-        <span class="room-card__schedule-label">Fahrten nur</span>
+        <span class="room-card__schedule-label">{t('Fahrten nur', 'Moves only')}</span>
         <label class="room-card__schedule-field">
-          ab
+          {t('ab', 'from')}
           <input
             type="number"
             min={0}
@@ -959,10 +966,10 @@ function RoomCard(props: RoomCardProps): JSX.Element {
               }
             }}
           />
-          Uhr
+          {t('Uhr', 'h')}
         </label>
         <label class="room-card__schedule-field">
-          bis
+          {t('bis', 'to')}
           <input
             type="number"
             min={1}
@@ -982,23 +989,23 @@ function RoomCard(props: RoomCardProps): JSX.Element {
               }
             }}
           />
-          Uhr
+          {t('Uhr', 'h')}
         </label>
-        <span class="room-card__schedule-hint">Sturm ignoriert die Ruhezeit</span>
+        <span class="room-card__schedule-hint">{t('Sturm ignoriert die Ruhezeit', 'Storm ignores the quiet hours')}</span>
       </div>
       <p class="room-card__indoor" data-testid={`room-card-indoor-${room.id}`}>
-        Innentemperatur:{' '}
+        {t('Innentemperatur:', 'Indoor temperature:')}{' '}
         {indoorLabel !== null ? (
           <strong>{indoorLabel}</strong>
         ) : (
           <span class="room-card__indoor--none">
-            kein Sensor (Thermostat hierher ziehen)
+            {t('kein Sensor (Thermostat hierher ziehen)', 'no sensor (drag a thermostat here)')}
           </span>
         )}
       </p>
       {dragOver && (
         <div class="room-card__drop-hint" data-testid={`room-card-drop-hint-${room.id}`}>
-          Loslassen zum Zuweisen
+          {t('Loslassen zum Zuweisen', 'Release to assign')}
         </div>
       )}
       {windows.length > 0 && (
@@ -1006,7 +1013,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
           {windows.map((w) => {
             const meta = props.shutters.find((d) => d.deviceId === w.shutterDeviceId);
             const name =
-              meta !== undefined ? deviceLabel(meta) : `Rollladen (…${w.id.slice(-4)})`;
+              meta !== undefined ? deviceLabel(meta) : t(`Rollladen (…${w.id.slice(-4)})`, `Shutter (…${w.id.slice(-4)})`);
             const contactMeta =
               w.contactDeviceId !== undefined
                 ? props.contacts.find((d) => d.deviceId === w.contactDeviceId)
@@ -1015,7 +1022,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
               w.contactDeviceId !== undefined
                 ? contactMeta !== undefined
                   ? deviceLabel(contactMeta)
-                  : `Kontakt (…${w.contactDeviceId.slice(-4)})`
+                  : t(`Kontakt (…${w.contactDeviceId.slice(-4)})`, `Contact (…${w.contactDeviceId.slice(-4)})`)
                 : null;
             const contactHover = contactHoverWin === w.id;
             return (
@@ -1048,7 +1055,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
                   ({w.orientationDeg}°)
                 </small>
                 <label class="room-card__window-orientation">
-                  <span>Himmelsrichtung</span>
+                  <span>{t('Himmelsrichtung', 'Orientation')}</span>
                   <select
                     data-testid={`room-card-window-orientation-${w.id}`}
                     value={String(nearestCompassDeg(w.orientationDeg))}
@@ -1061,7 +1068,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
                   >
                     {COMPASS_OPTIONS.map((o) => (
                       <option key={o.deg} value={String(o.deg)}>
-                        {o.label}
+                        {t(o.labelDe, o.labelEn)}
                       </option>
                     ))}
                   </select>
@@ -1077,7 +1084,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
                         type="button"
                         class="room-card__contact-clear"
                         data-testid={`room-card-window-contact-clear-${w.id}`}
-                        title="Fensterkontakt entfernen"
+                        title={t('Fensterkontakt entfernen', 'Remove window contact')}
                         onClick={(): void => props.onClearContact(w.id)}
                       >
                         ✕
@@ -1085,7 +1092,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
                     </Fragment>
                   ) : (
                     <span class="room-card__contact-none">
-                      kein Fensterkontakt (Sensor hierher ziehen)
+                      {t('kein Fensterkontakt (Sensor hierher ziehen)', 'no window contact (drag a sensor here)')}
                     </span>
                   )}
                 </span>
@@ -1101,7 +1108,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
                       )
                     }
                   />
-                  <span>Automatik aus</span>
+                  <span>{t('Automatik aus', 'Automation off')}</span>
                 </label>
               </li>
             );

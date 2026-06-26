@@ -7,6 +7,8 @@
  * "breathes" with the time of day and the weather. Deterministic + testable.
  */
 
+import { signal } from '@preact/signals';
+
 /** Bands of the day used to pick a palette. */
 export type AmbientPhase = 'night' | 'dawn' | 'day' | 'storm';
 
@@ -81,4 +83,13 @@ export function saveAmbient(on: boolean): void {
   } catch {
     /* ignore */
   }
+}
+
+/** Shared reactive ambient toggle: the header reads it to paint the background,
+ *  the Einstellungen tile toggles it. Persisted via {@link saveAmbient}. */
+export const ambientEnabled = signal<boolean>(loadAmbient());
+
+export function setAmbientEnabled(on: boolean): void {
+  ambientEnabled.value = on;
+  saveAmbient(on);
 }
