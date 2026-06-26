@@ -1,0 +1,76 @@
+# Heat Shield — release template (DISABLED).
+#
+# This file is named `release.yml.disabled` on purpose so GitHub
+# Actions does NOT pick it up. Steering rule (heat-shield-context.md):
+# "No publishing without explicit user verification on a real HCU."
+# Renaming this file to `release.yml` is a deliberate, manual act
+# the maintainer takes only after a green smoke run on the target
+# HCU.
+#
+# When enabling it, double-check:
+#   - the plugin version in package.json matches the tag,
+#   - the LABEL de.eq3.hmip.plugin.metadata.version matches too,
+#   - a real CONFIG / DISCOVER round-trip against the HCU did not
+#     produce ERROR_RESPONSE entries in the Connect log.
+
+name: Release (disabled)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Build + publish (manual gate)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint, test, build
+        run: |
+          npm run lint
+          npm test
+          npm run build
+
+      - name: Smoke
+        run: npm run smoke
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}:latest
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

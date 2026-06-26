@@ -1,0 +1,106 @@
+# Heat Shield CI (Task 15.3).
+#
+# Steering note: NO RELEASE / PUBLISH STEP. This workflow runs lint,
+# tests, builds the dist/, smoke-tests the boot module, and builds a
+# local Docker image. It must NEVER push to a registry, NEVER cut a
+# GitHub release, and NEVER run `npm publish`. Releases are gated on
+# explicit user verification on a real HCU; see the
+# `release.yml.disabled` template in this directory for what a future
+# release flow could look like.
+
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test-build:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: heatshield-dist
+          path: |
+            dist
+            src/plugin/dashboard/public/app.js
+          retention-days: 7
+
+  smoke:
+    name: Smoke (built dist)
+    needs: lint-test-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: heatshield-dist
+
+      - name: Run smoke test
+        run: npm run smoke
+
+  docker-build:
+    name: Docker build (no push)
+    needs: lint-test-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (load only — never push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          push: false
+          tags: heatshield:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

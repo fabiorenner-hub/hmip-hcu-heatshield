@@ -1,0 +1,41 @@
+# Dockerfile build-context filter (Task 15.1).
+#
+# Goal: keep the build context lean so `docker build` ships only what
+# we genuinely need to compile + bundle. The runtime image is assembled
+# from the build stage's output, so anything not required for `npm ci`
+# / `npm run build` should be excluded.
+#
+# Important quirk: `**/*.tsx` would also strip the SPA sources that
+# `esbuild src/plugin/dashboard/spa/index.tsx` reads at build time, so
+# we DO NOT add that pattern. The bundled `src/plugin/dashboard/public/app.js`
+# (an emitted JS bundle, not a TSX source) is generated inside the
+# build stage from the .tsx sources, so both must be in the context.
+
+node_modules
+dist
+.git
+.kiro
+.tmp-assets
+.smoke-data
+tests
+coverage
+*.log
+**/.DS_Store
+
+# Test files: per-file `*.test.ts` only — keep .tsx for SPA sources.
+**/*.test.ts
+
+# Editor / OS noise
+.vscode
+.idea
+Thumbs.db
+
+# Build outputs that the build stage regenerates anyway. We leave the
+# checked-in HTML and CSS in the context — they are inputs, not outputs.
+src/plugin/dashboard/public/app.js
+src/plugin/dashboard/public/app.js.map
+
+# Local dev artifacts
+.env
+.env.*
+!.env.example

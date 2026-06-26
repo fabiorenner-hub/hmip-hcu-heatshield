@@ -1,0 +1,7 @@
+dist/
+node_modules/
+coverage/
+.tmp-assets/
+/data/
+*.log
+src/plugin/dashboard/public/app.js

@@ -1,0 +1,15 @@
+node_modules
+dist
+.tmp-assets/
+/data
+*.log
+coverage
+.DS_Store
+.vscode/
+.idea/
+# Kiro workspace artifacts: steering + specs contain private setup details
+# (home location, HCU host, device layout) — never publish them.
+.kiro/
+# Built SPA bundle (rebuilt via `npm run build:spa`); index.html and styles.css stay checked in.
+src/plugin/dashboard/public/app.js
+src/plugin/dashboard/public/app.js.map

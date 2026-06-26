@@ -1,0 +1,6 @@
+{
+  "_comment": "Heat Shield house digital-twin asset (predictive-control-dashboard). A SINGLE static transparent render (house.png, from heatshield_haus_transparent_rgba_final.png). The background no longer switches by sun position or shutter state; all dynamics live in the SVG/HTML overlays.",
+  "displayWidthPx": 720,
+  "static": "house.png",
+  "fallback": "house.png"
+}

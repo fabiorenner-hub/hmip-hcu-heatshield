@@ -1,0 +1,47 @@
+{
+  "name": "hmip-plugin-heatshield",
+  "version": "1.16.8",
+  "description": "Heat Shield HMIP plugin (de.fr.renner.plugin.heatshield) — predictive shutter control for summer heat protection.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "main": "dist/plugin/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.spa.json && npm run build:spa",
+    "build:spa": "esbuild src/plugin/dashboard/spa/index.tsx --bundle --minify --target=es2022 --outfile=src/plugin/dashboard/public/app.js --jsx=transform --jsx-factory=h --jsx-fragment=Fragment --alias:react=preact/compat --alias:react-dom=preact/compat --loader:.png=dataurl --define:process.env.NODE_ENV=\"\\\"production\\\"\"",
+    "test": "vitest --run",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "smoke": "node scripts/smoke.mjs",
+    "build:image": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-image.ps1"
+  },
+  "devDependencies": {
+    "@preact/signals": "^1.3.4",
+    "@testing-library/preact": "^3.2.4",
+    "@types/leaflet": "^1.9.12",
+    "@types/node": "^20.12.7",
+    "@types/suncalc": "^1.9.2",
+    "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^7.7.0",
+    "@typescript-eslint/parser": "^7.7.0",
+    "esbuild": "^0.21.5",
+    "eslint": "^8.57.0",
+    "fast-check": "^3.23.2",
+    "jsdom": "^29.1.1",
+    "leaflet": "^1.9.4",
+    "preact": "^10.29.2",
+    "preact-router": "^4.1.2",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5",
+    "vitest": "^1.5.0"
+  },
+  "dependencies": {
+    "@fastify/static": "^9.1.3",
+    "fastify": "^5.8.5",
+    "suncalc": "^1.9.0",
+    "ws": "^8.20.1",
+    "zod": "^4.4.3"
+  }
+}

@@ -1,0 +1,6475 @@
+/* Heat Shield dashboard SPA styles (Tasks 11.1–11.4).
+ *
+ * The stylesheet is intentionally hand-rolled (no preprocessor, no
+ * CSS-in-JS). Variables drive the mode-header colour palette so a
+ * later design pass can re-skin the dashboard without touching the
+ * components.
+ */
+
+:root {
+  /* Surfaces — deep, layered dark palette with subtle depth. */
+  --color-bg: #05070d;
+  --color-bg-elev: #090d16;
+  --color-card: #101725;
+  --color-card-hover: #16202f;
+  --color-card-border: #232c3b;
+  --color-card-border-strong: #36404f;
+  --color-text: #e8edf6;
+  --color-muted: #9aa6b8;
+  --color-faint: #6b7686;
+
+  /* Accent — heat-shield amber, plus semantic status colours. */
+  --color-accent: #f59e0b;
+  --color-accent-strong: #fbbf24;
+  --color-accent-contrast: #1a1205;
+  --color-info: #3b82f6;
+  --color-success: #22c55e;
+  --color-warn: #f0b300;
+  --color-danger: #ef4444;
+
+  /* Focus ring (accessibility: visible keyboard focus everywhere). */
+  --focus-ring: 0 0 0 3px rgba(245, 158, 11, 0.45);
+
+  /* Spacing scale (4px base). */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  /* Radius + elevation scale. */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 10px 30px rgba(0, 0, 0, 0.45);
+
+  /* Mode header palette (unchanged semantics). */
+  --mode-normal: #4a5568;
+  --mode-summer-watch: #ffb366;
+  --mode-active-heat-protection: #ff8c42;
+  --mode-heatwave: #e63946;
+  --mode-night-cooling: #4361ee;
+  --mode-storm: #7a0c0c;
+  --mode-vacation: #8e44ad;
+  --mode-maintenance: #6c757d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1100px 540px at 82% -12%, rgba(245, 158, 11, 0.07), transparent 60%),
+    radial-gradient(900px 500px at 12% 8%, rgba(59, 130, 246, 0.06), transparent 62%),
+    linear-gradient(180deg, #070a12 0%, #04060c 100%),
+    var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial,
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h2 {
+  font-size: 1.4rem;
+  letter-spacing: -0.01em;
+}
+h3 {
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+/* Global keyboard focus ring for all interactive elements. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* App shell + tab nav -------------------------------------------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app__nav {
+  display: flex;
+  gap: var(--sp-1);
+  background: var(--color-bg-elev);
+  border-bottom: 1px solid var(--color-card-border);
+  padding: var(--sp-2) var(--sp-4);
+}
+
+.app__tab {
+  color: var(--color-muted);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.app__tab:hover {
+  color: var(--color-text);
+  background: var(--color-card);
+}
+
+.app__tab--active {
+  background: linear-gradient(180deg, var(--color-accent-strong) 0%, var(--color-accent) 100%);
+  color: var(--color-accent-contrast);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.app__main {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  width: 100%;
+}
+
+/* Legacy tabs keep their comfortable centered, padded column. The
+   full-bleed dashboard grid and module placeholders manage their own
+   padding. */
+.app__main > *:not(.dashboard-grid):not(.module-placeholder) {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  padding: var(--sp-4);
+}
+
+/* Mode header ---------------------------------------------------- */
+
+.mode-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: var(--mode-normal);
+  color: white;
+  margin-bottom: 18px;
+}
+
+.mode-header--summer_watch {
+  background: var(--mode-summer-watch);
+}
+.mode-header--active_heat_protection {
+  background: var(--mode-active-heat-protection);
+}
+.mode-header--heatwave {
+  background: var(--mode-heatwave);
+}
+.mode-header--night_cooling {
+  background: var(--mode-night-cooling);
+}
+.mode-header--storm {
+  background: var(--mode-storm);
+  animation: storm-blink 1.2s infinite alternate;
+}
+.mode-header--vacation {
+  background: var(--mode-vacation);
+}
+.mode-header--maintenance {
+  background: var(--mode-maintenance);
+}
+
+@keyframes storm-blink {
+  from {
+    box-shadow: 0 0 0 rgba(255, 0, 0, 0);
+  }
+  to {
+    box-shadow: 0 0 12px rgba(255, 30, 30, 0.7);
+  }
+}
+
+.mode-header__primary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mode-header__icon {
+  font-size: 20px;
+}
+
+.mode-header__label {
+  margin: 0;
+  font-size: 18px;
+}
+
+.mode-header__warning {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.mode-header__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mode-header__cycle {
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.mode-header__pill {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  text-transform: lowercase;
+}
+.mode-header__pill--open {
+  background: rgba(28, 175, 91, 0.55);
+}
+.mode-header__pill--reconnecting {
+  background: rgba(255, 175, 28, 0.55);
+}
+.mode-header__pill--closed {
+  background: rgba(220, 53, 69, 0.55);
+}
+
+/* Live tab grid -------------------------------------------------- */
+
+.tab-live__grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.tab-live__windows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.tab-live__sun h3 {
+  margin-top: 0;
+}
+
+.tab-live__empty {
+  color: var(--color-muted);
+  padding: 16px;
+  border: 1px dashed var(--color-card-border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* Window card ---------------------------------------------------- */
+
+.window-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.window-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.window-card__title {
+  margin: 0;
+  font-size: 14px;
+  flex: 1;
+}
+
+.window-card__badge {
+  background: rgba(255, 175, 28, 0.25);
+  color: #ffd87a;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.window-card__mode {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-muted);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.window-card__svg {
+  width: 100%;
+  height: auto;
+  background: #0a0e14;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.window-card__levels {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+.window-card__levels-sep {
+  color: var(--color-text);
+  margin: 0 4px;
+}
+
+/* Risk bar ------------------------------------------------------- */
+
+.risk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.risk-bar__track {
+  display: flex;
+  flex: 1;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.risk-bar__segment {
+  height: 100%;
+}
+
+.risk-bar__segment:hover {
+  filter: brightness(1.2);
+}
+
+.risk-bar__total {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* Sun polar plot ------------------------------------------------- */
+
+.sun-polar {
+  width: 100%;
+  height: auto;
+  max-width: 320px;
+  display: block;
+}
+
+/* Keep the Sonnenstand plot fully inside its KPI card (no top/bottom clip). */
+.kpi-card__sunplot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-height: 190px;
+  overflow: hidden;
+}
+.kpi-card--sun .sun-polar {
+  max-width: 180px;
+  max-height: 180px;
+  margin: 0 auto;
+}
+
+/* Placeholder tabs ---------------------------------------------- */
+
+.tab-placeholder {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 8px;
+  padding: 32px;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.tab-placeholder h2 {
+  margin-top: 0;
+}
+
+/* Error boundary ------------------------------------------------- */
+
+.error-boundary {
+  background: rgba(220, 53, 69, 0.15);
+  border: 1px solid rgba(220, 53, 69, 0.4);
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.error-boundary pre {
+  white-space: pre-wrap;
+  margin: 4px 0 0;
+}
+
+
+/* Config tabs (Tasks 12.1–12.4) ---------------------------------- */
+
+.tab-rooms__header,
+.tab-sources__header,
+.tab-rules__header,
+.tab-wizard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tab-rooms__actions,
+.tab-sources__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-rooms__error,
+.tab-sources__error,
+.tab-rules__error,
+.tab-wizard__validation--fail {
+  background: rgba(220, 53, 69, 0.18);
+  border: 1px solid rgba(220, 53, 69, 0.4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.tab-rooms__ok,
+.tab-sources__ok,
+.tab-rules__ok,
+.tab-wizard__validation--ok {
+  background: rgba(28, 175, 91, 0.18);
+  border: 1px solid rgba(28, 175, 91, 0.4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.tab-rooms__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.room-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.room-card--dragover {
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.4);
+}
+
+/* Window row contact drop target. */
+.room-card__window--contact-hover {
+  outline: 2px dashed #38bdf8;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.room-card__window-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8em;
+}
+
+.room-card__contact-name {
+  color: var(--color-text, #1e293b);
+}
+
+.room-card__contact-none {
+  color: var(--color-muted, #94a3b8);
+  font-style: italic;
+}
+
+.room-card__contact-clear {
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.room-card__contact-clear:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.room-card > header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Notifications section in the Rules tab. */
+.tab-rules__notifications {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-card-border, #e2e8f0);
+  border-radius: var(--radius-2, 10px);
+  background: var(--color-card, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tab-rules__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+}
+
+.tab-rules__field input {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--color-card-border, #cbd5e1);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.tab-rules__check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+}
+
+.tab-rules__event-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.room-card--issue {
+  border-color: rgba(220, 53, 69, 0.6);
+}
+
+.room-card__targets {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 6px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.room-card__windows {
+  margin: 6px 0 0;
+  padding-left: 16px;
+}
+
+.room-card__window--issue {
+  color: #f4a4ac;
+}
+
+.room-card__drop-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(74, 144, 226, 0.15);
+  border-radius: 8px;
+  pointer-events: none;
+  font-weight: 600;
+  color: #cfe1ff;
+}
+
+.tab-rooms__device-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tab-rooms__device-list li {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 6px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-rooms__device-list li:active {
+  cursor: grabbing;
+}
+
+.tab-rooms__unassigned {
+  margin-top: 12px;
+  padding: 16px;
+  border: 2px dashed var(--color-card-border);
+  border-radius: 8px;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.tab-rooms__unassigned--over {
+  border-color: #4a90e2;
+  color: #cfe1ff;
+}
+
+.tab-rooms__add-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.tab-rooms__add-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.tab-rooms__add-form input,
+.tab-rooms__add-form select {
+  background: var(--color-bg);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text);
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.tab-rooms__add-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+
+.tab-rooms__hint,
+.tab-sources__hint,
+.tab-rules__hint {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* Sources tab ---------------------------------------------------- */
+
+.tab-sources__discovered {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tab-sources__discovered details {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.tab-sources__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+
+.tab-sources__table th,
+.tab-sources__table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-card-border);
+  vertical-align: middle;
+}
+
+.tab-sources__table th[scope='row'] {
+  text-align: left;
+}
+
+.tab-sources__staleness {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #888;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.tab-sources__staleness--fresh {
+  background: #1caf5b;
+}
+
+.tab-sources__staleness--soon {
+  background: #f0b300;
+}
+
+.tab-sources__staleness--stale {
+  background: #dc3545;
+}
+
+/* Rules tab ------------------------------------------------------ */
+
+.tab-rules__profile-switcher {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab-rules__profile-btn--active {
+  background: #4a90e2;
+  color: #fff;
+}
+
+.tab-rules__sliders {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab-rules__slider-row label {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.tab-rules__slider-ref {
+  color: var(--color-muted);
+  margin-left: 12px;
+}
+
+.tab-rules__probe {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+/* Wizard --------------------------------------------------------- */
+
+.tab-wizard__steps {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.tab-wizard__steps li {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+}
+
+.tab-wizard__step--active {
+  background: #4a90e2;
+  color: #fff;
+  border-color: #4a90e2;
+}
+
+.tab-wizard__body {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.tab-wizard__body label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  color: var(--color-muted);
+}
+
+.tab-wizard__body input,
+.tab-wizard__body select {
+  background: var(--color-bg);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text);
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.tab-wizard__validation {
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.tab-wizard__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.tab-wizard__profile-switcher {
+  display: flex;
+  gap: 8px;
+}
+
+/* Recommendation banner + panel (Task 14.2) ---------------------- */
+
+.recommendation-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: rgba(255, 175, 28, 0.18);
+  border: 1px solid rgba(255, 175, 28, 0.45);
+  color: #6b4d00;
+  font-size: 14px;
+}
+
+.recommendation-banner__icon {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.recommendation-banner__more {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.recommendation-panel {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--color-surface, #f6f7fa);
+}
+
+.recommendation-panel h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.recommendation-panel__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.recommendation-panel__item {
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recommendation-panel__item--warn {
+  border-left: 4px solid #d6a700;
+}
+
+.recommendation-panel__item--info {
+  border-left: 4px solid #1c7fd6;
+}
+
+.recommendation-panel__title {
+  font-size: 14px;
+}
+
+.recommendation-panel__room {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.recommendation-panel__message {
+  margin: 0;
+  font-size: 13px;
+}
+
+.recommendation-panel__patch {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.recommendation-panel__error {
+  margin: 0;
+  font-size: 12px;
+  color: #b30021;
+}
+
+.recommendation-panel__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+
+/* ─── Discovery status banner ─────────────────────────────────────── */
+
+.discovery-status {
+  margin: 0.6rem 0 0.4rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.92em;
+  line-height: 1.35;
+  border: 1px solid transparent;
+}
+
+.discovery-status--ok {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #065f46;
+}
+
+.discovery-status--warn {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.discovery-status--error {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.discovery-status strong {
+  margin-right: 0.4em;
+}
+
+
+.discovery-status__line {
+  margin-bottom: 0.25rem;
+}
+
+.discovery-status__details {
+  margin-top: 0.4rem;
+}
+
+.discovery-status__details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.discovery-status__hist {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.25rem 0.75rem;
+  font-size: 0.9em;
+}
+
+.discovery-status__hist code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0 0.3em;
+  border-radius: 3px;
+}
+
+.discovery-status__type {
+  color: #6b7280;
+}
+
+.discovery-status__name {
+  color: #374151;
+}
+
+
+.discovery-status__shutters--none {
+  color: #991b1b;
+  font-weight: 500;
+}
+
+.discovery-status__shutters--ok {
+  color: #065f46;
+}
+
+
+.discovery-status__inventory {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.88em;
+}
+
+.discovery-status__inventory > li {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+  padding: 0.4rem 0.55rem;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.discovery-status__devid {
+  font-size: 0.85em;
+  color: #6b7280;
+}
+
+.discovery-status__features {
+  margin-top: 0.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.discovery-status__feature {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 3px;
+  padding: 0 0.35em;
+  font-family: monospace;
+  font-size: 0.85em;
+  color: #3730a3;
+}
+
+
+.discovery-status__raw--drop {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.discovery-status__raw--ok {
+  color: #374151;
+}
+
+
+/* ─── App header + master automation lever ────────────────────────── */
+
+.app__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  background: #0f172a;
+  color: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.app__brand {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.app__logo {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  display: block;
+}
+
+/* ─── Header actions + message bell ──────────────────────────────── */
+
+.app__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.message-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid rgba(248, 250, 252, 0.25);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.08);
+  color: #f8fafc;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.message-bell:hover {
+  background: rgba(248, 250, 252, 0.18);
+  border-color: rgba(248, 250, 252, 0.4);
+}
+
+.message-bell:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.message-bell__badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px #0f172a;
+}
+
+/* ─── Messages tab ───────────────────────────────────────────────── */
+
+.message-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.message-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-card-border, #e2e8f0);
+  border-radius: var(--radius-2, 10px);
+  background: var(--color-card, #fff);
+}
+
+.message-item--unread {
+  border-left: 4px solid #38bdf8;
+  background: var(--color-card-accent, #f0f9ff);
+}
+
+.message-item--read {
+  opacity: 0.72;
+}
+
+.message-item__icon {
+  font-size: 1.2rem;
+  line-height: 1.4;
+}
+
+.message-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-item__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.message-item__title {
+  font-weight: 700;
+}
+
+.message-item__kind {
+  font-size: 0.72rem;
+  color: var(--color-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.message-item__text {
+  margin: 0.2rem 0 0.3rem;
+  color: var(--color-text, #1e293b);
+}
+
+.message-item__ts {
+  font-size: 0.75rem;
+  color: var(--color-muted, #64748b);
+}
+
+/* Feels-like overview tile accent + trend arrows. */
+.overview-tile--accent {
+  border-color: #f59e0b;
+}
+
+.overview-tile__sub {
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--color-muted, #64748b);
+}
+
+.overview-tile__trend--up {
+  color: #ef4444;
+}
+
+.overview-tile__trend--down {
+  color: #0ea5e9;
+}
+
+.overview-tile__trend--flat {
+  color: var(--color-muted, #64748b);
+}
+
+.overview-tile__waiting {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.82em;
+  color: var(--color-muted, #94a3b8);
+  font-style: italic;
+}
+
+.automation-lever__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+.automation-lever__track {
+  display: inline-block;
+  width: 46px;
+  height: 24px;
+  border-radius: 12px;
+  background: #64748b;
+  position: relative;
+  transition: background 0.15s ease;
+  flex: 0 0 auto;
+}
+
+.automation-lever__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+
+.automation-lever--on .automation-lever__track {
+  background: #16a34a;
+}
+
+.automation-lever--on .automation-lever__knob {
+  transform: translateX(22px);
+}
+
+.automation-lever--off .automation-lever__label {
+  color: #fca5a5;
+}
+
+.automation-lever__error {
+  margin-left: 0.5rem;
+  color: #fca5a5;
+  font-size: 0.85em;
+}
+
+
+.discovery-status__fval {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+
+/* ─── Room presets + floor ────────────────────────────────────────── */
+
+.tab-rooms__presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+
+.tab-rooms__presets-label {
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+.tab-rooms__preset-btn {
+  background: linear-gradient(180deg, #eef4ff 0%, #dce8ff 100%);
+  border: 1px solid #93b4f5;
+  color: #1e3a8a;
+  border-radius: 999px;
+  padding: 0.32rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(30, 58, 138, 0.12);
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.tab-rooms__preset-btn small {
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.tab-rooms__preset-btn:hover {
+  background: linear-gradient(180deg, #e0ecff 0%, #c7dbff 100%);
+  box-shadow: 0 2px 6px rgba(30, 58, 138, 0.2);
+  transform: translateY(-1px);
+}
+
+.tab-rooms__preset-btn:active {
+  transform: translateY(0);
+}
+
+/* Auto-save indicator (rooms / sources / rules headers). */
+.tab-rooms__autosave,
+.tab-sources__autosave,
+.tab-rules__autosave {
+  font-size: 0.82rem;
+  color: var(--color-muted, #64748b);
+  font-style: italic;
+  align-self: center;
+}
+
+/* Room delete button. */
+.room-card__delete {
+  margin-left: auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.room-card__delete:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* Window-card level block (Live tab redesign). */
+.window-card__levels {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0.4rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.window-card__level-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.window-card__level-label {
+  font-size: 0.7rem;
+  color: var(--color-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.window-card__level-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.window-card__level-arrow {
+  font-size: 0.82rem;
+  color: var(--color-muted, #64748b);
+  white-space: nowrap;
+}
+
+.window-card__norisk {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-muted, #94a3b8);
+  text-align: center;
+  font-style: italic;
+}
+
+.room-card__floor {
+  background: #1e293b;
+  color: #f8fafc;
+  border-radius: 4px;
+  padding: 0 0.4em;
+  font-size: 0.8em;
+}
+
+
+/* ─── Mobile / installed-PWA layout ───────────────────────────────── */
+
+/* Respect the iOS safe area when launched standalone from home screen. */
+.app__header {
+  padding-top: calc(0.6rem + env(safe-area-inset-top, 0px));
+  padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1rem + env(safe-area-inset-right, 0px));
+}
+
+@media (max-width: 640px) {
+  .app__header {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  /* Tab bar becomes a horizontally scrollable strip. */
+  .app__nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .app__nav .app__tab {
+    flex: 0 0 auto;
+  }
+
+  /* Stack the rooms two-column grid. */
+  .tab-rooms__grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Wide config tables scroll instead of overflowing the viewport. */
+  .tab-sources table,
+  .tab-wizard table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Larger touch targets. */
+  button,
+  select,
+  input {
+    min-height: 40px;
+    font-size: 1rem;
+  }
+
+  .automation-lever__label {
+    font-size: 0.85rem;
+  }
+}
+
+/* --- Compass picker (window orientation) --- */
+.compass {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.compass--disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.compass__readout {
+  font-size: 0.85em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text, #e2e8f0);
+}
+
+/* --- Window assignment table (wizard step 4) --- */
+.window-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.window-table th,
+.window-table td {
+  padding: 8px 10px;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.window-table tbody tr {
+  border-top: 1px solid var(--color-card-border, #334155);
+}
+
+.window-table__block {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 0.85em;
+}
+
+/* --- Room card editable name + window rows --- */
+.room-card__name {
+  font-weight: 700;
+  font-size: 1.05em;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: inherit;
+  padding: 2px 4px;
+  width: 60%;
+}
+
+.room-card__name:hover,
+.room-card__name:focus {
+  border-color: var(--color-card-border, #334155);
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
+}
+
+.room-card__floor {
+  margin-left: 8px;
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.room-card__priority {
+  margin-left: 8px;
+  font-size: 0.8em;
+  opacity: 0.85;
+}
+
+.room-card__windows {
+  list-style: none;
+}
+
+.room-card__windows li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--color-card-border, #334155);
+}
+
+.room-card__window-name {
+  font-weight: 600;
+}
+
+.room-card__window-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8em;
+  opacity: 0.9;
+}
+
+/* On narrow screens stack the window-table cells into blocks. */
+@media (max-width: 720px) {
+  .window-table thead {
+    display: none;
+  }
+  .window-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 8px 0;
+  }
+  .window-table td {
+    padding: 4px 6px;
+  }
+}
+
+/* --- 360° overview panel (Live tab) --- */
+.overview-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.overview-tile {
+  position: relative;
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.overview-tile__label {
+  font-size: 0.8em;
+  color: var(--color-muted);
+}
+
+.overview-tile__value {
+  font-size: 1.25em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-tile__missing {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: #fcd34d;
+  cursor: pointer;
+  font-size: 0.95em;
+  text-decoration: underline dotted;
+}
+
+/* Freshness dot, shared with the sources table semantics. */
+.staleness-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #888;
+}
+.staleness-dot--fresh {
+  background: #1caf5b;
+}
+.staleness-dot--soon {
+  background: #f0b300;
+}
+.staleness-dot--stale {
+  background: #dc3545;
+}
+.staleness-dot--unknown {
+  background: #6b7280;
+}
+
+@media (max-width: 640px) {
+  .overview-panel {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* --- Per-window sun status cards (Live tab) --- */
+.tab-live__window-sun {
+  margin-top: 18px;
+}
+
+.window-sun-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.window-sun-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-left: 4px solid #6b7280;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.window-sun-card--lit {
+  border-left-color: #f59e0b;
+}
+.window-sun-card--soon {
+  border-left-color: #fcd34d;
+}
+.window-sun-card--away {
+  border-left-color: #6b7280;
+}
+
+.window-sun-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.window-sun-card__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85em;
+  color: var(--color-muted);
+}
+
+.window-sun-card__status {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Room card indoor-temp binding line */
+.room-card__indoor {
+  margin: 8px 0 0;
+  font-size: 0.85em;
+  color: var(--color-muted);
+}
+.room-card__indoor--none {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* ============================================================== */
+/* Design-system primitives (Task 11.2) — modern buttons, inputs, */
+/* selects, cards and tables shared across every tab.             */
+/* ============================================================== */
+
+/* Buttons: default = secondary; primary = filled accent. */
+button {
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-4);
+  min-height: 38px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+button:hover:not(:disabled) {
+  background: var(--color-card-hover);
+  border-color: var(--color-accent);
+}
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Inputs + selects: consistent fields with a clear focus state. */
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-3);
+  min-height: 38px;
+}
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--color-faint);
+}
+input::placeholder {
+  color: var(--color-faint);
+}
+
+/* Generic headings inside tab sections get breathing room. */
+.app__main h2 {
+  margin-top: 0;
+}
+
+/* Subtle elevation + hover on the recurring "card" surfaces so every
+   tab feels cohesive. Component-specific rules above still win. */
+.room-card,
+.window-card,
+.window-sun-card,
+.overview-tile,
+.tab-sources__discovered details,
+.recommendation-panel__item {
+  box-shadow: var(--shadow-1);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.room-card:hover,
+.window-card:hover,
+.window-sun-card:hover,
+.overview-tile:hover {
+  box-shadow: var(--shadow-2);
+  border-color: var(--color-card-border-strong);
+}
+
+/* Tables: zebra rows + sticky headers for the wide config tables. */
+.tab-sources__table thead th,
+.window-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-elev);
+  z-index: 1;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+.tab-sources__table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Cap input in the wizard window table. */
+.window-table__cap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.window-table__cap input {
+  width: 64px;
+}
+
+/* Section spacing rhythm. */
+.tab-live section,
+.tab-live__window-sun,
+.tab-sources h3,
+.tab-rooms h3 {
+  margin-top: var(--sp-5);
+}
+
+/* ─── Manual control panel (Live tab) ───────────────────────────── */
+.control-panel {
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-card-border, #e2e8f0);
+  border-radius: var(--radius-2, 10px);
+  background: var(--color-card, #fff);
+}
+
+.control-panel__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.control-panel__scenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.control-panel__scene-btn {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #93b4f5;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #eef4ff 0%, #dce8ff 100%);
+  color: #1e3a8a;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.control-panel__scene-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.control-panel__windows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.control-panel__window {
+  display: grid;
+  grid-template-columns: 1fr auto 3rem auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.control-panel__window-name {
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-panel__window-pct {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.control-panel__apply {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--color-card-border, #cbd5e1);
+  border-radius: 8px;
+  background: #f1f5f9;
+  cursor: pointer;
+}
+
+.control-panel__error {
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
+/* ─── Config backup (Diagnose tab) ──────────────────────────────── */
+.diag-backup {
+  margin-top: 1.5rem;
+}
+
+.diag-backup__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.diag-backup__import {
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--color-card-border, #cbd5e1);
+  border-radius: 8px;
+  background: #f1f5f9;
+  cursor: pointer;
+}
+
+.diag-backup__status {
+  font-size: 0.85rem;
+  color: var(--color-muted, #64748b);
+}
+
+.diag-backup__hint {
+  font-size: 0.8rem;
+  color: var(--color-muted, #94a3b8);
+  margin-top: 0.4rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* History / Verlauf tab + SVG line chart (Wave 3).                    */
+/* ------------------------------------------------------------------ */
+
+.tab-history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.tab-history__ranges {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.tab-history__ranges button {
+  background: var(--color-card);
+  color: var(--color-muted);
+  border: 1px solid var(--color-card-border);
+  border-radius: 999px;
+  padding: var(--sp-1) var(--sp-3);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.tab-history__range--active {
+  background: var(--color-accent) !important;
+  color: var(--color-accent-contrast) !important;
+  border-color: var(--color-accent) !important;
+}
+
+.tab-history__chart-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 12px;
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.tab-history__chart-card h3 {
+  margin: 0 0 var(--sp-3);
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.tab-history__error {
+  color: var(--color-danger);
+}
+
+.line-chart {
+  margin: 0;
+}
+
+.line-chart__plot {
+  position: relative;
+}
+
+.line-chart__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  touch-action: none;
+}
+
+.line-chart__cursor {
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 1;
+}
+
+/* Hover value tooltip (deep-dive interactivity). */
+.line-chart__tip {
+  position: absolute;
+  top: 6px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(13, 18, 28, 0.92);
+  border: 1px solid var(--color-card-border-strong, rgba(255, 255, 255, 0.16));
+  box-shadow: var(--shadow-2, 0 8px 24px rgba(0, 0, 0, 0.4));
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 2;
+}
+.line-chart__tip--left {
+  transform: translateX(-100%);
+}
+.line-chart__tip-time {
+  font-size: 11px;
+  color: var(--color-faint);
+  font-variant-numeric: tabular-nums;
+}
+.line-chart__tip-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+.line-chart__tip-row strong {
+  color: var(--color-text);
+}
+
+.line-chart--empty {
+  color: var(--color-faint);
+  padding: var(--sp-4);
+  text-align: center;
+}
+
+.line-chart__grid {
+  stroke: var(--color-card-border);
+  stroke-width: 1;
+}
+
+.line-chart__ylabel {
+  fill: var(--color-faint);
+  font-size: 11px;
+  text-anchor: end;
+}
+
+.line-chart__xlabel {
+  fill: var(--color-faint);
+  font-size: 11px;
+}
+
+.line-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.line-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.line-chart__swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.line-chart__unit {
+  margin-left: auto;
+  color: var(--color-faint);
+}
+
+/* ===================================================================
+ * Predictive Control Dashboard — design tokens + layout
+ * (predictive-control-dashboard Tasks 13–21, Requirement 11.4/13.6/15)
+ * =================================================================== */
+
+:root {
+  /* Action colours (Requirement 11.4). */
+  --action-shade: #f5b301;       /* Beschattung – gold */
+  --action-vent: #22c55e;        /* Lüftung – grün */
+  --action-nightvent: #22d3ee;   /* Nachtlüftung – cyan */
+  --action-cool: #3b82f6;        /* Kühlung – blau */
+  --action-warn: #ef4444;        /* Warnung/blockiert – rot */
+
+  /* Data-state tokens (Requirement 15). */
+  --state-measured: #e8edf6;
+  --state-forecast: #9aa6b8;
+  --state-planned: rgba(154, 166, 184, 0.45);
+  --state-executed: #22c55e;
+  --state-manual: #a855f7;
+
+  /* Heat-load accent. */
+  --heatload-purple: #a855f7;
+}
+
+/* --- Module nav --------------------------------------------------- */
+.app__modules {
+  display: flex;
+  gap: var(--sp-2);
+  flex: 1;
+  margin: 0 var(--sp-4);
+  flex-wrap: wrap;
+}
+.app__module {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-pill);
+  color: var(--color-muted);
+  text-decoration: none;
+  font-weight: 600;
+}
+.app__module-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+  opacity: 0.85;
+}
+.app__module--active .app__module-icon {
+  opacity: 1;
+}
+.app__module--active {
+  background: var(--color-card);
+  color: var(--color-accent-strong);
+  box-shadow: var(--shadow-1);
+}
+.app__module-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: var(--sp-1);
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--action-shade);
+  color: var(--color-accent-contrast);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* --- Three-column grid (Requirement 6) ---------------------------- */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 218px 1fr 443px;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  align-items: start;
+}
+.dashboard-grid__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.dashboard-grid__loading {
+  grid-column: 1 / -1;
+  color: var(--color-muted);
+  padding: var(--sp-6);
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- KPI cards ---------------------------------------------------- */
+.metrics-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.kpi-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+}
+.kpi-card__head {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+/* KPI header icons: custom white line-SVGs (transparent background) instead
+   of emoji. Subtle glow so they read on the glass surface. */
+.kpi-card__icon {
+  color: #ffffff;
+  opacity: 0.92;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+.kpi-card__value {
+  font-size: 26px;
+  font-weight: 700;
+  margin-top: var(--sp-1);
+}
+.kpi-card__hint,
+.kpi-card__meta dt {
+  color: var(--color-faint);
+  font-size: 12px;
+}
+.sparkline {
+  width: 100%;
+  height: 28px;
+  margin: var(--sp-2) 0;
+}
+.heatindex-ring__label {
+  fill: var(--color-text);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+/* --- House digital twin (Requirement 9) --------------------------- */
+.house-twin {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 720 / 480;
+  background-color: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.house-twin__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+.twin-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.twin-overlay--sunarc {
+  pointer-events: auto;
+  cursor: ew-resize;
+  height: 56%;
+  z-index: 1;
+}
+
+/* Facade exposure cards around the house. */
+.twin-overlay--facades {
+  z-index: 4;
+}
+.facade-card {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 60px;
+  background: rgba(11, 15, 23, 0.78);
+  border: 1px solid var(--color-card-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  box-shadow: var(--shadow-1);
+}
+.facade-card__dir {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+.facade-card__pct {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--action-shade);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Strongest-exposed facade highlight. */
+.facade-card--strongest {
+  border-color: var(--action-shade);
+  box-shadow: 0 0 0 2px rgba(245, 179, 1, 0.35), var(--shadow-1);
+}
+.facade-card--strongest .facade-card__dir {
+  color: var(--action-shade);
+}
+
+/* --- Twin header bar (above the image) + layout controls ---------- */
+.twin-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.twin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+  padding: 7px 9px;
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+}
+.twin-toolbar__insights {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.twin-toolbar__actions {
+  display: flex;
+  gap: 6px;
+}
+.twin-insight {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.twin-insight__label {
+  color: var(--color-faint);
+  letter-spacing: 0.02em;
+}
+.twin-insight__value {
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.twin-insight__icon {
+  color: #38bdf8;
+}
+.twin-btn {
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.twin-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-card-hover);
+}
+.twin-btn--active {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+.twin-btn--locked {
+  color: var(--color-muted);
+}
+
+/* Snap guide lines while dragging a badge. */
+.twin-guides {
+  z-index: 4;
+}
+.twin-guide {
+  position: absolute;
+  background: rgba(245, 179, 1, 0.5);
+}
+.twin-guide--v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-0.5px);
+}
+.twin-guide--h {
+  left: 0;
+  right: 0;
+  height: 1px;
+  transform: translateY(-0.5px);
+}
+
+/* --- Floating per-room badges (rich, draggable) ------------------- */
+.twin-overlay--rooms {
+  z-index: 3;
+}
+.house-twin--editing .twin-overlay--rooms {
+  z-index: 5;
+}
+.room-badge {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(13, 18, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+  padding: 3px 7px 3px 4px;
+  max-width: 138px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: box-shadow 0.12s ease, border-color 0.12s ease, transform 0.05s ease;
+  border-left: 3px solid var(--color-card-border);
+}
+.room-badge:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  z-index: 1;
+}
+.room-badge--draggable {
+  cursor: grab;
+}
+.room-badge--draggable:active {
+  cursor: grabbing;
+  transform: translate(-50%, -50%) scale(1.04);
+}
+/* Status accent on the left border. */
+.room-badge--scheduled,
+.room-badge--recommended {
+  border-left-color: var(--action-shade);
+}
+.room-badge--executing {
+  border-left-color: var(--action-cool);
+}
+.room-badge--completed {
+  border-left-color: var(--action-vent);
+}
+.room-badge--blocked {
+  border-left-color: var(--action-warn);
+}
+.room-badge--manuallyOverridden {
+  border-left-color: #a855f7;
+}
+.room-badge--selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(245, 179, 1, 0.45), 0 4px 14px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+}
+/* 12 h shutter preview (scrub): dashed outline + amber accent. */
+.room-badge--preview {
+  border-style: dashed;
+  border-color: var(--color-accent-strong);
+}
+.room-badge__preview-tag {
+  display: inline-block;
+  margin-left: 3px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: 8px;
+  font-weight: 700;
+  vertical-align: top;
+}
+/* Heat-map: subtle internal tint by heat band (no neon outer glow). */
+.room-badge--heat-low {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 0 0 9999px rgba(34, 197, 94, 0.12);
+  border-left-color: #22c55e;
+}
+.room-badge--heat-mid {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 0 0 9999px rgba(240, 179, 0, 0.14);
+  border-left-color: #f0b300;
+}
+.room-badge--heat-high {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 9999px rgba(239, 68, 68, 0.16);
+  border-left-color: #ef4444;
+}
+.room-badge__glyph {
+  flex: 0 0 auto;
+  display: block;
+}
+.room-badge__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.room-badge__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+.room-badge__roomname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.room-badge__floor {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-size: 8.5px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+.room-badge__metrics {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  line-height: 1.15;
+}
+.room-badge__pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.room-badge__pct[data-shutter='open'] {
+  color: var(--action-vent);
+}
+.room-badge__pct[data-shutter='mid'] {
+  color: var(--action-shade);
+}
+.room-badge__pct[data-shutter='closed'] {
+  color: #38bdf8;
+}
+.room-badge__sep {
+  color: var(--color-faint);
+}
+.room-badge__temp {
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.room-badge__trend {
+  font-size: 9px;
+}
+.room-badge__window {
+  color: #38bdf8;
+  flex: 0 0 auto;
+}
+.room-badge__fresh {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 2px;
+}
+.room-badge__fresh--stale {
+  background: var(--color-warn);
+}
+.room-badge__fresh--unbound {
+  background: var(--color-muted);
+}
+.room-badge__status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--color-muted);
+  box-shadow: 0 0 0 2px rgba(11, 15, 23, 0.6);
+}
+.room-badge__status[data-state='scheduled'],
+.room-badge__status[data-state='recommended'] {
+  background: var(--action-shade);
+}
+.room-badge__status[data-state='executing'] {
+  background: var(--action-cool);
+  animation: twin-pulse 1.4s ease-in-out infinite;
+}
+.room-badge__status[data-state='completed'] {
+  background: var(--action-vent);
+}
+.room-badge__status[data-state='blocked'] {
+  background: var(--action-warn);
+}
+.room-badge__status[data-state='manuallyOverridden'] {
+  background: #a855f7;
+}
+@keyframes twin-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* --- Twin legend panel -------------------------------------------- */
+.twin-legend {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 7;
+  width: min(330px, calc(100% - 16px));
+  background: rgba(11, 15, 23, 0.94);
+  border: 1px solid var(--color-card-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2, 0 8px 30px rgba(0, 0, 0, 0.5));
+  padding: 10px 12px;
+  pointer-events: auto;
+}
+.twin-legend__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.twin-legend__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent-strong);
+}
+.twin-legend__close {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.twin-legend__close:hover {
+  color: var(--color-text);
+}
+.twin-legend__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.twin-legend__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--color-muted);
+  line-height: 1.35;
+}
+.twin-legend__row b {
+  color: var(--color-text);
+}
+.twin-legend__row--note {
+  border-top: 1px solid var(--color-card-border);
+  padding-top: 8px;
+}
+.twin-legend__icon {
+  color: #38bdf8;
+  flex: 0 0 auto;
+}
+.twin-legend__dots {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.twin-legend__trend {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+.twin-legend__heat {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.twin-legend__heat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.twin-legend__heat-dot--low {
+  background: #22c55e;
+}
+.twin-legend__heat-dot--mid {
+  background: #f0b300;
+}
+.twin-legend__heat-dot--high {
+  background: #ef4444;
+}
+
+/* --- Twin detail popover (click on a badge) ----------------------- */
+.twin-popover {
+  position: absolute;
+  z-index: 8;
+  transform: translate(-50%, 0);
+  width: min(248px, calc(100% - 24px));
+  background: rgba(11, 15, 23, 0.96);
+  border: 1px solid var(--color-card-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+  padding: 9px 11px;
+  pointer-events: auto;
+}
+.twin-popover--above {
+  transform: translate(-50%, -100%);
+}
+/* Portalled to <body> and positioned via inline `fixed` left/top. Inline
+   styles already override position/transform/visibility; this just lifts it
+   above the page content (below the deep-dive modal at 1000 and the room
+   detail modal at 1100) and pins a stable width at the document level. */
+.twin-popover--portal {
+  z-index: 950;
+  width: min(264px, calc(100vw - 24px));
+  -webkit-overflow-scrolling: touch;
+  animation: twin-popover-in 0.14s ease-out;
+}
+@keyframes twin-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.twin-popover__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.twin-popover__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.twin-popover__close {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 3px;
+}
+.twin-popover__close:hover {
+  color: var(--color-text);
+}
+.twin-popover__grid {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.twin-popover__row {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 12px;
+}
+.twin-popover__row dt {
+  color: var(--color-faint);
+}
+.twin-popover__row dd {
+  margin: 0;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.twin-popover__muted {
+  color: var(--color-faint);
+  font-size: 10.5px;
+}
+.twin-popover__preview {
+  color: var(--color-accent-strong);
+  font-weight: 700;
+}
+.twin-popover__warn {
+  color: var(--color-warn);
+  font-size: 11px;
+}
+.twin-popover__heat {
+  font-weight: 700;
+}
+.twin-popover__heat--low {
+  color: #22c55e;
+}
+.twin-popover__heat--mid {
+  color: #f0b300;
+}
+.twin-popover__heat--high {
+  color: #ef4444;
+}
+.twin-popover__action {
+  margin: 7px 0 0;
+  padding-top: 7px;
+  border-top: 1px solid var(--color-card-border);
+  font-size: 11.5px;
+  color: var(--color-muted);
+  line-height: 1.35;
+}
+.twin-popover__action b {
+  color: var(--color-text);
+}
+
+/* Environment card (icons + value) — pinned to the bottom strip so it
+   never covers the SÜD facade card or the lower room tags. */
+.twin-overlay--env {
+  inset: auto 0 0 0;
+  height: auto;
+  z-index: 2;
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-end;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding-bottom: var(--sp-2);
+  padding-top: var(--sp-3);
+  background: linear-gradient(to top, rgba(11, 15, 23, 0.65), rgba(11, 15, 23, 0));
+}
+.env-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(11, 15, 23, 0.78);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+}
+.env-chip__icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+  flex: 0 0 auto;
+}
+.env-chip__body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.env-chip__label {
+  font-size: 10px;
+  color: var(--color-faint);
+  white-space: nowrap;
+}
+.env-chip__value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- Forecast timeline + actions (Requirement 11) ----------------- */
+.forecast-timeline__track,
+.next-actions__track {
+  display: flex;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scroll-snap-type: x proximity;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
+}
+.forecast-timeline__track::-webkit-scrollbar,
+.next-actions__track::-webkit-scrollbar {
+  height: 8px;
+}
+.forecast-timeline__track::-webkit-scrollbar-thumb,
+.next-actions__track::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-strong));
+  border-radius: 999px;
+}
+.forecast-timeline__track::-webkit-scrollbar-track,
+.next-actions__track::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+.forecast-card {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  min-width: 84px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  border-radius: var(--radius);
+  padding: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+}
+.forecast-card--now {
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+.next-actions__slot { min-width: 84px; }
+.action-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  color: #0b0f17;
+}
+.action--shade { background: var(--action-shade); }
+.action--vent { background: var(--action-vent); }
+.action--nightvent { background: var(--action-nightvent); }
+.action--cool { background: var(--action-cool); color: #fff; }
+.action--warn { background: var(--action-warn); color: #fff; }
+
+/* Next-actions readable list (room/device + target % + ETA). */
+.next-actions__list {
+  list-style: none;
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.next-actions__empty {
+  color: var(--color-muted);
+  font-style: italic;
+  margin: var(--sp-1) 0 0;
+}
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--color-card-border);
+  font-size: 13px;
+  font-weight: 500;
+}
+@media (prefers-color-scheme: light) {
+  .action-row {
+    background: rgba(20, 30, 50, 0.05) !important;
+  }
+}
+.action-row__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--color-muted);
+}
+.action-row__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.action-row__eta {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.action-row.action--shade { border-left-color: var(--action-shade); }
+.action-row.action--shade .action-row__dot { background: var(--action-shade); }
+.action-row.action--vent { border-left-color: var(--action-vent); }
+.action-row.action--vent .action-row__dot { background: var(--action-vent); }
+.action-row.action--nightvent { border-left-color: var(--action-nightvent); }
+.action-row.action--nightvent .action-row__dot { background: var(--action-nightvent); }
+.action-row.action--cool { border-left-color: var(--action-cool); }
+.action-row.action--cool .action-row__dot { background: var(--action-cool); }
+.action-row.action--warn { border-left-color: var(--action-warn); }
+.action-row.action--warn .action-row__dot { background: var(--action-warn); }
+
+/* --- Rooms & facades panel (Requirement 12) ----------------------- */
+.facade-map {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.facade-tile {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.facade-tile__dir {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+.facade-tile__pct {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.facade--strongest {
+  border-color: var(--action-shade);
+  box-shadow: 0 0 0 2px rgba(245, 179, 1, 0.35);
+}
+.facade--strongest .facade-tile__pct {
+  color: var(--action-shade);
+}
+
+/* Width-constrained room table: a min-width:0 scroll wrapper plus a
+   fixed table layout so the center column can never push under the
+   right analysis rail. */
+.rooms-table-wrap {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.rooms-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rooms-table__col-room { width: 26%; }
+.rooms-table__col-facade { width: 11%; }
+.rooms-table__col-shutter { width: 20%; }
+.rooms-table__col-temp { width: 11%; }
+.rooms-table__col-trend { width: 8%; }
+.rooms-table__col-action { width: 16%; }
+.rooms-table__col-status { width: 14%; }
+.rooms-table th,
+.rooms-table td {
+  text-align: left;
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--color-card-border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rooms-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+  font-weight: 600;
+}
+.rooms-table__room {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.rooms-table__room-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rooms-table__floor {
+  flex: 0 0 auto;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.rooms-table .action-chip {
+  max-width: 100%;
+}
+.rooms-table__noaction { color: var(--color-faint); }
+.shutter-bar {
+  position: relative;
+  height: 14px;
+  background: var(--color-bg-elev);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  min-width: 80px;
+}
+.shutter-bar__fill {
+  height: 100%;
+  background: var(--action-shade);
+}
+.shutter-bar__pct {
+  position: absolute;
+  inset: 0;
+  font-size: 10px;
+  text-align: center;
+  line-height: 14px;
+}
+.trend--up { color: var(--action-warn); }
+.trend--down { color: var(--action-vent); }
+.trend--flat { color: var(--color-muted); }
+.status-pill {
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  background: var(--color-card-border);
+}
+.status--blocked { background: var(--action-warn); color: #fff; }
+.status--manuallyOverridden { background: var(--state-manual); color: #fff; }
+
+/* --- Analysis rail (Requirement 13) ------------------------------- */
+.analysis-rail { display: flex; flex-direction: column; gap: var(--sp-3); }
+.analysis-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+}
+.analysis-card__title { font-weight: 600; }
+.analysis-card__empty {
+  color: var(--color-muted);
+  font-style: italic;
+  padding: var(--sp-4);
+  text-align: center;
+}
+.analysis-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.automation-status__info {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border-strong);
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.automation-status__info:hover {
+  color: var(--color-accent-strong);
+  border-color: var(--color-accent);
+}
+.automation-status__mode-line {
+  margin: var(--sp-1) 0 0;
+}
+.automation-status__mode {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-accent-strong);
+}
+.automation-status__goal {
+  margin: var(--sp-1) 0 var(--sp-2);
+  color: var(--color-muted);
+}
+.automation-status__decided {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-2);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-bg-elev);
+  border-radius: var(--radius-sm);
+}
+.automation-status__decided-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent-strong);
+}
+.automation-status__decided-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.automation-legend {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--color-card-border);
+  font-size: 12px;
+}
+.automation-legend__heading {
+  font-weight: 700;
+  margin: var(--sp-2) 0 var(--sp-1);
+  color: var(--color-text);
+}
+.automation-legend__modes {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.automation-legend__mode dt {
+  font-weight: 700;
+  color: var(--color-text);
+}
+.automation-legend__mode dd {
+  margin: 0 0 var(--sp-1);
+  color: var(--color-muted);
+}
+.automation-legend__mode--active {
+  border-left: 3px solid var(--color-accent);
+  padding-left: var(--sp-2);
+}
+.automation-legend__buckets {
+  margin: 0;
+  padding-left: var(--sp-4);
+  color: var(--color-muted);
+}
+.automation-legend__range {
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.line-chart__comfort {
+  fill: rgba(34, 197, 94, 0.12);
+}
+.reason-chip {
+  display: inline-block;
+  margin: 2px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-elev);
+  font-size: 12px;
+}
+.reasoning-chain { margin: var(--sp-2) 0 0; padding-left: var(--sp-4); }
+
+/* Shutter heatmap (Requirement 13.6). */
+.heatmap-row { display: flex; align-items: center; gap: var(--sp-2); margin: 2px 0; }
+.heatmap-row__label { width: 110px; font-size: 12px; color: var(--color-muted); }
+.heatmap-row--head .heatmap-axis {
+  flex: 1;
+  font-size: 9px;
+  color: var(--color-faint);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.heatmap-row--head { margin-bottom: 4px; }
+.heatmap-row__cells { display: flex; gap: 2px; flex: 1; }
+.heatmap-cell {
+  flex: 1;
+  height: 16px;
+  border-radius: 3px;
+}
+.heatmap-cell--future {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.18) 0,
+    rgba(255, 255, 255, 0.18) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+}
+
+.scrub-reset {
+  align-self: flex-start;
+  background: var(--color-card);
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent-strong);
+  border-radius: var(--radius-pill);
+  padding: var(--sp-1) var(--sp-3);
+  cursor: pointer;
+}
+
+.module-placeholder {
+  padding: var(--sp-6);
+  color: var(--color-muted);
+}
+
+/* --- Task: editable floor control on room cards ----------------------- */
+.room-card__floor-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  font-size: 0.8em;
+  color: var(--color-muted);
+}
+.room-card__floor-label {
+  white-space: nowrap;
+}
+.room-card__floor-input {
+  width: 7.5em;
+  background: var(--color-bg);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font: inherit;
+}
+.room-card__floor-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* --- Task: KPI rail self-use line + comparison subtitle --------------- */
+.kpi-card__selfuse {
+  color: var(--color-success);
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* --- Task: Lüftung / Klima read-only module panels -------------------- */
+.module-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.module-panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--color-card-border);
+}
+.module-panel__head h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.module-panel__badge {
+  background: var(--color-bg-elev);
+  color: var(--color-accent-strong);
+  border: 1px solid var(--color-card-border-strong);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.module-panel__intro {
+  color: var(--color-muted);
+  max-width: 60ch;
+  line-height: 1.5;
+  margin: 0;
+}
+.module-panel__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-3);
+}
+.module-panel__card {
+  position: relative;
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+  overflow: hidden;
+}
+.module-panel__card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-accent), var(--action-cool));
+  opacity: 0.85;
+}
+.module-panel__card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+  border-color: var(--color-card-border-strong);
+}
+.module-panel__card h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-faint);
+  margin: 0 0 var(--sp-2);
+}
+/* Card title (the standard heading element for cards across all tabs).
+   Reset the browser's default top margin so titles sit tight under the
+   card's top padding — fixes the large empty gap above the title. */
+.module-panel__card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+  color: var(--color-text);
+  margin: 0 0 var(--sp-2);
+}
+.module-panel__metric {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.module-panel__hint {
+  color: var(--color-muted);
+  font-size: 12px;
+  margin-top: var(--sp-2);
+  line-height: 1.45;
+}
+
+/* --- Task: Einstellungen hub sub-navigation --------------------------- */
+.settings-hub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.settings-hub__head p {
+  color: var(--color-muted);
+}
+.settings-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-3);
+}
+.settings-hub__card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  text-decoration: none;
+  color: var(--color-text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.settings-hub__card:hover {
+  border-color: var(--color-accent);
+  background: var(--color-card-hover);
+}
+.settings-hub__card-title {
+  font-weight: 600;
+}
+.settings-hub__card-desc {
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* --- House background upload (Einstellungen) ---------------------- */
+.house-upload {
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+}
+.house-upload__title {
+  margin: 0 0 var(--sp-1);
+  font-size: 15px;
+}
+.house-upload__hint {
+  margin: 0 0 var(--sp-3);
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.house-upload__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 600;
+  cursor: pointer;
+}
+.house-upload__btn input {
+  display: none;
+}
+.house-upload__preview {
+  display: block;
+  margin-top: var(--sp-3);
+  max-width: 320px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-card-border);
+}
+.house-upload__status {
+  margin: var(--sp-2) 0 0;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.house-upload__status--ok {
+  color: var(--state-executed);
+}
+.house-upload__status--error {
+  color: var(--action-warn);
+}
+
+/* --- Window orientation selector (Räume) -------------------------- */
+.room-card__window-orientation {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.room-card__window-orientation select {
+  background: var(--color-bg-elev);
+  color: var(--color-text);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+/* --- Lüftung module: ventilation advice --------------------------- */
+.vent-advice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--sp-3) 0;
+  padding: var(--sp-3);
+  border-radius: var(--radius-lg);
+  border-left: 5px solid var(--color-card-border);
+  background: var(--color-card);
+}
+.vent-advice__headline { font-size: 16px; font-weight: 700; }
+.vent-advice__detail { color: var(--color-muted); font-size: 13px; }
+.vent-advice--air_now { border-left-color: var(--action-vent, #22c55e); }
+.vent-advice--air_possible { border-left-color: var(--action-nightvent, #22d3ee); }
+.vent-advice--close_window { border-left-color: var(--action-warn, #ef4444); }
+.vent-advice--keep_closed { border-left-color: var(--action-shade, #f59e0b); }
+.vent-advice--neutral { border-left-color: var(--color-card-border); }
+
+/* Klima module: cooling advice border colours. */
+.vent-advice--cool-cool_now { border-left-color: var(--action-cool, #3b82f6); }
+.vent-advice--cool-precool { border-left-color: var(--action-nightvent, #22d3ee); }
+.vent-advice--cool-cool_grid { border-left-color: var(--action-warn, #ef4444); }
+.vent-advice--cool-no_cooling { border-left-color: var(--state-executed, #22c55e); }
+.vent-advice--cool-neutral { border-left-color: var(--color-card-border); }
+
+.vent-rooms { margin-top: var(--sp-3); }
+.vent-rooms__list {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+.vent-room {
+  display: grid;
+  grid-template-columns: 160px auto;
+  grid-template-rows: auto auto;
+  column-gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elev);
+  border-left: 4px solid var(--color-card-border);
+}
+.vent-room--air_now { border-left-color: var(--action-vent, #22c55e); }
+.vent-room--air_possible { border-left-color: var(--action-nightvent, #22d3ee); }
+.vent-room--close_window { border-left-color: var(--action-warn, #ef4444); }
+.vent-room--keep_closed { border-left-color: var(--action-shade, #f59e0b); }
+.vent-room__name { font-weight: 700; grid-row: 1 / span 2; align-self: center; }
+.vent-room__headline { font-weight: 600; }
+.vent-room__detail { color: var(--color-muted); font-size: 12px; grid-column: 2; }
+
+/* --- Learning card (day-to-day shading effect) -------------------- */
+.learning-card__days {
+  font-size: 11px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+.learning-list {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+.learning-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elev);
+  border-left: 3px solid var(--color-card-border);
+}
+.learning-row--shade_earlier { border-left-color: var(--action-shade, #f59e0b); }
+.learning-row--allow_more_light { border-left-color: var(--state-executed, #22c55e); }
+.learning-row--balanced { border-left-color: var(--action-cool, #3b82f6); }
+.learning-row--insufficient_data { border-left-color: var(--color-card-border); }
+.learning-row__name { font-weight: 700; font-size: 13px; }
+.learning-row__metrics {
+  font-size: 11px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+.learning-row__rec { font-size: 12px; color: var(--color-text); }
+
+/* ===================================================================
+   House digital twin — premium V3 additions
+   =================================================================== */
+
+/* Live day/night sky + ground shadow behind the transparent house. */
+.twin-sky {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.twin-shadow {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 14%;
+  height: 13%;
+  z-index: 0;
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0) 76%);
+  filter: blur(4px);
+  transform-origin: center;
+  pointer-events: none;
+}
+
+/* Schutz-Score ring chip in the toolbar. */
+.twin-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px 2px 4px;
+}
+.twin-score__body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+.twin-score__label {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--color-faint);
+  text-transform: uppercase;
+}
+.twin-score__value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Weather sparkline chip. */
+.twin-insight--wide {
+  gap: 6px;
+}
+.twin-spark {
+  display: block;
+}
+
+/* Sun-incidence arrow on facade cards. */
+.facade-card {
+  position: absolute;
+}
+.facade-card__inc {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  font-size: 11px;
+  color: #fbbf24;
+  text-shadow: 0 0 6px rgba(251, 191, 36, 0.7);
+  pointer-events: none;
+}
+
+/* "Heute" timeline below the twin. */
+.twin-timeline {
+  margin-top: var(--sp-2);
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius);
+  padding: 4px 10px 2px;
+}
+.twin-timeline__svg {
+  width: 100%;
+  height: 46px;
+  display: block;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+/* Smooth, non-laggy badge motion: animate position only when NOT dragging. */
+.room-badge {
+  transition:
+    left 0.35s cubic-bezier(0.22, 0.61, 0.36, 1),
+    top 0.35s cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.08s ease;
+}
+.house-twin--editing .room-badge,
+.room-badge--draggable {
+  transition: box-shadow 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+}
+
+/* Running-shutter animation while a move is in flight. */
+.room-badge__glyph--running {
+  animation: glyph-run 1.2s ease-in-out infinite;
+}
+@keyframes glyph-run {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Popover: 12 h forecast sparkline + risk-factor bars. */
+.twin-popover__chart {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-card-border);
+}
+.twin-popover__chart-label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+  margin-bottom: 3px;
+}
+.twin-popover__risk {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.twin-popover__riskrow {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+.twin-popover__riskname {
+  color: var(--color-muted);
+}
+.twin-popover__riskbar {
+  height: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.twin-popover__riskfill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--action-shade), #fb923c);
+  border-radius: 4px;
+}
+
+/* Loading skeleton (replaces the bare "warte auf Daten" text). */
+.dashboard-skeleton {
+  display: grid;
+  grid-template-columns: 218px 1fr 443px;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+.dashboard-skeleton__center {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.skeleton {
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    90deg,
+    var(--color-card) 25%,
+    var(--color-card-hover) 37%,
+    var(--color-card) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+.skeleton--rail {
+  height: 520px;
+}
+.skeleton--twin {
+  aspect-ratio: 720 / 480;
+}
+.skeleton--bar {
+  height: 46px;
+}
+.skeleton--cards {
+  height: 180px;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+@media (max-width: 900px) {
+  .dashboard-skeleton {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-skeleton .skeleton--rail {
+    height: 160px;
+  }
+}
+
+/* Respect reduced-motion: kill non-essential animation + transitions. */
+@media (prefers-reduced-motion: reduce) {
+  .room-badge,
+  .room-badge__glyph--running,
+  .room-badge__status,
+  .skeleton,
+  .twin-sun-rays {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ===================================================================
+   Light theme — token overrides (auto by OS preference). Accents stay
+   identical so brand colours are consistent across themes.
+   =================================================================== */
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-bg: #eef1f7;
+    --color-bg-elev: #ffffff;
+    --color-card: #ffffff;
+    --color-card-hover: #f3f6fb;
+    --color-card-border: #dde3ec;
+    --color-card-border-strong: #c4cdda;
+    --color-text: #1b232f;
+    --color-muted: #586374;
+    --color-faint: #8a94a3;
+    --shadow-1: 0 1px 2px rgba(20, 30, 50, 0.08);
+    --shadow-2: 0 4px 12px rgba(20, 30, 50, 0.1);
+    --shadow-3: 0 10px 30px rgba(20, 30, 50, 0.14);
+  }
+  body {
+    background: radial-gradient(
+        1200px 600px at 80% -10%,
+        rgba(245, 158, 11, 0.1),
+        transparent 60%
+      ),
+      var(--color-bg);
+  }
+  /* Twin overlay chips keep a translucent dark glass look so they stay
+     legible over the (still vivid) sky + house render in both themes. */
+}
+
+/* ===================================================================
+   Mobile / tablet polish (V4) — the dashboard is used on the phone as
+   an installed PWA, so the stacked layout must feel first-class.
+   =================================================================== */
+
+/* Stacked single column: lead with the house twin (the hero), then the
+   live KPI rail, then the analysis rail. */
+@media (max-width: 1100px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+  }
+  .dashboard-grid__col--center {
+    order: -1;
+  }
+  .dashboard-grid__col--left {
+    order: 0;
+  }
+  .dashboard-grid__col--right {
+    order: 1;
+  }
+  /* The left KPI rail is a vertical 218px stack on desktop; let it flow
+     into a responsive multi-column grid when full-width on tablet. */
+  .dashboard-grid__col--left {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--sp-3);
+  }
+}
+
+/* Module nav: a single horizontally-scrollable strip instead of wrapping
+   into several tall rows on a phone. */
+@media (max-width: 900px) {
+  .app__header {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .app__modules {
+    order: 3;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .app__modules::-webkit-scrollbar {
+    display: none;
+  }
+  .app__module {
+    flex: 0 0 auto;
+  }
+}
+
+/* Phone: tighten spacing, shrink the twin chrome, keep tap targets large. */
+@media (max-width: 640px) {
+  .dashboard-grid {
+    padding: var(--sp-2);
+    gap: var(--sp-2);
+  }
+  .dashboard-grid__col--left {
+    grid-template-columns: 1fr 1fr;
+  }
+  .twin-toolbar {
+    padding: 6px 7px;
+    gap: 6px;
+  }
+  .twin-toolbar__insights {
+    gap: 5px;
+  }
+  /* Drop the wordier insight chips on very small screens; keep Score +
+     12 h + Ø Rollo, which carry the most at-a-glance value. */
+  .twin-insight--secondary {
+    display: none;
+  }
+  .module-panel {
+    padding: var(--sp-3);
+  }
+  .module-panel__cards {
+    grid-template-columns: 1fr;
+  }
+  .twin-legend {
+    left: 6px;
+    right: 6px;
+    width: auto;
+  }
+  .twin-popover {
+    width: min(240px, calc(100vw - 32px));
+  }
+  /* Room badges are slightly smaller on phones so they crowd less. */
+  .room-badge {
+    max-width: 124px;
+    padding: 2px 6px 2px 4px;
+  }
+  .room-badge__name {
+    font-size: 9.5px;
+    max-width: 84px;
+  }
+  .room-badge__metrics {
+    font-size: 10px;
+  }
+}
+
+/* Self-calibration note in the learning card. */
+.learning-row__calib {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--color-info, #3b82f6);
+  line-height: 1.35;
+}
+
+/* ===================================================================
+   Forecast module — premium "Prognose & Verlauf" layout
+   =================================================================== */
+.tab-history.module-panel {
+  gap: var(--sp-4);
+}
+.forecast-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.forecast-section__title,
+.tab-history__verlauf > .tab-history__header h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-faint);
+  margin: 0;
+}
+.forecast-section__charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--sp-3);
+}
+.tab-history__verlauf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  border-top: 1px solid var(--color-card-border);
+  padding-top: var(--sp-3);
+}
+.tab-history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  border-bottom: none;
+}
+.tab-history__chart-card {
+  /* inherits .module-panel__card (shadow, accent bar, hover) */
+}
+.tab-history__chart-card::before {
+  display: none; /* the history cards don't need the accent bar */
+}
+@media (max-width: 640px) {
+  .forecast-section__charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===================================================================
+   Automation module (rules) — premium pass
+   =================================================================== */
+.tab-rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.tab-rules__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--color-card-border);
+}
+.tab-rules__header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+/* Segmented profile control. */
+.tab-rules__profile-switcher {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+.tab-rules__profile-switcher button {
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  border-radius: var(--radius-pill);
+  padding: 5px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab-rules__profile-switcher button:hover {
+  color: var(--color-text);
+}
+.tab-rules__profile-btn--active {
+  background: var(--color-accent) !important;
+  color: var(--color-accent-contrast) !important;
+}
+/* Thresholds + each config section as a premium card. */
+.tab-rules__sliders,
+.tab-rules__notifications,
+.tab-rules__advanced,
+.tab-rules__probe {
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-1);
+}
+.tab-rules__sliders {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sp-2);
+}
+.tab-rules__notifications h3,
+.tab-rules__advanced h3,
+.tab-rules__probe h3 {
+  margin: 0 0 var(--sp-2);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent-strong);
+}
+.tab-rules__slider-row {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-card-border);
+}
+.tab-rules__slider-row:last-child {
+  border-bottom: none;
+}
+.tab-rules__slider-row input[type='range'] {
+  accent-color: var(--color-accent);
+}
+/* The automation-logic card leads the tab; give it a touch more presence. */
+.tab-rules > .automation-status {
+  box-shadow: var(--shadow-1);
+}
+
+/* ===================================================================
+   Glass & Ambient design system (V1.2) — holistic, all tabs.
+   Translucent frosted surfaces + subtle highlight/glow over a dynamic,
+   time-of-day/weather background. Coordinated across modules.
+   =================================================================== */
+:root {
+  --glass-bg: rgba(10, 15, 26, 0.5);
+  --glass-bg-strong: rgba(10, 15, 26, 0.66);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-blur: 22px;
+  --glow-accent: 0 0 14px rgba(245, 158, 11, 0.32);
+
+  /* V2 glass — top-lit sheen + layered depth for a modern 3D feel. The
+     sheen is laid OVER the translucent base so light appears to graze the
+     glass from the top-left. Shadow stack = inset edge highlight + tight
+     contact shadow + soft ambient drop, giving each surface real elevation. */
+  --glass-sheen: linear-gradient(
+    157deg,
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(255, 255, 255, 0.035) 34%,
+    rgba(255, 255, 255, 0) 64%
+  );
+  --glass-edge: rgba(255, 255, 255, 0.16);
+  --glass-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 14px 38px rgba(0, 0, 0, 0.44);
+  --glass-shadow-hover:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 2px 6px rgba(0, 0, 0, 0.34),
+    0 26px 64px rgba(0, 0, 0, 0.54),
+    0 0 22px rgba(245, 158, 11, 0.1);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.5);
+    --glass-bg-strong: rgba(255, 255, 255, 0.68);
+    --glass-border: rgba(20, 30, 50, 0.12);
+    --glass-highlight: rgba(255, 255, 255, 0.55);
+    --glass-sheen: linear-gradient(
+      157deg,
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(255, 255, 255, 0.2) 34%,
+      rgba(255, 255, 255, 0) 64%
+    );
+    --glass-edge: rgba(20, 30, 50, 0.2);
+    --glass-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.7),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+      0 1px 2px rgba(20, 30, 50, 0.1),
+      0 14px 34px rgba(20, 30, 50, 0.16);
+    --glass-shadow-hover:
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      0 2px 6px rgba(20, 30, 50, 0.12),
+      0 26px 60px rgba(20, 30, 50, 0.22),
+      0 0 22px rgba(245, 158, 11, 0.12);
+  }
+}
+
+/* Frosted glass for the primary surfaces across every tab.
+   ONE canonical surface treatment — same background, border, radius, blur and
+   shadow everywhere so all cards/tiles look identical (V1.8.7 alignment). */
+.module-panel__card,
+.settings-hub__card,
+.kpi-card,
+.analysis-card,
+.tab-rules__sliders,
+.tab-rules__notifications,
+.tab-rules__advanced,
+.tab-rules__probe,
+.tab-history__chart-card,
+.forecast-card,
+.forecast-timeline,
+.auto-tech,
+.vent-advice,
+.vent-room,
+.automation-status,
+.window-card,
+.room-card,
+.message-item,
+.recommendation-panel__item {
+  background: var(--glass-sheen), var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  box-shadow: var(--glass-shadow);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Interactive surfaces lift toward the viewer on hover (3D depth cue).
+   Limited to the smaller, clickable cards so big panels don't jump. */
+@media (hover: hover) {
+  .kpi-card:hover,
+  .settings-hub__card:hover,
+  .window-card:hover,
+  .room-card:hover,
+  .vent-room:hover,
+  .message-item:hover,
+  .recommendation-panel__item:hover,
+  .forecast-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--glass-shadow-hover);
+    border-color: var(--glass-edge);
+  }
+}
+
+/* Glass header bar + module nav glow. */
+.app__header {
+  background: rgba(11, 15, 23, 0.72);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  border-bottom: 1px solid var(--glass-border);
+}
+.app__module--active {
+  box-shadow: var(--shadow-1), var(--glow-accent);
+}
+
+/* Ambient mode: the app sits on a dynamic gradient (set inline on .app);
+   make sub-surfaces a touch more translucent so it shows through. */
+.app--ambient {
+  min-height: 100vh;
+}
+.app--ambient .app__main > *:not(.dashboard-grid) {
+  background: transparent;
+}
+.app--ambient .dashboard-grid,
+.app--ambient .module-placeholder {
+  background: transparent;
+}
+
+/* Ambient toggle in the header. */
+.ambient-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(248, 250, 252, 0.08);
+  border: 1px solid rgba(248, 250, 252, 0.22);
+  color: #f8fafc;
+  border-radius: var(--radius-pill);
+  padding: 0.32rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.ambient-toggle:hover {
+  background: rgba(248, 250, 252, 0.16);
+}
+.ambient-toggle__dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fbbf24 0%, #3b82f6 100%);
+  box-shadow: 0 0 7px rgba(251, 191, 36, 0.55);
+}
+.ambient-toggle--on {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+
+/* ── Twin header: single minimal line with icon buttons ───────────── */
+.twin-toolbar {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.15);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.15);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-1);
+}
+.twin-toolbar__insights {
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+.twin-toolbar__actions {
+  flex: 0 0 auto;
+}
+.twin-iconbtn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-sheen), var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 9px;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 2px 5px rgba(0, 0, 0, 0.32);
+  transition: border-color 0.14s ease, box-shadow 0.14s ease,
+    background 0.14s ease, transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.twin-iconbtn:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 7px 18px rgba(0, 0, 0, 0.42),
+    var(--glow-accent);
+}
+.twin-iconbtn:active {
+  transform: translateY(0);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+.twin-iconbtn--active {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glow-accent);
+}
+/* Toolbar icon glyphs (e.g. the lock): force a bright stroke + crisp size so
+   they always read on the dark glass button, independent of inheritance. */
+.twin-iconbtn__glyph {
+  color: #ffffff;
+  display: block;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+.twin-iconbtn--active .twin-iconbtn__glyph {
+  color: var(--color-accent-strong);
+}
+
+/* Subtle accent glow on the headline KPI numbers (premium touch). */
+.kpi-card__value {
+  text-shadow: 0 0 18px rgba(245, 158, 11, 0.12);
+}
+
+/* Manual shutter control inside the twin popover. */
+.twin-control {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-card-border);
+}
+.twin-control__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.twin-control__row input[type='range'] {
+  flex: 1;
+  accent-color: var(--color-accent);
+}
+.twin-control__val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 38px;
+  text-align: right;
+}
+.twin-control__quick {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.twin-control__quick button {
+  flex: 1;
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text);
+  border-radius: 7px;
+  padding: 4px 0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.twin-control__quick button:hover {
+  border-color: var(--color-accent);
+}
+.twin-control__status {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--action-vent);
+}
+.twin-control__status--err {
+  color: var(--action-warn);
+}
+
+/* ===================================================================
+   Mobile house-twin fallback — compact, tappable room table (V1.3).
+   The spatial twin (absolutely-positioned badges over a fixed house
+   render) does not survive phone widths, so on <=640px we swap it for
+   a clean glass list. Rendered by <MobileRoomList>.
+   =================================================================== */
+.twin-wrap--mobile {
+  gap: var(--sp-2);
+}
+.twin-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.twin-mobile__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 14px;
+  background: var(--glass-sheen), var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0, 0, 0, 0.26);
+}
+.twin-mobile__empty {
+  margin: 0;
+  padding: var(--sp-4);
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.twin-mobile__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.twin-row {
+  border-radius: 14px;
+  background: var(--glass-sheen), var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--color-card-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 6px 18px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+.twin-row--scheduled,
+.twin-row--recommended {
+  border-left-color: var(--action-shade);
+}
+.twin-row--executing {
+  border-left-color: var(--action-cool);
+}
+.twin-row--completed {
+  border-left-color: var(--action-vent);
+}
+.twin-row--blocked {
+  border-left-color: var(--action-warn);
+}
+.twin-row--manuallyOverridden {
+  border-left-color: #a855f7;
+}
+.twin-row--open {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px rgba(245, 179, 1, 0.35), 0 8px 22px rgba(0, 0, 0, 0.3);
+}
+.twin-row__main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 12px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 48px; /* comfortable tap target */
+}
+.twin-row__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-weight: 600;
+  font-size: 14px;
+}
+.twin-row__roomname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.twin-row__pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+.twin-row__pct[data-shutter='open'] {
+  color: var(--action-vent);
+}
+.twin-row__pct[data-shutter='mid'] {
+  color: var(--action-shade);
+}
+.twin-row__pct[data-shutter='closed'] {
+  color: #38bdf8;
+}
+.twin-row__temp {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+.twin-row__win {
+  color: #38bdf8;
+  flex: 0 0 auto;
+}
+.twin-row__chev {
+  color: var(--color-faint);
+  font-size: 11px;
+  flex: 0 0 auto;
+  width: 12px;
+  text-align: center;
+}
+.twin-row__detail {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 10px;
+}
+.twin-row__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+  margin: 0;
+}
+.twin-row__cell dt {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-faint);
+}
+.twin-row__cell dd {
+  margin: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.twin-row__action {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+/* ===================================================================
+   Deep-dive charts (V1.3) — every chart can expand into a modal with
+   more y/x ticks for closer inspection. <ExpandableChart>.
+   =================================================================== */
+.chart-expand {
+  position: relative;
+}
+.chart-expand__btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.chart-expand:hover .chart-expand__btn,
+.chart-expand__btn:focus-visible {
+  opacity: 1;
+}
+.chart-expand__btn:hover {
+  color: var(--color-accent-strong);
+  border-color: var(--color-accent);
+}
+.chart-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(12px, 4vw, 48px);
+  background: rgba(2, 4, 9, 0.66);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: chart-modal-in 0.18s ease;
+}
+@keyframes chart-modal-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.chart-modal__panel {
+  width: min(1400px, 96vw);
+  max-height: 94vh;
+  min-height: min(70vh, 560px);
+  overflow: auto;
+  border-radius: 18px;
+  background: var(--glass-sheen), var(--glass-bg-strong);
+  border: 1px solid var(--glass-edge);
+  backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(1.4);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(1.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 36px 90px rgba(0, 0, 0, 0.64);
+  padding: var(--sp-4);
+}
+.chart-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.chart-modal__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-weight: 700;
+  font-size: 16px;
+}
+.chart-modal__subtitle {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.chart-modal__close {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--color-text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chart-modal__close:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+.chart-modal__body {
+  width: 100%;
+}
+
+/* ===================================================================
+   Per-room detail modal (V1.5) — opened from a badge / mobile row.
+   =================================================================== */
+.twin-popover__detail,
+.twin-row__detail .twin-popover__detail {
+  margin-top: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--color-accent-strong);
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.twin-popover__detail:hover {
+  border-color: var(--color-accent);
+  background: var(--glass-bg-strong);
+}
+.room-detail {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(8px, 3vw, 40px);
+  background: rgba(2, 4, 9, 0.7);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  animation: chart-modal-in 0.18s ease;
+}
+.room-detail__panel {
+  width: min(720px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  border-radius: 18px;
+  background: var(--glass-sheen), var(--glass-bg-strong);
+  border: 1px solid var(--glass-edge);
+  backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(1.4);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(1.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 36px 90px rgba(0, 0, 0, 0.64);
+  padding: var(--sp-4);
+}
+.room-detail__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.room-detail__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 18px;
+}
+.room-detail__close {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--color-text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.room-detail__close:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+.room-detail__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: var(--sp-4);
+}
+.room-detail__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+.room-detail__metric-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-faint);
+}
+.room-detail__metric-value {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.room-detail__section {
+  margin-bottom: var(--sp-4);
+}
+.room-detail__section h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.room-detail__empty {
+  margin: 0;
+  color: var(--color-faint);
+  font-size: 13px;
+}
+.room-detail__risk {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.room-detail__riskrow {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.room-detail__riskname {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.room-detail__riskbar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.room-detail__riskfill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--action-shade, #f59e0b), #ef4444);
+}
+.room-detail__learn {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.room-detail__rec {
+  color: var(--color-accent-strong);
+  font-weight: 600;
+}
+.room-detail__calib {
+  color: var(--color-muted);
+}
+@media (max-width: 560px) {
+  .room-detail__metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ===================================================================
+   First-run onboarding (V1.5) — shown until a room is configured.
+   =================================================================== */
+.dashboard-grid--onboarding {
+  display: flex;
+  justify-content: center;
+  padding: clamp(16px, 5vw, 56px);
+}
+.onboarding {
+  width: 100%;
+  max-width: 680px;
+}
+.onboarding__card {
+  border-radius: 22px;
+  padding: clamp(20px, 4vw, 40px);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(calc(var(--glass-blur) + 4px)) saturate(1.35);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 4px)) saturate(1.35);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 24px 70px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.onboarding__badge {
+  font-size: 44px;
+  filter: drop-shadow(0 4px 14px rgba(245, 158, 11, 0.4));
+}
+.onboarding__title {
+  margin: 10px 0 6px;
+  font-size: clamp(22px, 4vw, 30px);
+}
+.onboarding__lead {
+  margin: 0 auto 24px;
+  max-width: 46ch;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+.onboarding__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+.onboarding__step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+.onboarding__step-num {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+}
+.onboarding__step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.onboarding__step-title {
+  font-weight: 700;
+}
+.onboarding__step-text {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.onboarding__btn {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.onboarding__btn:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+.onboarding__btn--primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  border-color: var(--color-accent);
+}
+
+/* Per-room quiet schedule row in the rooms editor (V1.5). */
+.room-card__schedule {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-card-border);
+  font-size: 12.5px;
+  color: var(--color-muted);
+}
+.room-card__schedule-label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+.room-card__schedule-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.room-card__schedule-field input {
+  width: 56px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--color-card-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.room-card__schedule-hint {
+  font-size: 11px;
+  color: var(--color-faint);
+}
+
+/* ===================================================================
+   V1.6 — version badge, detailed automation explanation, KPI deep-dive,
+   and a holistic glass / glow / 3D pass across all tabs.
+   =================================================================== */
+
+/* Tiny version badge next to the brand — clickable, opens the Updates tab. */
+.app__version {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-faint);
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  align-self: center;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.app__version:hover {
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.12);
+}
+.app__version--update {
+  color: #fbbf24;
+  border-color: #fbbf2466;
+  background: #fbbf2418;
+}
+.app__version-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: #fbbf24;
+  box-shadow: 0 0 6px #fbbf24aa;
+  vertical-align: middle;
+}
+
+/* Detailed "why" explanation panel. */
+.automation-explain {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+}
+.automation-explain__block {
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+.automation-explain__block h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent-strong);
+}
+.automation-explain__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 14px;
+  margin: 0;
+}
+.automation-explain__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.automation-explain__row dt {
+  color: var(--color-muted);
+}
+.automation-explain__row dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.automation-explain__lead {
+  margin: 0 0 4px;
+}
+.automation-explain__text {
+  margin: 0;
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+.automation-explain__muted {
+  margin: 4px 0 0;
+  color: var(--color-faint);
+}
+.automation-explain__actions,
+.automation-explain__overrides {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.automation-explain__actions .automation-explain__reason {
+  color: var(--color-faint);
+  font-size: 12px;
+}
+.automation-explain__overrides li {
+  padding-left: 16px;
+  position: relative;
+  color: var(--color-warn);
+}
+.automation-explain__overrides li::before {
+  content: '⚠';
+  position: absolute;
+  left: 0;
+}
+.automation-explain__glossary {
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+.automation-explain__glossary summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.automation-explain__modes {
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.automation-explain__mode dt {
+  font-weight: 700;
+}
+.automation-explain__mode dd {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.automation-explain__mode--active {
+  border-left: 3px solid var(--color-accent);
+  padding-left: 8px;
+}
+.automation-explain__buckets {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11.5px;
+  color: var(--color-muted);
+}
+.automation-explain__range {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-faint);
+}
+
+/* KPI sparkline deep-dive affordance. */
+.sparkline-wrap {
+  position: relative;
+}
+.sparkline-expand {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  position: relative;
+}
+.sparkline-expand__icon {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 12px;
+  color: var(--color-faint);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.sparkline-expand:hover .sparkline-expand__icon {
+  opacity: 1;
+}
+
+/* Chart modal: the deep-dive chart renders 1:1 (no stretch). Its height is
+   set by the chart itself (height prop); we just let it fill the panel width. */
+.chart-modal__body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
+}
+.chart-modal__body .line-chart__svg {
+  width: 100%;
+  height: auto;
+}
+.chart-modal__body .line-chart {
+  width: 100%;
+}
+.chart-modal__body::-webkit-scrollbar {
+  height: 8px;
+}
+.chart-modal__body::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-strong));
+  border-radius: 999px;
+}
+
+/* ---- Holistic glass / glow / subtle 3D across all tabs ------------- */
+.module-panel__card,
+.kpi-card,
+.analysis-card,
+.settings-hub__card,
+.tab-history__chart-card,
+.forecast-card,
+.window-card,
+.room-card,
+.vent-advice,
+.vent-room,
+.automation-status {
+  transition:
+    transform 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+  will-change: transform;
+}
+.module-panel__card:hover,
+.kpi-card:hover,
+.analysis-card:hover,
+.settings-hub__card:hover,
+.tab-history__chart-card:hover,
+.window-card:hover,
+.room-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(245, 158, 11, 0.28);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 14px 38px rgba(0, 0, 0, 0.42),
+    0 0 22px rgba(245, 158, 11, 0.12);
+}
+/* Soft top-edge highlight gives the glass a 3D lip. */
+.module-panel__card,
+.kpi-card,
+.analysis-card,
+.tab-history__chart-card {
+  position: relative;
+}
+.module-panel__card::before,
+.kpi-card::before,
+.analysis-card::before,
+.tab-history__chart-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 40%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent);
+  pointer-events: none;
+}
+/* Module nav: active tab gets an accent glow; hover lifts subtly. */
+.app__module {
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.app__module:hover {
+  transform: translateY(-1px);
+}
+.app__module--active {
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.32);
+}
+/* Accent headings get a faint glow for the premium feel. */
+.module-panel__head h1,
+.forecast-section__title {
+  text-shadow: 0 0 18px rgba(245, 158, 11, 0.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-panel__card,
+  .kpi-card,
+  .analysis-card,
+  .settings-hub__card,
+  .tab-history__chart-card,
+  .window-card,
+  .room-card,
+  .vent-room,
+  .message-item,
+  .recommendation-panel__item,
+  .forecast-card,
+  .twin-iconbtn {
+    transition: none;
+  }
+  .module-panel__card:hover,
+  .kpi-card:hover,
+  .analysis-card:hover,
+  .window-card:hover,
+  .room-card:hover,
+  .settings-hub__card:hover,
+  .vent-room:hover,
+  .message-item:hover,
+  .recommendation-panel__item:hover,
+  .forecast-card:hover,
+  .twin-iconbtn:hover,
+  .twin-iconbtn:active {
+    transform: none;
+  }
+}
+
+/* ===================================================================
+   V1.8 — lighter default (non-ambient) theme + noise, technical
+   automation panel, Updates & Hilfe tabs.
+   =================================================================== */
+
+/* The default (non-ambient) background is lighter, with a stronger colour
+   gradient and a subtle dotted "noise" texture so the dark glass surfaces
+   float on a richer, less flat backdrop. Ambient mode keeps its own inline
+   dynamic gradient. */
+.app {
+  min-height: 100vh;
+}
+.app:not(.app--ambient) {
+  background:
+    radial-gradient(1200px 760px at 80% -14%, rgba(245, 158, 11, 0.16), transparent 58%),
+    radial-gradient(1000px 680px at 6% 0%, rgba(59, 130, 246, 0.16), transparent 60%),
+    radial-gradient(1000px 820px at 50% 120%, rgba(168, 85, 247, 0.10), transparent 60%),
+    linear-gradient(165deg, #20293c 0%, #18222f 48%, #111a28 100%);
+  background-attachment: fixed;
+}
+@media (prefers-color-scheme: light) {
+  .app:not(.app--ambient) {
+    background:
+      radial-gradient(1200px 760px at 80% -14%, rgba(245, 158, 11, 0.16), transparent 58%),
+      radial-gradient(1000px 680px at 6% 0%, rgba(59, 130, 246, 0.14), transparent 60%),
+      linear-gradient(165deg, #f1f5fb 0%, #e7eef7 50%, #dde6f2 100%);
+    background-attachment: fixed;
+  }
+}
+
+/* --- Technical automation panel ----------------------------------- */
+.auto-tech {
+  margin-top: 14px;
+  padding: var(--sp-4);
+}
+.auto-tech__title {
+  margin: 0 0 4px;
+}
+.auto-tech__intro {
+  margin: 0 0 14px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auto-tech__h4 {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent-strong);
+}
+.auto-tech__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.auto-tech__table th,
+.auto-tech__table td {
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.auto-tech__table th {
+  color: var(--color-faint);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+}
+.auto-tech__row--active {
+  background: rgba(245, 158, 11, 0.14);
+}
+.auto-tech__row--active td {
+  font-weight: 700;
+}
+.auto-tech__row--sum td {
+  font-weight: 700;
+  border-top: 1px solid var(--color-card-border-strong);
+}
+.auto-tech__win {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+.auto-tech__win h5 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.auto-tech__win-meta {
+  color: var(--color-faint);
+  font-weight: 500;
+  font-size: 12px;
+}
+.auto-tech__chain {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+.auto-tech__muted {
+  color: var(--color-faint);
+  font-size: 12.5px;
+}
+.auto-tech__gates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 6px 16px;
+  margin: 0;
+}
+.auto-tech__gate {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--glass-border);
+  font-size: 12.5px;
+}
+.auto-tech__gate dt {
+  color: var(--color-muted);
+}
+.auto-tech__gate dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Updates tab --------------------------------------------------- */
+.updates-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.updates-entry {
+  border-radius: 14px;
+  padding: 12px 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--color-accent);
+}
+.updates-entry__version {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--color-accent-strong);
+}
+.updates-entry__items {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+/* --- Help tab ------------------------------------------------------ */
+.help-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.help-section {
+  border-radius: 14px;
+  padding: 6px 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+.help-section__title {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 0;
+  list-style: none;
+}
+.help-section__title::-webkit-details-marker {
+  display: none;
+}
+.help-section__title::before {
+  content: '▸ ';
+  color: var(--color-accent);
+}
+details[open] > .help-section__title::before {
+  content: '▾ ';
+}
+.help-section__body {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--color-text);
+  padding-bottom: 10px;
+}
+.help-section__body ul,
+.help-section__body ol {
+  padding-left: 20px;
+}
+.help-section__body code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+/* Help: search box, category headers, reference tables, definition lists. */
+.help-search {
+  width: 100%;
+  margin: 0 0 var(--sp-3);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--glass-sheen), var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--glass-shadow);
+}
+.help-search::placeholder {
+  color: var(--color-faint);
+}
+.help-cat-group {
+  margin-top: var(--sp-4);
+}
+.help-cat {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-accent-strong);
+  margin: 0 0 8px;
+  padding-left: 2px;
+}
+.help-empty {
+  color: var(--color-muted);
+  font-style: italic;
+  padding: var(--sp-4) 0;
+}
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 4px;
+  font-size: 12.5px;
+}
+.help-table th,
+.help-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--glass-border);
+  vertical-align: top;
+}
+.help-table th {
+  color: var(--color-muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.help-table td:first-child {
+  white-space: nowrap;
+}
+.help-dl {
+  margin: 6px 0 0;
+}
+.help-dl dt {
+  font-weight: 700;
+  color: var(--color-text);
+  margin-top: 8px;
+}
+.help-dl dd {
+  margin: 2px 0 0;
+  color: var(--color-muted);
+}
+
+/* --- Forecast timeline gets the glass-panel treatment (V1.8.2) -----
+   V1.8.4: große, deutliche Umrandung um das ganze Panel; die Kacheln
+   darin sind transparent (Glas, kein gefüllter Tile-Look). */
+.forecast-timeline {
+  margin-top: var(--sp-3);
+  padding: var(--sp-4);
+}
+/* Inner cards transparent — sie zeigen das Panel/den Hintergrund durch. */
+.forecast-timeline .forecast-card {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.forecast-timeline .forecast-card--now {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: var(--color-accent);
+}
+@media (prefers-color-scheme: light) {
+  .forecast-timeline {
+    border-color: rgba(20, 30, 50, 0.2);
+  }
+  .forecast-timeline .forecast-card {
+    background: transparent;
+    border-color: rgba(20, 30, 50, 0.16);
+  }
+}
+
+/* ===================================================================
+   Wetter tab — DWD warnings, rain radar (Leaflet/RainViewer), windrose.
+   =================================================================== */
+.weather-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+  align-items: stretch;
+}
+.weather-grid__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+/* Wind rose grows to match the radar's height; its content centres in the
+   extra space so the card never looks half-empty. */
+.weather-grid__side .windrose-card {
+  flex: 1 1 auto;
+}
+.weather-grid__side .windrose-card .windrose__body {
+  flex: 1;
+  justify-content: center;
+}
+@media (max-width: 860px) {
+  .weather-grid {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .weather-grid__side .windrose-card {
+    flex: 0 0 auto;
+  }
+}
+
+/* --- DWD warnings ------------------------------------------------- */
+.dwd-warnings {
+  margin-top: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--glass-sheen), var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  box-shadow: var(--glass-shadow);
+}
+.dwd-warnings__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.dwd-warnings__head h2 {
+  margin: 0;
+}
+.dwd-warnings__region {
+  font-size: 12px;
+  color: var(--color-faint);
+}
+.dwd-warnings__empty {
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  font-style: italic;
+}
+.dwd-warnings__list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dwd-warning {
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  border: 1px solid var(--glass-border);
+  border-left: 4px solid var(--color-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+.dwd-warning--l1 {
+  border-left-color: #eab308;
+}
+.dwd-warning--l2 {
+  border-left-color: #f97316;
+}
+.dwd-warning--l3 {
+  border-left-color: #ef4444;
+}
+.dwd-warning--l4 {
+  border-left-color: #a21caf;
+}
+.dwd-warning--pre {
+  border-left-style: dashed;
+}
+.dwd-warning__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dwd-warning__badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.dwd-warning__event {
+  font-weight: 700;
+}
+.dwd-warning__headline {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+.dwd-warning__when {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  color: var(--color-faint);
+  font-variant-numeric: tabular-nums;
+}
+.dwd-warning__instruction {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+/* --- Rain radar (Leaflet) ----------------------------------------- */
+.radar {
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+  border-radius: var(--radius-lg);
+  background: var(--glass-sheen), var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  box-shadow: var(--glass-shadow);
+}
+.radar__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.radar__head h2 {
+  margin: 0;
+}
+.radar__time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--color-accent-strong);
+}
+.radar__map {
+  width: 100%;
+  height: 360px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--color-bg-elev);
+}
+.radar__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.radar__play {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 13px;
+}
+.radar__scrub {
+  flex: 1;
+  accent-color: var(--color-accent);
+}
+.radar__legend {
+  font-size: 10.5px;
+  color: var(--color-faint);
+  white-space: nowrap;
+}
+.radar__clouds {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+.radar__clouds--on {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+.radar__error {
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  font-style: italic;
+}
+/* Home marker on the radar map: a glowing accent dot. */
+.radar-home-marker span {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35), 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+/* Keep Leaflet's chrome legible on the glass theme. */
+.radar .leaflet-control-attribution {
+  font-size: 9px;
+  background: rgba(11, 15, 23, 0.6);
+  color: var(--color-faint);
+}
+.radar .leaflet-control-attribution a {
+  color: var(--color-muted);
+}
+
+/* --- Windrose ----------------------------------------------------- */
+.windrose-card {
+  display: flex;
+  flex-direction: column;
+}
+.windrose__body {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: 6px;
+}
+.windrose__dial {
+  flex: 0 0 auto;
+  width: 104px;
+  height: 104px;
+}
+.windrose__ring {
+  fill: rgba(255, 255, 255, 0.03);
+  stroke: var(--color-card-border-strong);
+  stroke-width: 1;
+}
+.windrose__ring--inner {
+  fill: none;
+  stroke: var(--glass-border);
+}
+.windrose__tick {
+  stroke: var(--color-faint);
+  stroke-width: 1.4;
+}
+.windrose__card-label {
+  fill: var(--color-muted);
+  font-size: 8px;
+  font-weight: 700;
+}
+.windrose__card-label--n {
+  fill: var(--color-accent-strong);
+}
+.windrose__needle-line {
+  stroke: var(--color-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.windrose__needle-head {
+  fill: var(--color-accent-strong);
+}
+.windrose__hub {
+  fill: var(--color-text);
+}
+.windrose__readout {
+  flex: 1;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.windrose__readout dt {
+  font-size: 11px;
+  color: var(--color-faint);
+}
+.windrose__readout dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.windrose__bft {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+.windrose__error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* --- Weather facts (UV, precip, pressure, humidity, sun times) ----- */
+.weather-facts {
+  margin-top: var(--sp-3);
+}
+.weather-facts__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.wfact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+}
+.wfact__label {
+  font-size: 11px;
+  color: var(--color-faint);
+}
+.wfact__value {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Bewässerung tab ---------------------------------------------- */
+.irrigation__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: var(--sp-3) 0;
+}
+.irrigation__charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-3);
+}
+.irrigation__thunder {
+  border-left-color: #a21caf !important;
+}
+.irrigation__kpi-accent {
+  color: var(--color-info);
+}
+.gardena-card {
+  margin-top: var(--sp-3);
+  border-style: dashed !important;
+}
+.gardena-card__badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-accent-strong);
+  margin-left: 8px;
+}
+
+/* --- Gardena live irrigation (Bewässerung tab) -------------------- */
+.gardena-card__badge--live {
+  color: #34d399;
+}
+/* When live Gardena devices are present, drop the dashed "planned" look. */
+.gardena-card:has(.gardena__sensors),
+.gardena-card:has(.gardena__valves) {
+  border-style: solid !important;
+}
+.gardena__sensors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
+}
+.gardena-sensor {
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 12px);
+  padding: var(--sp-3);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.04));
+}
+.gardena-sensor h3 {
+  margin: 0 0 var(--sp-2);
+  font-size: 14px;
+}
+.gardena-sensor__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-2);
+  margin: 0;
+}
+.gardena-sensor__grid dt {
+  font-size: 11px;
+  color: var(--color-muted, #94a3b8);
+  margin: 0;
+}
+.gardena-sensor__grid dd {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.gardena__valves {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
+}
+.gardena-valve {
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 12px);
+  padding: var(--sp-3);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.04));
+}
+.gardena-valve__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.gardena-valve__head h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.gardena-valve__state {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted, #94a3b8);
+}
+.gardena-valve__state--on {
+  color: #34d399;
+}
+.gardena-valve__actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+.gardena-valve__btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid #34d39955;
+  background: #34d39922;
+  color: #34d399;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.gardena-valve__btn:hover:not(:disabled) {
+  background: #34d39933;
+}
+.gardena-valve__btn--off {
+  border-color: #f8717155;
+  background: #f8717122;
+  color: #f87171;
+}
+.gardena-valve__btn--off:hover:not(:disabled) {
+  background: #f8717133;
+}
+.gardena-valve__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --- Wind outlook (compact card below the wind rose) -------------- */
+.wind-outlook h3 {
+  margin: 0 0 var(--sp-2);
+  font-size: 14px;
+}
+.wind-outlook__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+}
+.wind-outlook__row:last-child {
+  border-bottom: none;
+}
+.wind-outlook__label {
+  font-size: 12px;
+  color: var(--color-muted, #94a3b8);
+}
+.wind-outlook__value {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Weather forecast charts grid (Wetter tab) -------------------- */
+.weather-charts {
+  margin-top: var(--sp-4);
+}
+.weather-charts__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+.weather-charts__ranges {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: 999px;
+  padding: 3px;
+}
+.weather-charts__ranges button {
+  border: none;
+  background: transparent;
+  color: var(--color-muted, #94a3b8);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.weather-charts__range--active {
+  background: var(--color-accent, #38bdf8) !important;
+  color: #0b1120 !important;
+}
+.weather-charts__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-3);
+}
+.weather-charts__card h3 {
+  margin: 0 0 var(--sp-2);
+  font-size: 14px;
+}
+
+/* --- Gardena cloud connection settings (Bewässerung tab) ---------- */
+.gardena-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+.gardena-config {
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+}
+.gardena-config h2 {
+  margin: 0 0 var(--sp-2);
+}
+.gardena-config .tab-rules__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: var(--sp-2) 0;
+}
+.gardena-config .tab-rules__field span {
+  font-size: 12px;
+  color: var(--color-muted, #94a3b8);
+}
+.gardena-config .tab-rules__field input {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.14));
+  background: var(--glass-bg, rgba(255, 255, 255, 0.04));
+  color: var(--color-text, #e2e8f0);
+}
+.gardena-config .tab-rules__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: var(--sp-2) 0;
+}
+
+/* --- Irrigation zones (Bewässerung tab) --------------------------- */
+.irrigation-zones {
+  margin: var(--sp-3) 0;
+}
+.irrigation-zones__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.irr-mode {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+}
+.irr-mode--heat { color: #fb923c; }
+.irr-mode--eco { color: #34d399; }
+.irr-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0;
+}
+.irr-kpi {
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 12px);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.04));
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.irr-kpi__lbl { font-size: 11px; color: var(--color-muted, #94a3b8); }
+.irr-kpi__val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.irr-zone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--sp-3);
+}
+.irr-zone {
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 14px);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.04));
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.irr-zone__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.irr-zone__head h3 { margin: 0; font-size: 15px; }
+.irr-zone__badge {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 2px 8px; border-radius: 999px; color: var(--color-muted, #94a3b8);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.14));
+}
+.irr-zone__badge--critical { color: #f87171; border-color: #f8717155; }
+.irr-zone__badge--high { color: #fb923c; }
+.irr-zone__body { display: flex; align-items: center; gap: var(--sp-3); }
+.irr-gauge {
+  flex: 0 0 auto;
+  width: 84px; height: 84px; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background:
+    radial-gradient(closest-side, var(--color-bg, #0b1120) 78%, transparent 79% 100%),
+    conic-gradient(var(--gc, #34d399) calc(var(--g, 0%)), rgba(255, 255, 255, 0.08) 0);
+}
+.irr-gauge__val { font-size: 18px; font-weight: 700; }
+.irr-gauge__lbl { font-size: 9.5px; color: var(--color-muted, #94a3b8); }
+.irr-zone__facts {
+  flex: 1; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;
+}
+.irr-zone__facts dt { font-size: 10.5px; color: var(--color-muted, #94a3b8); margin: 0; }
+.irr-zone__facts dd { margin: 0 0 4px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.irr-zone__why {
+  margin: 0; font-size: 12px; color: var(--color-muted, #cbd5e1);
+  background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 6px 8px;
+}
+.irr-zone__why--blocked { color: #fbbf24; }
+.irr-zone__fault { margin: 0; font-size: 12px; color: #f87171; font-weight: 600; }
+.irr-zone__learn { margin: 0; font-size: 11px; color: var(--color-muted, #94a3b8); }
+.irr-spark { width: 100%; height: 24px; }
+.irr-zone__spark-wrap { display: flex; flex-direction: column; gap: 2px; }
+.irr-zone__sparklbl { font-size: 9.5px; color: var(--color-muted, #64748b); letter-spacing: 0.02em; }
+.irr-zone__actions { display: flex; gap: 8px; margin-top: 2px; }
+.irr-btn {
+  flex: 1; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-weight: 600;
+  border: 1px solid #34d39955; background: #34d39922; color: #34d399;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.irr-btn:hover:not(:disabled) { background: #34d39933; }
+.irr-btn--stop { border-color: #f8717155; background: #f8717122; color: #f87171; }
+.irr-btn--stop:hover:not(:disabled) { background: #f8717133; }
+.irr-btn--ghost { border-color: var(--glass-border, rgba(255,255,255,0.14)); background: transparent; color: var(--color-muted, #94a3b8); }
+.irr-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* --- Automatik toggle (Bewässerung tab) --------------------------- */
+.irr-auto-toggle { margin: var(--sp-3) 0; }
+.irr-auto-toggle__row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+}
+.irr-auto-toggle__row h2 { margin: 0 0 4px; }
+.irr-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.irr-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.irr-switch__track {
+  position: relative; width: 46px; height: 26px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14); transition: background 0.18s ease; flex: 0 0 auto;
+}
+.irr-switch__track::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  border-radius: 50%; background: #e2e8f0; transition: transform 0.18s ease;
+}
+.irr-switch input:checked + .irr-switch__track { background: #34d399; }
+.irr-switch input:checked + .irr-switch__track::after { transform: translateX(20px); }
+.irr-switch input:focus-visible + .irr-switch__track { outline: 2px solid #34d399; outline-offset: 2px; }
+.irr-switch__label { font-size: 13px; font-weight: 700; min-width: 26px; }
+
+/* --- Inline duration picker + calibration -------------------------- */
+.irr-zone__picker {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 2px;
+  background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 8px;
+}
+.irr-zone__picker-lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.irr-zone__picker-lbl > span { color: var(--color-muted, #94a3b8); }
+.irr-zone__picker-lbl select,
+.irr-zone__picker-lbl input[type="range"] { width: 100%; }
+.irr-zone__picker-actions { display: flex; gap: 8px; }
+
+/* --- Day-ahead plan ------------------------------------------------ */
+.irr-plan { margin: var(--sp-3) 0; }
+.irr-plan h3 { margin: 0 0 var(--sp-2); font-size: 15px; }
+.irr-plan__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.irr-plan__item {
+  display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 10px; align-items: center;
+  padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.03);
+  font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.irr-plan__when { color: #38bdf8; font-weight: 600; }
+.irr-plan__zone { font-weight: 600; }
+.irr-plan__dur { color: var(--color-muted, #94a3b8); text-align: right; }
+.irr-plan__note { margin: var(--sp-2) 0 0; }
+.irr-plan__err {
+  margin: 0 0 var(--sp-2); padding: 6px 8px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  color: #fbbf24; background: #fbbf2415; border: 1px solid #fbbf2455;
+}
+
+/* --- Day-ahead timeline editor (drag-to-move) --------------------- */
+.irr-tl { margin: var(--sp-2) 0; }
+.irr-tl__day { font-size: 12px; font-weight: 700; color: var(--color-muted, #94a3b8); margin-bottom: 4px; }
+.irr-tl__track {
+  position: relative; height: 40px; border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.04));
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+  overflow: hidden; touch-action: none;
+}
+.irr-tl__tick {
+  position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.08);
+  font-size: 9px; color: var(--color-muted, #64748b); padding-left: 3px; line-height: 40px;
+}
+.irr-tl__block {
+  position: absolute; top: 6px; bottom: 6px; min-width: 28px;
+  background: #34d39933; border: 1px solid #34d399aa; border-radius: 6px;
+  cursor: grab; display: flex; align-items: center; overflow: hidden;
+  touch-action: none; user-select: none;
+}
+.irr-tl__block:active { cursor: grabbing; }
+.irr-tl__block--auto { background: #38bdf833; border-color: #38bdf8aa; }
+.irr-tl__block--off { opacity: 0.4; }
+.irr-tl__block--done { background: #64748b33; border-color: #64748baa; }
+.irr-tl__block-label {
+  font-size: 10.5px; font-weight: 600; white-space: nowrap; padding: 0 5px;
+  pointer-events: none; color: #e2e8f0;
+}
+
+/* --- Plan list rows ------------------------------------------------ */
+.irr-plan__list { list-style: none; margin: var(--sp-2) 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.irr-plan__item {
+  display: grid; grid-template-columns: auto 1fr auto auto auto; gap: 8px; align-items: center;
+  padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.03);
+}
+.irr-plan__chk { display: inline-flex; align-items: center; }
+.irr-plan__zone { font-weight: 600; font-size: 13px; }
+.irr-plan__time, .irr-plan__dursel {
+  padding: 4px 6px; border-radius: 6px; font-size: 12px;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.14));
+  background: var(--glass-bg, rgba(255,255,255,0.04)); color: var(--color-text, #e2e8f0);
+}
+.irr-plan__del {
+  border: 1px solid #f8717155; background: #f8717122; color: #f87171;
+  border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-weight: 700;
+}
+.irr-plan__del:hover { background: #f8717133; }
+.irr-plan__add {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: var(--sp-2);
+}
+.irr-plan__add select, .irr-plan__add input {
+  padding: 6px 8px; border-radius: 6px; font-size: 12px;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.14));
+  background: var(--glass-bg, rgba(255,255,255,0.04)); color: var(--color-text, #e2e8f0);
+}
+.irr-plan__add .irr-btn { flex: 0 0 auto; }
+
+/* --- Valve manager (Einstellungen) --------------------------------- */
+.irr-valve-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.irr-valve-list__item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.03);
+}
+.irr-valve-list__zone { font-size: 11.5px; color: var(--color-muted, #94a3b8); }
+
+/* --- Irrigation settings (Einstellungen) -------------------------- */
+.irr-settings-zones { display: flex; flex-direction: column; gap: var(--sp-3); margin: var(--sp-3) 0; }
+.irr-zone-edit__head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.irr-zone-edit__name {
+  flex: 1; font-size: 15px; font-weight: 600; padding: 6px 8px;
+  border-radius: 8px; border: 1px solid var(--glass-border, rgba(255,255,255,0.14));
+  background: var(--glass-bg, rgba(255,255,255,0.04)); color: var(--color-text, #e2e8f0);
+}
+.irr-zone-edit__grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.irr-zone-edit .tab-rules__field { display: flex; flex-direction: column; gap: 4px; }
+.irr-zone-edit .tab-rules__field span { font-size: 11px; color: var(--color-muted, #94a3b8); }
+.irr-zone-edit .tab-rules__field input,
+.irr-zone-edit .tab-rules__field select,
+.tab-irrigation-settings .tab-rules__field input,
+.tab-irrigation-settings .tab-rules__field select {
+  padding: 7px 9px; border-radius: 8px;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.14));
+  background: var(--glass-bg, rgba(255,255,255,0.04)); color: var(--color-text, #e2e8f0);
+}
+
+/* ===================================================================
+   Updates banner · Logs & Debug · Hilfe-Überblick
+   =================================================================== */
+.updates-banner { margin-bottom: var(--sp-3); }
+.updates-banner .irr-btn { display: inline-block; width: auto; text-decoration: none; margin-top: var(--sp-2); }
+.updates-banner--new {
+  border-color: #fbbf2466;
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.10), rgba(255, 255, 255, 0.02));
+}
+.updates-banner--new h3 { color: #fbbf24; }
+
+/* Logs & Debug */
+.logs-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: var(--sp-2) 0;
+}
+.logs-toolbar__field { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-muted); }
+.logs-toolbar__field select {
+  padding: 4px 6px; border-radius: 6px; font-size: 12px;
+  border: 1px solid var(--glass-border); background: var(--glass-bg, rgba(255,255,255,0.04)); color: var(--color-text);
+}
+.logs-toolbar__count, .logs-toolbar__title { font-size: 12px; color: var(--color-faint); font-variant-numeric: tabular-nums; }
+.logs-toolbar__title { font-weight: 600; color: var(--color-muted); margin-right: auto; }
+.logs-endpoints__grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin: var(--sp-2) 0;
+}
+.logs-pre {
+  margin: var(--sp-2) 0 0; padding: 10px 12px; border-radius: 10px;
+  background: rgba(2, 6, 16, 0.6); border: 1px solid var(--glass-border);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 11.5px; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word; max-height: 460px; overflow: auto;
+}
+.logs-pre--log { white-space: pre; word-break: normal; }
+.logs-result { margin-top: var(--sp-2); }
+.logs-sysinfo { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 18px; }
+.logs-sysinfo > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.logs-sysinfo dt { font-size: 11px; color: var(--color-faint); }
+.logs-sysinfo dd { margin: 0; font-size: 13px; font-weight: 600; word-break: break-word; }
+.logs-sysinfo__ua { font-weight: 400 !important; font-size: 11.5px !important; color: var(--color-muted); }
+
+/* Hilfe — overview groups */
+.help-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--sp-3); }
+.help-group__list { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.help-group__row { display: flex; flex-direction: column; gap: 1px; }
+.help-group__row dt { font-size: 13px; font-weight: 700; color: var(--color-text); margin: 0; }
+.help-group__row dd { margin: 0; font-size: 12px; color: var(--color-muted); line-height: 1.4; }

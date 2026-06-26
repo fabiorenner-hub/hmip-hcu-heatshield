@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Heat Shield">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#16233c"/>
+      <stop offset="100%" stop-color="#0a0f1a"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="55%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </radialGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="186" r="140" fill="url(#glow)"/>
+  <!-- sun -->
+  <circle cx="256" cy="186" r="66" fill="url(#sun)"/>
+  <g stroke="#fbbf24" stroke-width="16" stroke-linecap="round">
+    <line x1="256" y1="70" x2="256" y2="100"/>
+    <line x1="366" y1="186" x2="396" y2="186"/>
+    <line x1="116" y1="186" x2="146" y2="186"/>
+    <line x1="333" y1="109" x2="354" y2="88"/>
+    <line x1="179" y1="109" x2="158" y2="88"/>
+  </g>
+  <!-- shield -->
+  <path d="M256 250 L372 286 V366 C372 420 318 452 256 470 C194 452 140 420 140 366 V286 Z"
+        fill="url(#shield)"/>
+  <path d="M256 250 L372 286 V366 C372 420 318 452 256 470 V250 Z"
+        fill="#000000" opacity="0.12"/>
+  <path d="M256 300 L300 314 V362 C300 392 280 408 256 418 C232 408 212 392 212 362 V314 Z"
+        fill="#0a0f1a"/>
+</svg>

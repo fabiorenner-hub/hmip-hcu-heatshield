@@ -1,0 +1,8 @@
+# Normalize line endings: LF in the repo, auto on checkout.
+* text=auto eol=lf
+
+# Binary assets — never normalize.
+*.png binary
+*.svg text eol=lf
+*.tar.gz binary
+*.gz binary
