@@ -511,8 +511,18 @@ class HeatShieldBoot {
     });
     this.bridge = new UserInputBridge({
       ownDevices: this.ownDevices,
-      readState: () => readState({ statePath: this.statePath() }),
-      writeState: (s) => writeState(s, { statePath: this.statePath() }),
+      // Operate on the LIVE in-memory runtime state, not a fresh disk read.
+      // Otherwise an HMIP-app switch toggle (pause/vacation) would only be
+      // written to state.json and never reach the engine or the dashboard
+      // until the next plugin restart — which is exactly the "status doesn't
+      // change" symptom. The bridge clones the baseline before mutating, so
+      // handing back the live object is safe; writeState swaps the live
+      // reference and persists.
+      readState: () => Promise.resolve(this.runtime.state),
+      writeState: async (s) => {
+        this.runtime.state = s;
+        await writeState(s, { statePath: this.statePath() });
+      },
       emptyState: emptyRuntimeState,
       manualOverrideMinutes: config.rules.manualOverrideMinutes,
       location: config.location,

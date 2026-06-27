@@ -3,6 +3,16 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 1.18.4
+
+- **Fix: Plugin-Schalter in der Homematic-App wirken sofort.** Das Umschalten der
+  plugin-eigenen Geräte „Hitzeschutz pausiert" und „Urlaub" in der Homematic-App
+  wurde bisher nur nach `/data/state.json` geschrieben, aber nicht in den
+  laufenden In-Memory-Zustand übernommen — Status (Dashboard) und Automatik
+  änderten sich erst nach einem Neustart. Die Übersteuerung läuft jetzt direkt
+  auf dem Live-Zustand; Schalten wirkt unmittelbar. Zusätzlich loggt das Plugin
+  jeden empfangenen `CONTROL_REQUEST` (Gerät + Wert) zur Diagnose.
+
 ## 1.18.3
 
 - **Beschattung folgt der tatsächlichen Sonnenlast.** Der vorausschauende

@@ -464,6 +464,7 @@ export class OwnDeviceManager extends EventEmitter<OwnDeviceManagerEvents> {
     const requestedValue = switchState.on;
     this.markUnconfirmed(deviceId, requestedValue);
 
+    this.log('info', 'CONTROL_REQUEST applied', { deviceId, requestedValue });
     this.emit('userInput', {
       deviceId,
       requestedValue,

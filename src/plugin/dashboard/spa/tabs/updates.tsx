@@ -21,6 +21,15 @@ interface ChangelogEntry {
 function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '1.18.4',
+    items: [
+      t(
+        'Fix: Das Schalten der Plugin-Geräte „Hitzeschutz pausiert" und „Urlaub" in der Homematic-App wirkt jetzt sofort auf Status und Automatik — bisher wurde der Schaltbefehl nur gespeichert, aber erst nach einem Neustart übernommen.',
+        'Fix: toggling the plugin devices "Heat protection paused" and "Vacation" in the Homematic app now takes effect immediately on status and automation — previously the toggle was only persisted and applied only after a restart.',
+      ),
+    ],
+  },
+  {
     version: '1.18.3',
     items: [
       t(
