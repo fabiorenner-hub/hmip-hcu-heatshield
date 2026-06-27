@@ -372,6 +372,12 @@ export interface RoomDetail {
   /** Freshness of the indoor-temperature signal. */
   indoorTempState?: 'fresh' | 'stale' | 'unbound';
   /**
+   * ISO timestamp until which a manual override holds this room's window
+   * (future = active). While active the engine holds the position, so the
+   * timeline/forecast stay put. Absent/null = no override.
+   */
+  manualOverrideUntil?: string | null;
+  /**
    * Predicted shutter percent (0=open … 95/100=closed) over the next ~12 h,
    * hourly. Drives the scrub-based 12 h shutter preview in the house twin.
    */

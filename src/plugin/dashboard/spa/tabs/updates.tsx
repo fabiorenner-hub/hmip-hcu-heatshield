@@ -21,6 +21,31 @@ interface ChangelogEntry {
 function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '1.18.3',
+    items: [
+      t(
+        'Beschattung folgt der tatsächlichen Sonnenlast: an heißen, aber bewölkten Phasen bleiben die Rollläden für Tageslicht offen statt unnötig zu schließen (ein geschlossener Rollo kühlt einen warmen Raum nicht, wenn keine Sonne anliegt) — und schließen automatisch, sobald wieder Solarlast auftritt.',
+        'Shading now follows the actual solar load: on hot but cloudy spells the shutters stay open for daylight instead of closing pointlessly (a closed shutter cannot cool a warm room when there is no sun) — and close again automatically once solar load returns.',
+      ),
+      t(
+        'Live-PV-Nowcast: bricht die PV-Leistung durch aufziehende Wolken ein, korrigiert das Plugin die Strahlungsprognose der nächsten Stunden sofort, statt der trägeren Wettervorhersage zu folgen.',
+        'Live PV nowcast: when PV output collapses under incoming clouds, the plugin immediately corrects the next hours\u2019 radiation forecast instead of trailing the slower weather forecast.',
+      ),
+      t(
+        'Selbstlernende Anlagen-Ausrichtung: der Azimut der PV-Anlage wird aus der Leistungskurve gelernt, sodass der Nowcast ohne manuelle Eingabe weiß, wann die Sonne auf die Module scheint.',
+        'Self-learning array orientation: the PV array azimuth is learned from the power curve, so the nowcast knows when the sun is on the panels without manual configuration.',
+      ),
+      t(
+        'Diagramm „Temperatur mit/ohne Beschattung" zeigt jetzt den echten Beschattungsnutzen (zwei separate Simulationen statt nahezu identischer Kurven).',
+        'The "temperature with/without shading" chart now shows the real shading benefit (two separate simulations instead of near-identical curves).',
+      ),
+      t(
+        'Korrektur: Räume mit aktiver manueller Übersteuerung werden in der 12-Stunden-Rollladen-Vorschau als gehalten dargestellt (mit „Manuell"-Markierung) statt eine Fahrt anzuzeigen, die wegen der Übersteuerung gar nicht ausgeführt wird.',
+        'Fix: rooms with an active manual override now show as held in the 12 h shutter timeline (with a "Manual" tag) instead of a move that the override prevents from running.',
+      ),
+    ],
+  },
+  {
     version: '1.18.2',
     items: [
       t(

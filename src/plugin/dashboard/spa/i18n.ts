@@ -164,6 +164,8 @@ const SERVER_EXACT: Record<string, string> = {
     'Predictive position keeps comfort across the horizon',
   'Stärkstes Schließen, da keine Halteposition den Komfort wahrt':
     'Strongest closure, as no hold position preserves comfort',
+  'Geöffnet – aktuell keine Sonnenlast, Schließen würde nicht kühlen':
+    'Opened — no solar load right now, closing would not cool',
   // Ventilation / cooling advice headlines
   'Keine Empfehlung': 'No recommendation',
   'Fenster schließen': 'Close the window',

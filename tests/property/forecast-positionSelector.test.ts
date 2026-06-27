@@ -183,4 +183,53 @@ describe('positionSelector — Properties 7–11', () => {
       { numRuns: 50 },
     );
   });
+
+  // Solar-benefit gate: when the room cannot be held comfortable AND there is
+  // no near-term solar load to block, the planner must NOT force the strongest
+  // close (closing a shutter cannot cool a non-solar heat load) — it opens for
+  // daylight instead. Mirrors the real "40 °C outside but cloudy now" case.
+  it('does not force-close when the room is hot but there is no near-term solar load', () => {
+    // Hot room (peak 30, above the 24.5 upper bound at every level) but zero
+    // heat load → no sun to block. Open-vs-closed makes no thermal difference.
+    const fn = (_level01: number): RoomTrajectory => ({
+      roomId: 'r1',
+      points: [
+        { ts: NOW.toISOString(), indoorTempC: 29, heatLoad01: 0 },
+        { ts: new Date(NOW.getTime() + 3600_000).toISOString(), indoorTempC: 30, heatLoad01: 0 },
+      ],
+      uncertain: false,
+      confidence01: 0.9,
+    });
+    const ctx: PlannerWindowContext = {
+      windowId: 'w1', roomId: 'r1', currentLevel01: 0.95,
+      candidateLevels01: CANDIDATES, minSecondsBetweenMoves: 7200, movementBudgetPerInterval: 1,
+    };
+    const plan = selectPosition(ctx, fn, bounds, NOW);
+    // Most-open candidate (0), not the strongest close (0.95).
+    expect(plan.target01).toBe(0);
+    expect(plan.plannedActions[0]?.reason).toContain('keine Sonnenlast');
+  });
+
+  it('still closes hard when the room is hot AND near-term solar load is present', () => {
+    // Hot room with real solar load → closing remains correct.
+    const fn = (level01: number): RoomTrajectory => {
+      const peak = 30 - level01 * 2; // still above bound even fully closed
+      return {
+        roomId: 'r1',
+        points: [
+          { ts: NOW.toISOString(), indoorTempC: peak - 1, heatLoad01: 0.6 },
+          { ts: new Date(NOW.getTime() + 3600_000).toISOString(), indoorTempC: peak, heatLoad01: 0.6 },
+        ],
+        uncertain: false,
+        confidence01: 0.9,
+      };
+    };
+    const ctx: PlannerWindowContext = {
+      windowId: 'w1', roomId: 'r1', currentLevel01: 0,
+      candidateLevels01: CANDIDATES, minSecondsBetweenMoves: 7200, movementBudgetPerInterval: 1,
+    };
+    const plan = selectPosition(ctx, fn, bounds, NOW);
+    expect(plan.target01).toBe(1);
+    expect(plan.plannedActions[0]?.reason).toContain('Stärkstes Schließen');
+  });
 });

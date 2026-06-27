@@ -3,6 +3,30 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 1.18.3
+
+- **Beschattung folgt der tatsächlichen Sonnenlast.** Der vorausschauende
+  Planer schließt nicht mehr maximal, nur weil ein Raum warm ist — er prüft
+  zuerst, ob in den nächsten Stunden überhaupt Solarlast anliegt. An heißen,
+  aber bewölkten Phasen bleiben die Rollläden für Tageslicht offen und schließen
+  automatisch, sobald wieder Sonne auf das Fenster trifft.
+- **Live-PV-Nowcast.** Bricht die PV-Leistung durch aufziehende Wolken ein,
+  korrigiert das Plugin die Strahlungsprognose der nächsten Stunden sofort,
+  statt der trägeren OpenMeteo-Vorhersage zu folgen — nur wenn die Sonne
+  tatsächlich auf der Anlage steht (sonst unzuverlässig).
+- **Selbstlernende Anlagen-Ausrichtung.** Der Azimut der PV-Anlage wird aus der
+  Leistungskurve gelernt (leistungsgewichteter Kreismittelwert des
+  Sonnenazimuts, elevations-normalisiert), persistiert unter `/data`. Der
+  manuelle `orientationHint` bleibt Fallback, bis die Schätzung sicher ist.
+- **Diagramm „Temperatur mit/ohne Beschattung".** Zeigt jetzt zwei echte
+  Gegen-Simulationen (alle Fenster offen vs. alle geschlossen) statt nahezu
+  identischer Kurven.
+- **Fix: manuelle Übersteuerung in der 12-h-Vorschau.** Räume mit aktiver
+  Übersteuerung wurden in der „Rollladen-Steuerung · nächste 12 h"-Vorschau
+  fälschlich mit einer geplanten Fahrt dargestellt, obwohl die Übersteuerung
+  diese hält. Jetzt halten sie ihre Position (mit „Manuell"-Markierung) bis die
+  Übersteuerung abläuft.
+
 ## 1.18.2
 
 - **Regenradar: dunkle Bedien-Elemente.** Die Karten-Steuerung (Zoom-Buttons und

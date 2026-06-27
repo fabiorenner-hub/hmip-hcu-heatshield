@@ -16,6 +16,7 @@ import type { CycleSnapshot } from '../orchestrator.js';
 import { getSunPosition, type SunPosition } from '../sun.js';
 import type { Location } from '../../../shared/types.js';
 import { detectDeviation, type DeviationResult } from './deviation.js';
+import { computeCloudNowcast, arrayAzimuthFromHint } from './nowcast.js';
 import {
   selectPosition,
   type ComfortBounds,
@@ -36,6 +37,19 @@ export type DeviationBaseline = Record<
 
 export interface PlannerResult {
   readonly trajectories: ReadonlyMap<string, RoomTrajectory>;
+  /**
+   * Per-room counterfactual trajectory with EVERY window fully shaded to its
+   * heat-stau cap (best-case shading). Used by the "Temperatur mit Beschattung"
+   * chart so it shows the genuine effect of shading rather than the current
+   * (already-shaded) state. Same keys as `trajectories`.
+   */
+  readonly shadedTrajectories: ReadonlyMap<string, RoomTrajectory>;
+  /**
+   * Per-room counterfactual trajectory with EVERY window fully OPEN (level 0,
+   * full solar gain) — the "ohne Beschattung" worst case. Same keys as
+   * `trajectories`.
+   */
+  readonly openTrajectories: ReadonlyMap<string, RoomTrajectory>;
   readonly windows: ReadonlyMap<string, PositionPlan>;
   readonly deviations: ReadonlyArray<DeviationResult>;
   readonly plannedActions: ReadonlyArray<PlannedAction>;
@@ -59,6 +73,12 @@ export interface PlannerDeps {
    * the configured value.
    */
   readonly inertiaByRoom?: Readonly<Record<string, number>>;
+  /**
+   * Self-learned PV array azimuth (deg) from the power curve. When present it
+   * overrides the configured `orientationHint` for the live PV cloud nowcast,
+   * so the nowcast self-calibrates to the real array. Optional; absent → hint.
+   */
+  readonly pvArrayAzimuthDeg?: number;
 }
 
 /**
@@ -136,6 +156,8 @@ export function runForecastPlanner(
   const { config, baseline, now } = deps;
   const planning = config.rules.planning ?? DEFAULT_PLANNING;
   const trajectories = new Map<string, RoomTrajectory>();
+  const shadedTrajectories = new Map<string, RoomTrajectory>();
+  const openTrajectories = new Map<string, RoomTrajectory>();
   const windowsPlan = new Map<string, PositionPlan>();
   const deviations: DeviationResult[] = [];
   const plannedActions: PlannedAction[] = [];
@@ -162,6 +184,22 @@ export function runForecastPlanner(
   // (the thermal model then falls back to the scalar `now` values).
   const series = snapshot.forecastSeries ?? [];
   const seriesMs = series.map((p) => Date.parse(p.ts));
+
+  // "Zweiter Hebel": live PV cloud nowcast. When the sun is on the PV array we
+  // can read current cloudiness from PV vs. the clear-sky expectation and damp
+  // the NEAR-TERM forecast radiation accordingly, fading back to the raw
+  // forecast over `NOWCAST_WINDOW_MS`. Unreliable (→ no correction) when the
+  // sun is too low or off the array (e.g. SE array in the late-afternoon west
+  // sun), where low PV is expected geometry, not clouds.
+  const NOWCAST_WINDOW_MS = 3 * 3600_000;
+  const nowcast = computeCloudNowcast({
+    pvSmoothedKw: snapshot.pvSmoothedKw,
+    pvPeakKwp: config.fusionSolar.pvPeakKwp,
+    sun: memoSun(now, config.location),
+    arrayAzimuthDeg: deps.pvArrayAzimuthDeg ?? arrayAzimuthFromHint(config.fusionSolar.orientationHint),
+  });
+  const nowMs = now.getTime();
+
   const sampleForecast = (
     t: Date,
   ): { outdoorTempC?: number | null; radiationWm2?: number | null; cloudCover01?: number | null } => {
@@ -183,9 +221,19 @@ export function runForecastPlanner(
       }
     }
     const p = series[bestIdx]!;
+    // Apply the live PV nowcast to the near-term radiation only.
+    let radiationWm2 = p.radiationWm2;
+    if (nowcast.reliable && radiationWm2 !== null) {
+      const dtMs = tMs - nowMs;
+      if (dtMs >= 0 && dtMs <= NOWCAST_WINDOW_MS) {
+        const progress = dtMs / NOWCAST_WINDOW_MS; // 0 now → 1 at window end
+        const factor = nowcast.cloudFactor01 + (1 - nowcast.cloudFactor01) * progress;
+        radiationWm2 = radiationWm2 * factor;
+      }
+    }
     return {
       outdoorTempC: p.tempC,
-      radiationWm2: p.radiationWm2,
+      radiationWm2,
       cloudCover01: p.cloudCover01,
     };
   };
@@ -213,6 +261,24 @@ export function runForecastPlanner(
           overrideWindowId !== undefined && w.config.id === overrideWindowId
             ? (overrideLevel ?? 0)
             : (w.currentLevel01 ?? 0),
+      }));
+
+    // Counterfactual window sets for the "mit/ohne Beschattung" charts:
+    //  - openWindows:   every shutter fully OPEN (level 0) → full solar gain.
+    //  - shadedWindows: every shutter closed to its heat-stau cap (best case).
+    const openWindows = (): ThermalWindowInput[] =>
+      roomWindows.map((w) => ({
+        orientationDeg: w.config.orientationDeg,
+        areaM2: w.config.areaM2 ?? 1.5,
+        type: w.config.type,
+        currentLevel01: 0,
+      }));
+    const shadedWindows = (): ThermalWindowInput[] =>
+      roomWindows.map((w) => ({
+        orientationDeg: w.config.orientationDeg,
+        areaM2: w.config.areaM2 ?? 1.5,
+        type: w.config.type,
+        currentLevel01: heatCapForWindow(w.config),
       }));
 
     const staleInputs = new Set<string>();
@@ -244,6 +310,41 @@ export function runForecastPlanner(
 
     if (baseTraj !== null) {
       trajectories.set(roomId, baseTraj);
+
+      // Counterfactual open/shaded trajectories share every input with the
+      // base trajectory except the per-window shutter levels. Reusing the
+      // memoized sun cache + forecast sampler keeps this cheap.
+      const counterfactual = (windows: ThermalWindowInput[]): RoomTrajectory | null =>
+        forecastRoom({
+          now,
+          horizonHours: planning.horizonHours,
+          timeStepMinutes: planning.timeStepMinutes,
+          location: config.location,
+          room: {
+            id: roomId,
+            thermalInertiaMinutes: inertia,
+            indoorTempC: roomData.tempC,
+            targets: roomData.targets,
+          },
+          windows,
+          outdoorTempC: snapshot.outdoorTempC,
+          forecastMaxTempC: snapshot.forecastMaxTempC,
+          cloudCover01: null,
+          radiationWm2: snapshot.radiationWm2,
+          pvPowerKw: snapshot.pvSmoothedKw,
+          pvPeakKwp: config.fusionSolar.pvPeakKwp,
+          staleInputs,
+          sunFn: memoSun,
+          sampleForecast,
+        });
+      const openTraj = counterfactual(openWindows());
+      const shadedTraj = counterfactual(shadedWindows());
+      if (openTraj !== null) {
+        openTrajectories.set(roomId, openTraj);
+      }
+      if (shadedTraj !== null) {
+        shadedTrajectories.set(roomId, shadedTraj);
+      }
     }
 
     // Deviation vs previous baseline for this room (now vs forecast-now).
@@ -331,6 +432,8 @@ export function runForecastPlanner(
 
   return {
     trajectories,
+    shadedTrajectories,
+    openTrajectories,
     windows: windowsPlan,
     deviations,
     plannedActions,

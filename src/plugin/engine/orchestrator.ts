@@ -268,6 +268,11 @@ export interface OrchestratorDeps {
    * loop, forwarded to the Forecast_Planner. Optional; absent → configured.
    */
   inertiaByRoom?: Readonly<Record<string, number>>;
+  /**
+   * Self-learned PV array azimuth (deg) from the power curve, forwarded to the
+   * Forecast_Planner's cloud nowcast. Optional; absent → orientationHint.
+   */
+  pvArrayAzimuthDeg?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -570,6 +575,9 @@ export async function runCycle(
         : {}),
       ...(deps.inertiaByRoom !== undefined
         ? { inertiaByRoom: deps.inertiaByRoom }
+        : {}),
+      ...(deps.pvArrayAzimuthDeg !== undefined
+        ? { pvArrayAzimuthDeg: deps.pvArrayAzimuthDeg }
         : {}),
     });
   } catch (err) {

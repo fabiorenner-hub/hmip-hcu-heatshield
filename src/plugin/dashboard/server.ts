@@ -300,6 +300,13 @@ export interface DashboardSnapshotV2 extends DashboardSnapshot {
     /** Freshness of the indoor-temperature signal. */
     indoorTempState?: 'fresh' | 'stale' | 'unbound';
     /**
+     * ISO timestamp until which a manual override holds this room's window
+     * (in the future = override active). While active the engine will not
+     * execute planned moves, so the timeline/forecast hold the current
+     * position. Absent/null = no override.
+     */
+    manualOverrideUntil?: string | null;
+    /**
      * Predicted shutter percent (0=open … 95/100=closed) over the next
      * ~12 h, hourly. Derived from the per-room thermal forecast; surfaced
      * as the scrub-driven 12 h preview in the house twin.

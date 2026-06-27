@@ -540,9 +540,24 @@ export function ShutterTimeline(props: {
               ))}
             </div>
           </div>
-          {props.rooms.map((r) => (
+          {props.rooms.map((r) => {
+            const overrideActive =
+              r.manualOverrideUntil != null &&
+              Date.parse(r.manualOverrideUntil) > nowMs;
+            return (
             <div class="heatmap-row" key={r.id} data-testid={`heatmap-row-${r.id}`}>
-              <span class="heatmap-row__label">{r.name}</span>
+              <span class="heatmap-row__label">
+                {r.name}
+                {overrideActive && (
+                  <span
+                    class="heatmap-row__override"
+                    data-testid={`heatmap-override-${r.id}`}
+                    title={t('Manuelle Übersteuerung aktiv – Position wird gehalten', 'Manual override active — position held')}
+                  >
+                    {t('Manuell', 'Manual')}
+                  </span>
+                )}
+              </span>
               <div class="heatmap-row__cells">
                 {bucketTimes.map((ms, i) => {
                   const pct = percentAt(r, ms);
@@ -559,7 +574,8 @@ export function ShutterTimeline(props: {
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

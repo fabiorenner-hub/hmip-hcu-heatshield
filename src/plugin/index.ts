@@ -130,6 +130,16 @@ import {
   compactCalibration,
 } from './persistence/calibrationStore.js';
 import {
+  accumulatePvOrientation,
+  estimatePvOrientation,
+  emptyPvOrientationState,
+  type PvOrientationState,
+} from './engine/learning/pvOrientation.js';
+import {
+  readPvOrientation,
+  writePvOrientation,
+} from './persistence/pvOrientationStore.js';
+import {
   emptyRuntimeState,
   readState,
   writeState,
@@ -444,6 +454,12 @@ class HeatShieldBoot {
   private calibHistory: CalibrationObservation[] = [];
   /** Calibrated inertia model per room, recomputed on each day rollover. */
   private calibratedModels = new Map<string, CalibratedRoom>();
+
+  // --- PV array azimuth self-learning (from the power curve) -----------
+  /** Running power-weighted accumulator persisted under /data. */
+  private pvOrientState: PvOrientationState = emptyPvOrientationState();
+  /** Learned array azimuth (deg) once confident; null → use orientationHint. */
+  private pvArrayAzimuthDeg: number | null = null;
   // --- impact / "Wirkung" tracker (in-memory, per local day) -----------
   private impactDay = '';
   private impactCyclesToday = 0;
@@ -606,6 +622,14 @@ class HeatShieldBoot {
       this.recomputeCalibration();
     } catch (err) {
       this.logBuffer.append('warn', 'calibrationStore.load failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      this.pvOrientState = await readPvOrientation({ dataDir: this.env.dataDir });
+      this.recomputePvOrientation();
+    } catch (err) {
+      this.logBuffer.append('warn', 'pvOrientationStore.load failed', {
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -1068,11 +1092,17 @@ class HeatShieldBoot {
     // slope used this cycle reflects the freshest sample (Task 5.3 / 6.1).
     await this.recordTrends(now);
     const snapshot = this.buildCycleSnapshot(now);
+    // Self-learn the PV array azimuth from the power curve: fold this cycle's
+    // (sun, PV) sample into the running accumulator. Best-effort persistence.
+    await this.accumulatePvOrientationSample(now, snapshot.pvSmoothedKw);
     const out = await runCycle(snapshot, {
       config: this.config,
       forecastBaseline: this.forecastBaseline,
       comfortBiasByRoom: this.learnedBiasByRoom(),
       inertiaByRoom: this.calibratedInertiaByRoom(),
+      ...(this.pvArrayAzimuthDeg !== null
+        ? { pvArrayAzimuthDeg: this.pvArrayAzimuthDeg }
+        : {}),
       hmipSystem: this.hmipSystem ?? {
         setShutterLevel: async (): Promise<void> => undefined,
       },
@@ -3201,8 +3231,35 @@ class HeatShieldBoot {
         slope === null || Math.abs(slope) < 0.1 ? 'flat' : slope > 0 ? 'up' : 'down';
       const plan =
         win !== undefined ? plannerResult?.windows.get(win.id) : undefined;
-      const nextAction: PlannedAction | null = plan?.plannedActions[0] ?? null;
-      const status: PlannedAction['state'] = nextAction?.state ?? 'completed';
+      const rawNextAction: PlannedAction | null = plan?.plannedActions[0] ?? null;
+      // Active manual override: the safety layer holds this window until the
+      // override expires, so the engine will NOT execute any planned move
+      // before then. Reflect that here so the 12 h timeline/forecast show the
+      // held position instead of a phantom move (e.g. a night-time open the
+      // user has overridden). The planned move is deferred to the override's
+      // expiry; if that is beyond the 12 h horizon the room simply stays put.
+      const overrideUntilMs = (() => {
+        if (win === undefined) return 0;
+        const rs = this.runtime.state.windows.find((s) => s.windowId === win.id);
+        const iso = rs?.manualOverrideUntil ?? null;
+        const ms = iso !== null ? Date.parse(iso) : NaN;
+        return Number.isFinite(ms) ? ms : 0;
+      })();
+      const nowMs = Date.now();
+      const overrideActive = overrideUntilMs > nowMs;
+      const nextAction: PlannedAction | null =
+        overrideActive && rawNextAction !== null
+          ? {
+              ...rawNextAction,
+              state: 'manuallyOverridden',
+              scheduledTs: new Date(
+                Math.max(Date.parse(rawNextAction.scheduledTs) || 0, overrideUntilMs),
+              ).toISOString(),
+            }
+          : rawNextAction;
+      const status: PlannedAction['state'] = overrideActive
+        ? 'manuallyOverridden'
+        : nextAction?.state ?? 'completed';
       // Roof-window flag for the 95 %/100 % convention.
       const roof = win?.type === 'roof_window';
       const traj = plannerResult?.trajectories.get(r.id);
@@ -3221,6 +3278,10 @@ class HeatShieldBoot {
         .sort((a, b) => Date.parse(a.scheduledTs) - Date.parse(b.scheduledTs));
       const capPct = roof ? 100 : 95;
       const plannedPercentAt = (tMs: number): number => {
+        // While an override is active the engine holds the position.
+        if (overrideActive && tMs < overrideUntilMs) {
+          return shutterPercent;
+        }
         let pct = shutterPercent;
         for (const a of plannedActionsSorted) {
           if (Date.parse(a.scheduledTs) <= tMs) {
@@ -3251,6 +3312,9 @@ class HeatShieldBoot {
         status,
         windowOpen,
         roof,
+        ...(overrideActive
+          ? { manualOverrideUntil: new Date(overrideUntilMs).toISOString() }
+          : {}),
         ...(heatLoad01 !== undefined ? { heatLoad01 } : {}),
         ...(shutterForecast !== undefined && shutterForecast.length > 0
           ? { shutterForecast }
@@ -3291,24 +3355,29 @@ class HeatShieldBoot {
     if (plannerResult === undefined) {
       return empty;
     }
-    // Use the first available room trajectory as the headline series.
-    const first = plannerResult.trajectories.values().next();
+    // Headline = the first room with a trajectory (same room across all three
+    // series so the chart compares like-for-like).
+    const first = plannerResult.trajectories.entries().next();
     if (first.done === true) {
       return empty;
     }
-    const traj = first.value;
+    const [roomId, baseTraj] = first.value;
+    // "Mit Beschattung" = best-case fully-shaded counterfactual; "ohne
+    // Beschattung" = fully-open counterfactual. Both are real RC simulations
+    // (planner.ts), so the spread genuinely reflects the value of shading.
+    // Fall back to the base trajectory if a counterfactual is unavailable.
+    const shaded = plannerResult.shadedTrajectories.get(roomId) ?? baseTraj;
+    const open = plannerResult.openTrajectories.get(roomId) ?? baseTraj;
     return {
-      indoorForecastWithShade: traj.points.map((p) => ({
+      indoorForecastWithShade: shaded.points.map((p) => ({
         ts: p.ts,
         tempC: p.indoorTempC,
       })),
-      // Without shading we add the (un-damped) heat-load forcing as a rough
-      // upper bound so the chart can show the mit/ohne spread.
-      indoorForecastNoShade: traj.points.map((p) => ({
+      indoorForecastNoShade: open.points.map((p) => ({
         ts: p.ts,
-        tempC: Math.round((p.indoorTempC + p.heatLoad01 * 3) * 100) / 100,
+        tempC: p.indoorTempC,
       })),
-      heatLoadForecast: traj.points.map((p) => ({
+      heatLoadForecast: baseTraj.points.map((p) => ({
         ts: p.ts,
         load01: p.heatLoad01,
       })),
@@ -3599,6 +3668,42 @@ class HeatShieldBoot {
       }
     }
     return out;
+  }
+
+  /**
+   * Fold this cycle's (sun, PV) sample into the PV-orientation accumulator,
+   * recompute the learned azimuth, and persist. Best-effort: a persistence
+   * failure is logged but never blocks the cycle.
+   */
+  private async accumulatePvOrientationSample(
+    now: Date,
+    pvSmoothedKw: number | null,
+  ): Promise<void> {
+    const sun = getSunPosition(now, this.config.location);
+    const next = accumulatePvOrientation(this.pvOrientState, {
+      sunAzimuthDeg: sun.azimuthDeg,
+      sunElevationDeg: sun.elevationDeg,
+      sunIsUp: sun.isUp,
+      pvKw: pvSmoothedKw,
+    });
+    if (next === this.pvOrientState) {
+      return; // sample ignored (night / low PV) — nothing to persist.
+    }
+    this.pvOrientState = next;
+    this.recomputePvOrientation();
+    try {
+      await writePvOrientation(this.pvOrientState, { dataDir: this.env.dataDir });
+    } catch (err) {
+      this.logBuffer.append('warn', 'pvOrientationStore.write failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /** Recompute the learned PV array azimuth from the running accumulator. */
+  private recomputePvOrientation(): void {
+    const est = estimatePvOrientation(this.pvOrientState);
+    this.pvArrayAzimuthDeg = est?.azimuthDeg ?? null;
   }
 
   /** Recompute the per-room calibrated inertia from the persisted history. */

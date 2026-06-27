@@ -1,0 +1,38 @@
+[size=150][b]Heat Shield – vorausschauender Hitzeschutz als Plugin für die Homematic IP HCU (Open Source)[/b][/size]
+
+Hallo zusammen,
+
+ich möchte euch ein Plugin vorstellen, das ich für die [b]Homematic IP Home Control Unit (HCU)[/b] gebaut habe: [b]Heat Shield[/b]. Die Grundidee ist simpel, aber im Sommer Gold wert – denn Hitzeschutz ist eigentlich ein Timing-Problem. Wenn man die Rollläden erst runterfährt, [i]wenn[/i] es im Zimmer schon warm ist, ist es zu spät: die Wärme steckt längst in Wänden und Möbeln und geht über Stunden nicht mehr raus. Reine Zeit- oder Sonnenstandsschaltungen verdunkeln das Haus dagegen oft den ganzen Tag „auf Verdacht" und kosten unnötig Tageslicht und Motorfahrten.
+
+Heat Shield geht das anders an: Statt auf die aktuelle Temperatur zu [i]reagieren[/i], rechnet das Plugin eine [b]12-Stunden-Wärmeprognose pro Raum[/b] und wählt daraus die Rollladenposition, die den Raum über den ganzen Zeitraum komfortabel hält – mit den [b]wenigsten Fahrten[/b]. In die Prognose fließen Sonnenstand, die Wetterkurve, die PV-Erzeugung als Maß für die solare Last, die thermische Trägheit des Gebäudes und die Fenstergeometrie ein. Das Leitprinzip dahinter: [b]so wenige Fahrten wie nötig, so viel Tageslicht wie möglich, Kühlen zuerst.[/b]
+
+Die Daten holt sich das Plugin als reiner WebSocket-Client über die [b]offizielle Connect API[/b] der HCU zusammen: native Homematic-IP-Geräte (Rollläden, Fensterkontakte, Thermostate, Temperatur-/Feuchte- und Lichtsensoren), die PV-Leistung vom FusionSolar-Plugin, das Wetter von Open-Meteo und die amtlichen Unwetterwarnungen vom DWD. Native Rollläden werden ausschließlich über den dokumentierten Connect-API-Befehl gesteuert – nichts wird „erfunden", und die strengen Schema-/Enum-Regeln der HCU werden eingehalten.
+
+Damit nichts wie eine Blackbox wirkt, ist jede Entscheidung im Dashboard nachvollziehbar: Es zeigt den aktiven Modus, den ausschlaggebenden Faktor und die relevanten Messwerte. Intern arbeitet eine Zustandsmaschine mit acht Modi in klarer Priorität – ganz oben steht [b]STORM[/b] (bei Wind fahren außenliegende Rollläden zum Schutz hoch und überschreiben alles andere), darunter Wartung, Urlaub, Nachtauskühlung, Hitzewelle, aktiver Hitzeschutz, Sommer-Beobachtung und Normalbetrieb. Und das Ganze lernt mit: pro Raum ein begrenzter Komfort-Bias, eine Gewichtung des tatsächlich gemessenen solaren Eintrags und eine Selbstkalibrierung der thermischen Trägheit aus „vorhergesagtem vs. tatsächlichem Peak".
+
+Wer mag, bekommt obendrauf eine vollwertige [b]ET-gesteuerte Gartenbewässerung[/b] über das GARDENA smart system – direkt mit dem eigenen Husqvarna-Application-Key, ohne separates Gardena-Plugin. Statt nach Zeitplan zu gießen, führt das Plugin eine Wasserbilanz nach FAO-56 (aus Referenz-Verdunstung, Regen und ausgebrachtem Wasser) und wässert erst, wenn das pflanzenverfügbare Wasser aufgebraucht ist – tief und selten. Dazu gibt es einen editierbaren Tagesplan (Drag-&-Drop), Lernen von Kc-Wert und Abgaberate je Zone, und jede Menge Sicherheits-Gates: immer nur ein Ventil gleichzeitig, Regen-/Frost-/Wind-Skip, Tagesbudgets, Cycle-and-Soak, bevorzugtes Gießen bei PV-Überschuss und Mähroboter-Koordination.
+
+Bedient wird alles über ein eigenständiges, selbst gehostetes [b]Dashboard direkt auf der HCU[/b] (eine installierbare PWA, responsiv für Browser und Handy, mit automatischem Hell-/Dunkel-Theme). Kurz zusammengefasst, was drinsteckt:
+
+[list]
+[*][b]Digitaler Zwilling[/b] des Hauses mit Live-Himmel, Sonnenbogen, Raum-Badges, Heat-Map und 12-Stunden-Rollladen-Vorschau
+[*][b]Wetter-Tab[/b] mit animiertem Regenradar (Leaflet + RainViewer), kompakter Windrose, DWD-Warnungen und interaktiven Deep-Dive-Diagrammen
+[*][b]Bewässerung[/b] mit Zonenkarten, Bodenwasser-Anzeige, Lern-Status und Tagesplan-Editor
+[*][b]Automatik, Räume & Fenster, Quellen, Diagnose[/b] sowie ein Tab [b]Logs & Debug[/b] – inklusive Button „Alle Informationen" für einen kompletten Diagnose-Export in einer Datei (praktisch für Support)
+[*][b]Live-Updates[/b] ohne Reload, optionaler [b]Telegram-Bot[/b] (Morgen-Briefing, Abend-Rückblick, Sturm-/Hitze-/UV-Alarme)
+[*]Komplett [b]zweisprachig (DE/EN)[/b] – die Sprache folgt dem Browser und ist pro Gerät umstellbar
+[/list]
+
+Wichtig ist mir der Datenschutz-Aspekt: Heat Shield läuft [b]lokal[/b] auf der HCU und im eigenen Netz, Scope [i]LOCAL[/i], gelernte Modelle und Zustand liegen nur im /data-Volume. [b]Keine Pflicht-Cloud, keine Telemetrie.[/b] Nichts ist auf ein bestimmtes Zuhause hartkodiert – Standort, Quellen, Räume, Schwellen und Bewässerungszonen pflegt man bequem über die Konfigurationsseite.
+
+Unter der Haube ist es sauber gebaut: TypeScript (strict), eine pure, deterministische Engine, rund 960 automatisierte Tests, ESLint/Prettier, Frontend mit Preact ohne CDN, ausgeliefert als arm64-Docker-Image für die HCU.
+
+[b]Installation[/b] in Kürze: das aktuelle [i]heatshield-<version>-arm64.tar.gz[/i] aus den GitHub-Releases laden, in [b]HCUweb → Plugins[/b] hochladen, auf der Konfigseite Standort und (falls genutzt) Quellen sowie GARDENA-Key eintragen – fertig. Das Dashboard ist danach unter [i]http://<deine-hcu>.local:8089/[/i] erreichbar.
+
+[b]Download & Quellcode (Apache-2.0):[/b]
+[url=https://github.com/fabiorenner-hub/hmip-hcu-heatshield]github.com/fabiorenner-hub/hmip-hcu-heatshield[/url]
+Neueste Version: [url=https://github.com/fabiorenner-hub/hmip-hcu-heatshield/releases/latest]Releases → latest[/url]
+
+Über Feedback, Ideen und Bug-Reports freue ich mich – am besten als GitHub-Issue mit HCU-Firmware-Version, Plugin-Version und dem Export aus [i]Logs & Debug → „Alle Informationen"[/i].
+
+[size=85][i]Hinweis: Heat Shield ist ein privates Hobby-Projekt und kein offizielles eQ-3-Produkt. Nutzung auf eigenes Risiko.[/i][/size]
