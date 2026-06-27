@@ -103,7 +103,7 @@ export function ForecastTimeline(props: {
   const now = props.now ?? new Date();
   const horizonH = props.hours ?? 12;
   const showActions = props.showActions ?? true;
-  const titlePrefix = props.titlePrefix ?? 'Forecast';
+  const titlePrefix = props.titlePrefix ?? t('Wettervorhersage', 'Weather forecast');
   const allCards: ForecastTimelineCard[] = props.snapshot.forecastTimeline ?? [];
   const horizonMs = now.getTime() + horizonH * 3_600_000 + 60_000;
   const cards = allCards.filter((c, i) => i === 0 || Date.parse(c.ts) <= horizonMs);
@@ -152,21 +152,30 @@ export function ForecastTimeline(props: {
             ) : (
               <ul class="next-actions__list">
                 {sortedActions.map((a) => {
-                  const cat = actionCategory(a);
+                  const held = a.state === 'manuallyOverridden' || a.state === 'blocked';
+                  const cat = held ? 'warn' : actionCategory(a);
                   const label = resolveActionLabel(a, rooms, windows);
+                  const heldText =
+                    a.state === 'manuallyOverridden'
+                      ? t('manuell übersteuert', 'manually overridden')
+                      : t('Automatik aus', 'automation off');
                   return (
                     <li
                       key={`${a.windowId}-${a.scheduledTs}`}
-                      class={`action-row action--${cat}`}
+                      class={`action-row action--${cat} ${held ? 'action--held' : ''}`}
                       data-testid="action-chip"
                       data-category={cat}
-                      title={a.reason}
+                      title={held ? heldText : a.reason}
                     >
                       <span class="action-row__dot" aria-hidden="true" />
                       <span class="action-row__text">
-                        {label} {t('auf', 'to')} {clampPct(a.targetPercent)} %
+                        {held
+                          ? `${label} · ${heldText}`
+                          : `${label} ${t('auf', 'to')} ${clampPct(a.targetPercent)} %`}
                       </span>
-                      <span class="action-row__eta">{formatEta(a.scheduledTs, now)}</span>
+                      <span class="action-row__eta">
+                        {held ? t('keine Fahrt', 'no move') : formatEta(a.scheduledTs, now)}
+                      </span>
                     </li>
                   );
                 })}

@@ -3,6 +3,49 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 1.19.0
+
+- **Alert-Modus „Katastrophenschutz-Zentrale".** Bei einer aktiven DWD-Warnung
+  ab Stufe Rot erscheint auf der Startseite (Beschattung) und im Wetter-Tab ein
+  auffälliges, pulsierendes Panel: amtliche Warnung mit DWD-Handlungshinweis,
+  Gültigkeit, Live-Sicherheitswerte (Gewitter, Wind, Niederschlag der nächsten
+  2 h), ein 15-Minuten-Niederschlags-Strip und – auf der Startseite – ein
+  kompaktes Regenradar. Verschwindet automatisch, sobald die Warnung endet. Je
+  Tab unter Einstellungen → Darstellung abschaltbar.
+- **DWD-Warnungen per Telegram.** Sofortige Meldung bei neuer/eskalierter
+  Warnung, alle 30 Minuten ein Lage-Update solange aktiv, und automatische
+  „Entwarnung". Während eines Alarms wird der DWD-Feed alle 2 statt 5 Minuten
+  abgefragt.
+- **DWD-Region konfigurierbar + Landkreis-Fix.** Der Ort für die Warnungen ist
+  jetzt im UI einstellbar (Einstellungen → Darstellung; Standard Berlin) und
+  wird im Einrichtungs-Assistenten automatisch aus den Koordinaten
+  vorgeschlagen. Warnungen werden zusätzlich auf Landkreis-Ebene erkannt (eine
+  Gemeinde-Warnzelle ist oft leer, die Warnung liegt auf dem Landkreis).
+- **Sofort-Warnung bei offenen Fenstern im Unwetter.** Sind bei Sturm/Regen
+  Fenster offen – besonders Dachfenster – kommt umgehend eine eskalierte Warnung
+  über Telegram und das Dashboard.
+- **Regenradar verbessert.** Verlauf / Jetzt / Vorhersage sind jetzt klar
+  getrennt (Badge + relative Zeit), dazu ein neuer 2-Stunden-Niederschlags-Strip
+  (Open-Meteo, 15-Minuten-Auflösung) unter dem Radar.
+- **Bewässerung: AUTO-Knopf im Planer.** Legt die optimale Bewässerungsstrategie
+  an und berechnet täglich neu, ob/wann/wie lange jede Zone läuft (ET-Modell,
+  Pflanze, Boden, Sensoren); setzt manuelle Einträge zurück.
+- **Beschattung:** „Forecast – Nächste 12 Stunden" heißt jetzt
+  „Wettervorhersage – Nächste 12 Stunden".
+
+## 1.18.5
+
+- **Mobile-Navigation nutzbar.** Der Master-Automatik-Schalter in der Kopfzeile
+  hat auf dem iPhone die Navigation verdrängt. Auf schmalen Screens wird jetzt
+  nur noch der kompakte Schalter angezeigt (Beschriftung ausgeblendet, Status
+  weiter über Farbe erkennbar; `aria-label`/`title` für Screenreader).
+- **Übersteuerte / inaktive Fenster zeigen „keine Fahrt".** „Nächste Aktionen"
+  und die 12-h-Vorschau („Rollladen-Steuerung") zeigten geplante Fahrten auch
+  für Fenster, die wegen einer aktiven manuellen Übersteuerung oder
+  ausgeschalteter Automatik gar nicht bewegt werden. Solche Einträge werden
+  jetzt als gehalten markiert („manuell übersteuert" bzw. „Automatik aus" —
+  „keine Fahrt") und zählen nicht mehr ins Aktions-Badge.
+
 ## 1.18.4
 
 - **Fix: Plugin-Schalter in der Homematic-App wirken sofort.** Das Umschalten der

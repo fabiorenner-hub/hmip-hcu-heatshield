@@ -130,7 +130,7 @@ const FIXTURE_CONFIG: Config = {
     pollIntervalMinutes: 15,
     baseUrl: 'https://api.open-meteo.com',
   },
-  dwd: { enabled: true, regionName: 'Beispielstadt', warncellId: '' },
+  dwd: { enabled: true, regionName: 'Beispielstadt', warncellId: '', alertOnDashboard: true, alertOnWeather: true },
   gardena: {
     enabled: false,
     clientId: '',

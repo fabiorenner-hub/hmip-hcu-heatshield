@@ -1487,8 +1487,21 @@ h3 {
     font-size: 1rem;
   }
 
+  /* Phone: the master automation lever shrinks to just the switch — the long
+     "Automatik AUS — Konfigurationsmodus" label was eating the header width
+     and crowding the nav. State stays clear via colour + the row 3 nav. The
+     button keeps an aria-label/title for accessibility. */
   .automation-lever__label {
-    font-size: 0.85rem;
+    display: none;
+  }
+  .automation-lever__btn {
+    gap: 0;
+    min-height: 40px;
+    padding: 0 0.25rem;
+  }
+  .app__header-actions {
+    gap: 0.4rem;
+    flex: 0 0 auto;
   }
 }
 
@@ -3036,6 +3049,21 @@ input::placeholder {
 .action-row.action--cool .action-row__dot { background: var(--action-cool); }
 .action-row.action--warn { border-left-color: var(--action-warn); }
 .action-row.action--warn .action-row__dot { background: var(--action-warn); }
+
+/* Held actions (manual override / automation off) won't execute: render
+   muted with a steady amber edge so they read as "informational, no move". */
+.action-row.action--held {
+  opacity: 0.78;
+  border-left-color: var(--color-accent);
+}
+.action-row.action--held .action-row__dot {
+  background: var(--color-accent);
+}
+.action-row.action--held .action-row__eta {
+  font-style: italic;
+  font-weight: 600;
+  color: var(--color-accent-strong);
+}
 
 /* --- Rooms & facades panel (Requirement 12) ----------------------- */
 .facade-map {
@@ -6380,6 +6408,36 @@ details[open] > .help-section__title::before {
 /* --- Day-ahead plan ------------------------------------------------ */
 .irr-plan { margin: var(--sp-3) 0; }
 .irr-plan h3 { margin: 0 0 var(--sp-2); font-size: 15px; }
+.irr-plan__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.irr-plan__head h3 { margin: 0; }
+.irr-auto-btn {
+  flex: 0 0 auto;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-accent);
+  background: transparent;
+  color: var(--color-accent-strong);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+.irr-auto-btn:hover {
+  background: rgba(245, 158, 11, 0.12);
+  box-shadow: var(--glow-accent);
+}
+.irr-auto-btn--on {
+  background: linear-gradient(180deg, var(--color-accent-strong) 0%, var(--color-accent) 100%);
+  color: var(--color-accent-contrast);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.irr-plan__auto-hint { margin: var(--sp-1) 0 var(--sp-2); }
 .irr-plan__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .irr-plan__item {
   display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 10px; align-items: center;
@@ -6738,4 +6796,210 @@ textarea {
 /* Leaflet control containers sometimes carry a white fallback background. */
 .radar__map .leaflet-control {
   filter: none;
+}
+
+
+/* ===================================================================
+   Rain radar forecast badge + precipitation outlook strip (Wetter tab).
+   =================================================================== */
+.radar__forecast-badge {
+  display: inline-block;
+  margin-right: var(--sp-2);
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  vertical-align: middle;
+}
+.radar__rel {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.precip-outlook {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  box-shadow: var(--shadow-2);
+}
+.precip-outlook__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.precip-outlook__head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.precip-outlook__sum {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-info);
+  font-variant-numeric: tabular-nums;
+}
+.precip-outlook__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 56px;
+  padding: 2px 0;
+}
+.precip-outlook__bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(148, 163, 184, 0.18);
+  transition: height 0.2s ease;
+}
+.precip-outlook__bar--wet {
+  background: linear-gradient(180deg, var(--color-info) 0%, #1e3a8a 100%);
+}
+.precip-outlook__axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--color-faint);
+  font-variant-numeric: tabular-nums;
+}
+.precip-outlook__hint {
+  margin: var(--sp-2) 0 0;
+}
+
+
+/* ===================================================================
+   Alert-Mode — "Katastrophenschutz-Zentrale" (DWD level ≥ 3).
+   A hard-to-miss, pulsing panel shown on Beschattung + Wetter while an
+   active severe-weather warning is present. --alert-color is set inline
+   from the warning level (red / violet).
+   =================================================================== */
+@keyframes alert-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--alert-color), 0 0 18px rgba(239, 68, 68, 0.25); }
+  50%      { box-shadow: 0 0 0 2px var(--alert-color), 0 0 34px rgba(239, 68, 68, 0.55); }
+}
+.alert-center {
+  grid-column: 1 / -1; /* full width across the 3-column dashboard grid */
+  --alert-color: #ef4444;
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--alert-color);
+  background:
+    radial-gradient(120% 100% at 50% -20%, rgba(239, 68, 68, 0.14), transparent 60%),
+    var(--color-card);
+  box-shadow: 0 0 0 1px var(--alert-color), 0 0 18px rgba(239, 68, 68, 0.25);
+  animation: alert-pulse 2s ease-in-out infinite;
+}
+.alert-center__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.alert-center__siren {
+  font-size: 1.9rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px var(--alert-color));
+}
+.alert-center__headline {
+  display: flex;
+  flex-direction: column;
+}
+.alert-center__title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--alert-color);
+  text-transform: uppercase;
+}
+.alert-center__sub {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+.alert-center__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0;
+}
+.alert-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border);
+}
+.alert-metric--hot {
+  border-color: var(--alert-color);
+  box-shadow: inset 0 0 0 1px var(--alert-color);
+}
+.alert-metric__icon { font-size: 1.3rem; line-height: 1; }
+.alert-metric__label { font-size: 10.5px; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.alert-metric__value { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.alert-metric__hint { font-size: 10px; color: var(--color-faint); }
+.alert-center__warnings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.alert-warning {
+  --alert-color: #ef4444;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--color-bg-elev);
+  border-left: 4px solid var(--alert-color);
+}
+.alert-warning__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.alert-warning__badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--alert-color);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  text-transform: uppercase;
+}
+.alert-warning__event { font-weight: 700; font-size: 14px; }
+.alert-warning__until { margin-left: auto; font-size: 12px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.alert-warning__instruction { margin: 4px 0 0; font-size: 13px; color: var(--color-text); line-height: 1.45; }
+.alert-center__radar { margin-top: var(--sp-3); }
+/* Keep the embedded start-page radar compact. */
+.alert-center__radar .radar__map { height: 220px; }
+.alert-center__foot { margin: var(--sp-3) 0 0; font-size: 11px; color: var(--color-faint); }
+
+@media (max-width: 640px) {
+  .alert-center__metrics { grid-template-columns: 1fr; }
+}
+
+
+/* Appearance tab — labelled text field (DWD region etc.). */
+.appearance-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: var(--sp-2) 0;
+}
+.appearance-field__label {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.appearance-field__input {
+  min-height: 36px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-card-border);
+  background: var(--color-bg-elev);
+  color: var(--color-text);
+  font-size: 14px;
 }

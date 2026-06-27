@@ -26,7 +26,7 @@
  */
 
 import { h, type JSX } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import { navigate } from '../app.js';
 import { getSunPosition } from '../components/sunPolarPlot.js';
@@ -54,6 +54,28 @@ const DEFAULT_LOCATION: Location = {
   timezone: 'Europe/Berlin',
 };
 
+/**
+ * Best-effort reverse-geocode (browser-side, no key, CORS) of coordinates to a
+ * locality/city name for the DWD warning region. Only the coordinates are
+ * sent. Failure → null (the manual field stays as-is).
+ */
+async function reverseGeocodeRegion(lat: number, lon: number): Promise<string | null> {
+  try {
+    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=de`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const j = (await res.json()) as {
+      locality?: string;
+      city?: string;
+      principalSubdivision?: string;
+    };
+    const name = (j.locality ?? j.city ?? j.principalSubdivision ?? '').trim();
+    return name.length > 0 ? name : null;
+  } catch {
+    return null;
+  }
+}
+
 const PRIORITIES: Room['priority'][] = ['very_high', 'high', 'medium', 'low'];
 const PROFILES: ProfileName[] = ['conservative', 'standard', 'aggressive', 'custom'];
 
@@ -69,6 +91,8 @@ export function WizardTab(): JSX.Element {
   const [step, setStep] = useState<number>(1);
   const [stepResults, setStepResults] = useState<Record<number, ValidationOutcome | null>>({});
   const [draftLocation, setDraftLocation] = useState<Location>(DEFAULT_LOCATION);
+  const [draftRegion, setDraftRegion] = useState<string>('Berlin');
+  const regionAutoRef = useRef<string>('');
   const [draftRooms, setDraftRooms] = useState<Room[]>([]);
   const [draftWindows, setDraftWindows] = useState<WindowDef[]>([]);
   const [openMeteoDeviceId, setOpenMeteoDeviceId] = useState<string>('');
@@ -84,7 +108,35 @@ export function WizardTab(): JSX.Element {
     setDraftRooms(c.rooms);
     setDraftWindows(c.windows);
     setDraftProfile(c.rules.profile);
+    setDraftRegion(c.dwd?.regionName ?? 'Berlin');
   }, [cfg.config.value]);
+
+  // Derive the DWD warning region from the chosen coordinates (debounced,
+  // best-effort). Only overwrites the field while it still holds the default
+  // or the previously auto-filled value, so a manual entry sticks.
+  useEffect(() => {
+    const lat = draftLocation.latitude;
+    const lon = draftLocation.longitude;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return;
+    }
+    let cancelled = false;
+    const id = setTimeout(() => {
+      void reverseGeocodeRegion(lat, lon).then((name) => {
+        if (cancelled || name === null) {
+          return;
+        }
+        setDraftRegion((cur) =>
+          cur.trim() === '' || cur === 'Berlin' || cur === regionAutoRef.current ? name : cur,
+        );
+        regionAutoRef.current = name;
+      });
+    }, 700);
+    return (): void => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [draftLocation.latitude, draftLocation.longitude]);
 
   const validateStep = async (n: number, body: unknown): Promise<ValidationOutcome> => {
     try {
@@ -163,6 +215,7 @@ export function WizardTab(): JSX.Element {
       rooms: draftRooms,
       windows: draftWindows,
       rules: applyProfile(current.rules, draftProfile),
+      dwd: { ...current.dwd, regionName: draftRegion.trim().length > 0 ? draftRegion.trim() : 'Berlin' },
     };
     const ok = await cfg.save(merged);
     if (ok) {
@@ -267,7 +320,14 @@ export function WizardTab(): JSX.Element {
       </ol>
 
       <div class="tab-wizard__body" data-testid={`wizard-body-${step}`}>
-        {step === 1 && <Step1 location={draftLocation} setLocation={setDraftLocation} />}
+        {step === 1 && (
+          <Step1
+            location={draftLocation}
+            setLocation={setDraftLocation}
+            region={draftRegion}
+            setRegion={setDraftRegion}
+          />
+        )}
         {step === 2 && (
           <Step2
             discovery={discovery}
@@ -351,9 +411,11 @@ export function WizardTab(): JSX.Element {
 interface Step1Props {
   location: Location;
   setLocation: (l: Location) => void;
+  region: string;
+  setRegion: (s: string) => void;
 }
 function Step1(props: Step1Props): JSX.Element {
-  const { location, setLocation } = props;
+  const { location, setLocation, region, setRegion } = props;
   const sun = useMemo(
     () => getSunPosition(new Date(), location.latitude, location.longitude),
     [location.latitude, location.longitude],
@@ -405,6 +467,22 @@ function Step1(props: Step1Props): JSX.Element {
           }
         />
       </label>
+      <label>
+        {t('Ort für Unwetterwarnungen (DWD)', 'Location for severe-weather warnings (DWD)')}
+        <input
+          type="text"
+          data-testid="wizard-dwd-region"
+          value={region}
+          placeholder="Berlin"
+          onInput={(e): void => setRegion((e.currentTarget as HTMLInputElement).value)}
+        />
+      </label>
+      <p class="module-panel__hint" data-testid="wizard-region-hint">
+        {t(
+          'Wird automatisch aus den Koordinaten vorgeschlagen (Gemeinde/Stadt). Du kannst ihn anpassen — Warnungen werden auch auf Landkreis-Ebene erkannt.',
+          'Suggested automatically from the coordinates (municipality/city). You can adjust it — warnings are also detected at district level.',
+        )}
+      </p>
       <p data-testid="wizard-sun-preview">
         {t(
           `Sonnenstand jetzt: Azimut ${sun.azimuthDeg.toFixed(1)}°, Höhe ${sun.elevationDeg.toFixed(1)}°`,

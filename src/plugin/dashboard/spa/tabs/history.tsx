@@ -16,7 +16,9 @@ import { ExpandableChart, type ChartSeries } from '../components/lineChart.js';
 import { ForecastTimeline } from '../components/dashboard/forecastTimeline.js';
 import { TemperatureChart, HeatLoadChart } from '../components/dashboard/analysisRail.js';
 import { DwdWarnings } from '../components/dashboard/dwdWarnings.js';
+import { AlertCenter } from '../components/dashboard/alertCenter.js';
 import { RadarMap } from '../components/dashboard/radarMap.js';
+import { PrecipOutlook } from '../components/dashboard/precipOutlook.js';
 import { WindRose } from '../components/dashboard/windRose.js';
 import { WindOutlook } from '../components/dashboard/windOutlook.js';
 import { WeatherFacts } from '../components/dashboard/weatherFacts.js';
@@ -217,6 +219,9 @@ export function HistoryTab(): JSX.Element {
         )}
       </p>
 
+      {/* 0) Alert-Modus zuerst (nur bei aktiver Warnung ≥ Rot) */}
+      <AlertCenter latitude={latitude} longitude={longitude} surface="weather" />
+
       {/* 1) Warnungen zuerst */}
       <DwdWarnings />
 
@@ -240,6 +245,7 @@ export function HistoryTab(): JSX.Element {
         <WindOutlook latitude={latitude} longitude={longitude} />
       </div>
       <RadarMap latitude={latitude} longitude={longitude} />
+      <PrecipOutlook />
 
       {/* 5) Diagramme (dive deep) */}
       <WeatherCharts latitude={latitude} longitude={longitude} />

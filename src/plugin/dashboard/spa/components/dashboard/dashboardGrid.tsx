@@ -14,6 +14,7 @@ import { useState } from 'preact/hooks';
 import { route } from 'preact-router';
 
 import { AnalysisRail } from './analysisRail.js';
+import { AlertCenter } from './alertCenter.js';
 import { ForecastTimeline } from './forecastTimeline.js';
 import { HouseDigitalTwin } from './houseDigitalTwin.js';
 import { LiveMetricsRail } from './liveMetricsRail.js';
@@ -65,6 +66,7 @@ export function DashboardGrid(props: DashboardGridProps): JSX.Element {
 
   return (
     <div class="dashboard-grid" data-testid="dashboard-grid">
+      <AlertCenter latitude={props.latitude} longitude={props.longitude} surface="dashboard" showRadar />
       <div class="dashboard-grid__col dashboard-grid__col--left" data-testid="grid-col-left">
         <LiveMetricsRail
           snapshot={snapshot}

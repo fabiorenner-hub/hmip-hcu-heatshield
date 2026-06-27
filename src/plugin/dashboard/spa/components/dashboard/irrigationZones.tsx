@@ -19,6 +19,7 @@ import {
   addPlanEntry,
   calibrateIrrigationZone,
   deletePlanEntry,
+  resetPlanToAuto,
   runIrrigationZone,
   skipIrrigationZone,
   stopIrrigationZone,
@@ -388,7 +389,7 @@ function TimelineDay(props: {
 }
 
 /** Editable day-ahead plan (drag timeline + list + add row), optimistic. */
-function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: IrrigationZoneView[] }): JSX.Element {
+function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: IrrigationZoneView[]; autoMode: boolean }): JSX.Element {
   const [addZone, setAddZone] = useState('');
   const [addTime, setAddTime] = useState('06:00');
   const [addDur, setAddDur] = useState(15);
@@ -450,6 +451,12 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
     applyLocal(plan.filter((e) => e.id !== id), deletePlanEntry(id));
   };
 
+  const doAuto = (): void => {
+    // Reset to the pure AUTO strategy: drop manual edits, re-seed the optimal
+    // plan from the live forecast. Optimistically clear, server re-seeds.
+    applyLocal([], resetPlanToAuto());
+  };
+
   const doAdd = (): void => {
     const zoneId = addZone !== '' ? addZone : (props.zones[0]?.id ?? '');
     if (zoneId === '') return;
@@ -481,7 +488,29 @@ function DayAheadPlan(props: { plan: IrrigationPlanEntryView[]; zones: Irrigatio
 
   return (
     <article class="module-panel__card irr-plan" data-testid="irr-plan">
-      <h3>{t('Bewässerungsplan · verschiebbar', 'Irrigation plan · draggable')}</h3>
+      <header class="irr-plan__head">
+        <h3>{t('Bewässerungsplan · verschiebbar', 'Irrigation plan · draggable')}</h3>
+        <button
+          type="button"
+          class={`irr-auto-btn${props.autoMode ? ' irr-auto-btn--on' : ''}`}
+          data-testid="irr-auto-btn"
+          title={t(
+            'Optimale Bewässerungsstrategie automatisch anlegen — täglich neu berechnet aus Wetter, Pflanze, Boden und Sensoren. Setzt manuelle Einträge zurück.',
+            'Automatically build the optimal irrigation strategy — recomputed daily from weather, plant, soil and sensors. Resets manual entries.',
+          )}
+          onClick={doAuto}
+        >
+          {props.autoMode
+            ? t('AUTO · aktiv', 'AUTO · on')
+            : t('AUTO-Strategie', 'AUTO strategy')}
+        </button>
+      </header>
+      <p class="module-panel__hint irr-plan__auto-hint">
+        {t(
+          'AUTO berechnet täglich automatisch, ob, wann und wie lange jede Zone bewässert wird – aus Wetter/ET, Pflanzenbedarf, Bodenprofil und Feuchtesensoren.',
+          'AUTO computes daily whether, when and how long each zone is watered – from weather/ET, plant demand, soil profile and moisture sensors.',
+        )}
+      </p>
       {err !== null && (
         <p class="irr-plan__err" data-testid="irr-plan-err">{err}</p>
       )}
@@ -618,7 +647,7 @@ export function IrrigationZones(props: { info: IrrigationInfo }): JSX.Element {
         </p>
       ) : (
         <Fragment>
-          <DayAheadPlan plan={i.plan} zones={i.zones} />
+          <DayAheadPlan plan={i.plan} zones={i.zones} autoMode={i.autoMode} />
           <div class="irr-zone-grid">
             {i.zones.map((z) => (
               <ZoneCard key={z.id} zone={z} />

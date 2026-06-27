@@ -558,7 +558,9 @@ export function App(props: AppProps = {}): JSX.Element {
             const active = isModuleActive(currentUrl, m.href);
             const isBeschattung = m.testId === 'nav-module-beschattung';
             const badgeCount =
-              (snapshot.value?.plannedActions?.length ?? 0) + unreadMessages.value;
+              (snapshot.value?.plannedActions?.filter(
+                (a) => a.state !== 'manuallyOverridden' && a.state !== 'blocked',
+              ).length ?? 0) + unreadMessages.value;
             return (
               <RouterLink
                 key={m.href}

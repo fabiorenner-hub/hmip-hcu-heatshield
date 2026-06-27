@@ -519,8 +519,12 @@ export const LearningSchema = z
 export const DwdSchema = z
   .object({
     enabled: z.boolean().default(true),
-    regionName: z.string().default(''),
+    regionName: z.string().default('Berlin'),
     warncellId: z.string().default(''),
+    /** Show the Alert-Mode panel on the Beschattung (start) page. */
+    alertOnDashboard: z.boolean().default(true),
+    /** Show the Alert-Mode panel on the Wetter tab. */
+    alertOnWeather: z.boolean().default(true),
   })
   .prefault({});
 

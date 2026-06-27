@@ -186,6 +186,16 @@ export function RadarMap(props: { latitude: number; longitude: number }): JSX.El
   };
 
   const activeTime = frames[activeIdx]?.time ?? null;
+  const nowMs = Date.now();
+  const isForecast = activeTime !== null && activeTime * 1000 > nowMs + 90_000;
+  const relLabel = ((): string => {
+    if (activeTime === null) return '';
+    const dMin = Math.round((activeTime * 1000 - nowMs) / 60_000);
+    if (Math.abs(dMin) <= 2) return t('jetzt', 'now');
+    return dMin < 0
+      ? t(`vor ${-dMin} min`, `${-dMin} min ago`)
+      : t(`in ${dMin} min`, `in ${dMin} min`);
+  })();
   const label =
     activeTime === null
       ? '—'
@@ -200,7 +210,13 @@ export function RadarMap(props: { latitude: number; longitude: number }): JSX.El
       <header class="radar__head">
         <h2>{t('Regenradar', 'Rain radar')}</h2>
         <span class="radar__time" data-testid="radar-time">
+          {isForecast && (
+            <span class="radar__forecast-badge" data-testid="radar-forecast-badge">
+              {t('Vorhersage', 'Forecast')}
+            </span>
+          )}
           {label}
+          {relLabel !== '' && <span class="radar__rel"> · {relLabel}</span>}
         </span>
       </header>
       <div class="radar__map" ref={containerRef} data-testid="radar-canvas" />

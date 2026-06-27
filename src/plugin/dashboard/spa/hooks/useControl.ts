@@ -181,6 +181,10 @@ export function addPlanEntry(
 ): Promise<boolean> {
   return planFetch('', { zoneId, startTs, durationMin });
 }
+/** Reset the day-ahead plan to the pure AUTO strategy (re-seed from forecast). */
+export function resetPlanToAuto(): Promise<boolean> {
+  return planFetch('/auto', {});
+}
 
 export function useControl(): UseControlResult {
   return {

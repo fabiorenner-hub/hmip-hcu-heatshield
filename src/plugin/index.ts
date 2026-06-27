@@ -162,10 +162,37 @@ import { HcuSourceCache } from './sources/hcu.js';
 import type { HmipDeviceMeta } from './sources/hcu.js';
 import { resolveSignal, type SourceContext } from './sources/index.js';
 import { OpenMeteoAdapter } from './sources/openMeteo.js';
+import { getDwdWarnings, type DwdWarning, type DwdWarningsResult } from './sources/dwdWarnings.js';
 import { GardenaCloudAdapter } from './sources/gardena.js';
 import { IrrigationController } from './irrigation/controller.js';
 
 const PLUGIN_ID = 'de.fr.renner.plugin.heatshield';
+
+/** DWD severity level (1 gelb … 4 violett) → bilingual label. */
+function dwdLevelLabel(level: number, en: boolean): string {
+  if (en) {
+    switch (level) {
+      case 4:
+        return 'Extreme (violet)';
+      case 3:
+        return 'Severe (red)';
+      case 2:
+        return 'Moderate (orange)';
+      default:
+        return 'Minor (yellow)';
+    }
+  }
+  switch (level) {
+    case 4:
+      return 'Extrem (Violett)';
+    case 3:
+      return 'Unwetter (Rot)';
+    case 2:
+      return 'Markant (Orange)';
+    default:
+      return 'Wetterwarnung (Gelb)';
+  }
+}
 
 /**
  * Map a WMO weather code to a weather emoji for the forecast timeline.
@@ -460,6 +487,20 @@ class HeatShieldBoot {
   private pvOrientState: PvOrientationState = emptyPvOrientationState();
   /** Learned array azimuth (deg) once confident; null → use orientationHint. */
   private pvArrayAzimuthDeg: number | null = null;
+
+  // --- DWD severe-weather warnings → Telegram/bell ---------------------
+  /** Identities of warnings already notified (cleared when they expire). */
+  private dwdSeen = new Set<string>();
+  /** Throttle: last DWD fetch (epoch ms). */
+  private dwdLastFetchMs = 0;
+  /** Latest DWD result, surfaced in the snapshot for the Alert-Mode UI. */
+  private dwdLatest: DwdWarningsResult | null = null;
+  /** Whether an alert-level (≥3 Rot) warning is currently active. */
+  private dwdAlertActive = false;
+  /** Last 30-min situation heartbeat sent while an alert is active (epoch ms). */
+  private dwdLastHeartbeatMs = 0;
+  /** Window ids already warned as "open during storm/rain" (cleared on close). */
+  private stormOpenWarned = new Set<string>();
   // --- impact / "Wirkung" tracker (in-memory, per local day) -----------
   private impactDay = '';
   private impactCyclesToday = 0;
@@ -1140,6 +1181,8 @@ class HeatShieldBoot {
     await this.maybeAutoApplyLearning(now);
     await this.maybeHealthWatchdog(now, snapshot);
     await this.maybeAlerts(now, snapshot);
+    await this.maybeDwdWarnings(now);
+    await this.maybeStormOpenWindows(now, snapshot);
     await this.recordLearning(now, snapshot, out);
     try {
       await writeState(this.runtime.state, { statePath: this.statePath() });
@@ -1765,6 +1808,248 @@ class HeatShieldBoot {
       this.logBuffer.append('warn', 'health watchdog notify failed', {
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+  }
+
+  /**
+   * Poll the official DWD severe-weather warnings for the configured region
+   * and push NEW ones to Telegram + the in-app bell, grouped into a single
+   * message. Throttled to every 5 min (DWD's own cadence). Deduplicated by a
+   * per-warning identity; when a warning expires it is forgotten, so a later
+   * re-issued warning notifies again. Gated by the `weather` toggle. Never
+   * throws — a feed/network hiccup just skips this cycle.
+   */
+  private async maybeDwdWarnings(now: Date): Promise<void> {
+    const dwd = this.config.dwd;
+    if (!dwd.enabled) {
+      return;
+    }
+    const nowMs = now.getTime();
+    // Poll faster (2 min) while an alert is active so fast-changing severe
+    // weather is reflected quickly; otherwise the DWD cadence of 5 min.
+    const throttleMs = this.dwdAlertActive ? 2 * 60_000 : 5 * 60_000;
+    if (nowMs - this.dwdLastFetchMs < throttleMs) {
+      return;
+    }
+    this.dwdLastFetchMs = nowMs;
+    try {
+      const res = await getDwdWarnings({
+        regionName: dwd.regionName,
+        ...(dwd.warncellId.length > 0 ? { warncellId: dwd.warncellId } : {}),
+      });
+      this.dwdLatest = res;
+      // Only act on genuine, active warnings (skip advance-notices).
+      const active = res.warnings.filter((w) => !w.preliminary);
+      const maxLevel = active.reduce((m, w) => (w.level > m ? w.level : m), 0);
+      const idOf = (w: DwdWarning): string =>
+        `${w.event}|${w.level}|${w.start ?? ''}|${w.end ?? ''}`;
+      const fresh = active.filter((w) => !this.dwdSeen.has(idOf(w)));
+      // Remember the currently-active set so vanished warnings can re-fire
+      // later, while active ones stay deduped.
+      this.dwdSeen = new Set(active.map(idOf));
+      const en = this.config.notifications.language === 'en';
+
+      // New / escalated warnings → immediate notification.
+      if (fresh.length > 0) {
+        const title = en
+          ? `⚠ Severe weather warning (${res.regionName})`
+          : `⚠ Unwetterwarnung (${res.regionName})`;
+        const body = fresh.map((w) => this.dwdWarningLine(w, en)).join('\n');
+        await this.emitWeatherMessage(title, body);
+      }
+
+      // Alert-Mode (≥ level 3 Rot): a temporary disaster-protection mode.
+      const alertNow = maxLevel >= 3;
+      if (alertNow) {
+        // Heartbeat: a situation update every 30 min until the alert clears.
+        if (this.dwdLastHeartbeatMs === 0) {
+          this.dwdLastHeartbeatMs = nowMs;
+        } else if (nowMs - this.dwdLastHeartbeatMs >= 30 * 60_000) {
+          this.dwdLastHeartbeatMs = nowMs;
+          const title = en
+            ? `🛡 Situation update (${res.regionName})`
+            : `🛡 Lage-Update (${res.regionName})`;
+          const body = this.buildAlertSituationText(active, en);
+          await this.emitWeatherMessage(title, body);
+        }
+      } else if (this.dwdAlertActive) {
+        // Transition out of alert → all-clear.
+        const title = en ? `✅ All clear (${res.regionName})` : `✅ Entwarnung (${res.regionName})`;
+        const body = en
+          ? 'The severe-weather warning has been lifted.'
+          : 'Die Unwetterwarnung wurde aufgehoben.';
+        await this.emitWeatherMessage(title, body);
+        this.dwdLastHeartbeatMs = 0;
+      }
+      this.dwdAlertActive = alertNow;
+
+      if (fresh.length > 0) {
+        this.logBuffer.append('info', 'dwd warnings notified', {
+          region: res.regionName,
+          count: fresh.length,
+          maxLevel,
+        });
+      }
+    } catch (err) {
+      this.logBuffer.append('warn', 'dwd warnings fetch failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Immediate safety warning for OPEN windows during storm/rain. Open windows
+   * (especially roof windows / Dachfenster) are dangerous in severe weather, so
+   * while STORM mode or an active wind/rain DWD warning is in effect, any open
+   * sash triggers a grouped, escalated warning to Telegram + the bell. Fires
+   * once per open episode per window (re-fires if a window is reopened).
+   */
+  private async maybeStormOpenWindows(now: Date, snapshot: CycleSnapshot): Promise<void> {
+    void now;
+    const stormMode = this.runtime.lastMode === 'STORM';
+    const dangerous = stormMode || (this.dwdAlertActive && this.dwdHasStormOrRain());
+    if (!dangerous) {
+      if (this.stormOpenWarned.size > 0) {
+        this.stormOpenWarned.clear();
+      }
+      return;
+    }
+    const openWins = snapshot.windows.filter(
+      (w) => w.contactState === 'open' || w.contactState === 'tilted',
+    );
+    if (openWins.length === 0) {
+      this.stormOpenWarned.clear();
+      return;
+    }
+    // Fresh = newly-open windows we have not warned about this episode.
+    const fresh = openWins.filter((w) => !this.stormOpenWarned.has(w.config.id));
+    this.stormOpenWarned = new Set(openWins.map((w) => w.config.id));
+    if (fresh.length === 0) {
+      return;
+    }
+    const en = this.config.notifications.language === 'en';
+    const labelOf = (w: (typeof fresh)[number]): string =>
+      this.windowLabel(w.config.id) ?? w.config.id;
+    const roof = fresh.filter((w) => w.config.type === 'roof_window');
+    const other = fresh.filter((w) => w.config.type !== 'roof_window');
+    const lines: string[] = [];
+    if (roof.length > 0) {
+      lines.push(
+        (en ? '🚨 ROOF WINDOWS open: ' : '🚨 DACHFENSTER offen: ') +
+          roof.map(labelOf).join(', '),
+      );
+    }
+    if (other.length > 0) {
+      lines.push((en ? 'Windows open: ' : 'Fenster offen: ') + other.map(labelOf).join(', '));
+    }
+    const advice = en
+      ? 'Open windows are dangerous in storm/rain — roof windows especially. Please close them now.'
+      : 'Offene Fenster sind bei Sturm/Regen gefährlich — besonders Dachfenster. Bitte jetzt schließen.';
+    const title = en ? '🚨 Close windows — severe weather!' : '🚨 Fenster schließen — Unwetter!';
+    await this.emitWeatherMessage(title, `${lines.join('\n')}\n${advice}`);
+    this.logBuffer.append('warn', 'storm open-window warning', {
+      roof: roof.length,
+      other: other.length,
+    });
+  }
+
+  /** True when the latest DWD result holds an active wind/rain/thunder warning. */
+  private dwdHasStormOrRain(): boolean {
+    const res = this.dwdLatest;
+    if (res === null) {
+      return false;
+    }
+    return res.warnings.some(
+      (w) =>
+        !w.preliminary &&
+        /sturm|orkan|b(ö|oe)|wind|regen|gewitter|hagel|storm|rain|thunder|hail|gust/iu.test(
+          `${w.event} ${w.headline}`,
+        ),
+    );
+  }
+
+  /** Emit a weather message to the store + Telegram and notify the live bell. */
+  private async emitWeatherMessage(title: string, body: string): Promise<void> {
+    const msg = await this.notifications.emit('weather', title, body, 'weather');
+    this.events.emit('event', {
+      type: 'message.created',
+      payload: { id: msg.id },
+    } satisfies DashboardStreamEvent);
+  }
+
+  /** One readable line for a single DWD warning. */
+  private dwdWarningLine(w: DwdWarning, en: boolean): string {
+    const lvl = dwdLevelLabel(w.level, en);
+    const head = w.headline.length > 0 ? w.headline : w.event;
+    const until = w.end !== null ? ` (${en ? 'until' : 'bis'} ${this.fmtClock(new Date(w.end))})` : '';
+    return `${lvl}: ${head}${until}`;
+  }
+
+  /** Compose the 30-min situation report (level + live wind/precip + advice). */
+  private buildAlertSituationText(active: ReadonlyArray<DwdWarning>, en: boolean): string {
+    const lines = active.map((w) => this.dwdWarningLine(w, en));
+    const windObj = this.openMeteo.getValue('windSpeed');
+    const windMs =
+      windObj !== null && Number.isFinite(windObj.value) ? windObj.value : null;
+    const precip2h = (this.openMeteo.getNowcastSeries() ?? [])
+      .filter((p) => {
+        const ms = Date.parse(p.ts);
+        return Number.isFinite(ms) && ms >= Date.now() && ms <= Date.now() + 2 * 3_600_000;
+      })
+      .reduce((s, p) => s + Math.max(0, p.precipMm ?? 0), 0);
+    const windTxt =
+      windMs !== null
+        ? en
+          ? `Wind ${Math.round(windMs * 3.6)} km/h`
+          : `Wind ${Math.round(windMs * 3.6)} km/h`
+        : '';
+    const precipTxt = en
+      ? `rain next 2 h ≈ ${Math.round(precip2h * 10) / 10} mm`
+      : `Regen nächste 2 h ≈ ${Math.round(precip2h * 10) / 10} mm`;
+    const live = [windTxt, precipTxt].filter((s) => s.length > 0).join(' · ');
+    return `${lines.join('\n')}\n${live}`;
+  }
+
+  /** Build the snapshot `weatherAlert` block from the latest DWD result. */
+  private buildWeatherAlert(): NonNullable<DashboardSnapshotV2['weatherAlert']> | null {
+    const res = this.dwdLatest;
+    if (res === null) {
+      return null;
+    }
+    const active = res.warnings.filter((w) => !w.preliminary);
+    if (active.length === 0) {
+      return null;
+    }
+    const maxLevel = active.reduce((m, w) => (w.level > m ? w.level : m), 0);
+    return {
+      active: maxLevel >= 3,
+      maxLevel,
+      region: res.regionName,
+      updatedTs:
+        res.time !== null ? new Date(res.time).toISOString() : new Date().toISOString(),
+      warnings: active.map((w) => ({
+        level: w.level,
+        event: w.event,
+        headline: w.headline,
+        description: w.description,
+        instruction: w.instruction,
+        start: w.start !== null ? new Date(w.start).toISOString() : null,
+        end: w.end !== null ? new Date(w.end).toISOString() : null,
+      })),
+    };
+  }
+
+  /** Local HH:MM for the configured timezone. */
+  private fmtClock(d: Date): string {
+    try {
+      return new Intl.DateTimeFormat('de-DE', {
+        timeZone: this.config.location.timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(d);
+    } catch {
+      return d.toISOString().slice(11, 16);
     }
   }
 
@@ -2527,6 +2812,7 @@ class HeatShieldBoot {
       updateIrrigationPlanEntry: (entryId, patch) =>
         this.irrigation.updatePlanEntry(entryId, patch),
       deleteIrrigationPlanEntry: (entryId) => this.irrigation.deletePlanEntry(entryId),
+      resetIrrigationPlanAuto: () => this.irrigation.resetPlanToAuto(),
       addIrrigationPlanEntry: (zoneId, startTs, durationMin) =>
         this.irrigation.addPlanEntry(zoneId, startTs, durationMin),
       setMaintenanceMode: async () => {
@@ -2892,13 +3178,59 @@ class HeatShieldBoot {
     };
 
     const plannerResult = this.lastPlannerResult;
-    const plannedActions: PlannedAction[] = plannerResult
-      ? [...plannerResult.plannedActions]
-      : [];
+    // Annotate planned actions that will NOT actually execute, so the
+    // dashboard never promises a move that won't happen:
+    //   - a window with an active manual override → 'manuallyOverridden'
+    //     (held until the override expires; defer the move to expiry),
+    //   - a window with automation blocked in config → 'blocked'.
+    // Both are surfaced as "held / no move" in the Nächste-Aktionen list.
+    const actionsNowMs = now.getTime();
+    const winCfgById = new Map(this.config.windows.map((w) => [w.id, w]));
+    const overrideUntilByWindow = new Map<string, number>();
+    for (const ws of this.runtime.state.windows) {
+      if (ws.manualOverrideUntil !== null && ws.manualOverrideUntil !== undefined) {
+        const ms = Date.parse(ws.manualOverrideUntil);
+        if (Number.isFinite(ms) && ms > actionsNowMs) {
+          overrideUntilByWindow.set(ws.windowId, ms);
+        }
+      }
+    }
+    const plannedActions: PlannedAction[] = (
+      plannerResult ? plannerResult.plannedActions : []
+    ).map((a) => {
+      const ovr = overrideUntilByWindow.get(a.windowId);
+      if (ovr !== undefined) {
+        return {
+          ...a,
+          state: 'manuallyOverridden' as const,
+          scheduledTs: new Date(
+            Math.max(Date.parse(a.scheduledTs) || actionsNowMs, ovr),
+          ).toISOString(),
+        };
+      }
+      if (winCfgById.get(a.windowId)?.automationBlocked === true) {
+        return { ...a, state: 'blocked' as const };
+      }
+      return a;
+    });
     const roomsDetail = this.buildRoomsDetail(ctx, plannerResult);
     const trajectories = this.buildTrajectories(plannerResult);
     const modeInfo = this.buildModeInfo(this.runtime.lastMode);
     const forecastTimeline = this.buildForecastTimeline(now);
+    // +2 h precipitation outlook (15-min steps) from Open-Meteo minutely_15.
+    const precipNowcastMs = now.getTime();
+    const precipNowcast = this.openMeteo
+      .getNowcastSeries()
+      .filter((p) => {
+        const ms = Date.parse(p.ts);
+        return (
+          Number.isFinite(ms) &&
+          ms >= precipNowcastMs - 15 * 60_000 &&
+          ms <= precipNowcastMs + 2 * 3_600_000 + 60_000
+        );
+      })
+      .map((p) => ({ ts: p.ts, precipMm: Math.max(0, p.precipMm ?? 0) }));
+    const weatherAlert = this.buildWeatherAlert();
 
     const roomTemps = this.config.rooms
       .map((r) => {
@@ -2990,6 +3322,8 @@ class HeatShieldBoot {
       ...(pvSelfUse01 !== undefined ? { pvSelfUse01 } : {}),
       roomsDetail,
       forecastTimeline,
+      ...(precipNowcast.length > 0 ? { precipNowcast } : {}),
+      ...(weatherAlert !== null ? { weatherAlert } : {}),
       plannedActions,
       ventilation: this.buildVentilation(now, sunPos.isUp, roomsDetail),
       cooling: this.buildCooling(
@@ -3257,6 +3591,9 @@ class HeatShieldBoot {
       })();
       const nowMs = Date.now();
       const overrideActive = overrideUntilMs > nowMs;
+      // Automation blocked in config → the engine never moves this window
+      // either, so the timeline must hold flat (no phantom move).
+      const blocked = win?.automationBlocked === true;
       const nextAction: PlannedAction | null =
         overrideActive && rawNextAction !== null
           ? {
@@ -3266,10 +3603,14 @@ class HeatShieldBoot {
                 Math.max(Date.parse(rawNextAction.scheduledTs) || 0, overrideUntilMs),
               ).toISOString(),
             }
-          : rawNextAction;
+          : blocked
+            ? null
+            : rawNextAction;
       const status: PlannedAction['state'] = overrideActive
         ? 'manuallyOverridden'
-        : nextAction?.state ?? 'completed';
+        : blocked
+          ? 'blocked'
+          : nextAction?.state ?? 'completed';
       // Roof-window flag for the 95 %/100 % convention.
       const roof = win?.type === 'roof_window';
       const traj = plannerResult?.trajectories.get(r.id);
@@ -3288,7 +3629,10 @@ class HeatShieldBoot {
         .sort((a, b) => Date.parse(a.scheduledTs) - Date.parse(b.scheduledTs));
       const capPct = roof ? 100 : 95;
       const plannedPercentAt = (tMs: number): number => {
-        // While an override is active the engine holds the position.
+        // Blocked or overridden → the engine holds the position.
+        if (blocked) {
+          return shutterPercent;
+        }
         if (overrideActive && tMs < overrideUntilMs) {
           return shutterPercent;
         }

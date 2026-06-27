@@ -156,6 +156,26 @@ async function loadWarnings(
   return parsed;
 }
 
+/**
+ * Candidate warncell IDs to check for a resolved cell. DWD issues most
+ * warnings on the LANDKREIS cell (`1xxxxxxxx`), while a region name often
+ * resolves to the finer GEMEINDE cell (`8DDDDD###`) which is then empty in the
+ * `warnapp_landkreise` feed. We therefore also derive the parent Landkreis cell
+ * `1` + <5-digit Kreis> + `000` (the Kreis digits are shared, e.g. Gemeinde
+ * `812063080` → Landkreis `112063000`) and aggregate warnings from both.
+ */
+export function candidateCells(cellId: string): string[] {
+  const out = [cellId];
+  const m = /^8(\d{5})\d{3}$/u.exec(cellId);
+  if (m !== null) {
+    const landkreis = `1${m[1]}000`;
+    if (!out.includes(landkreis)) {
+      out.push(landkreis);
+    }
+  }
+  return out;
+}
+
 async function resolveCellId(
   regionName: string,
   fetchFn: typeof globalThis.fetch,
@@ -196,7 +216,21 @@ export async function getDwdWarnings(
       : await resolveCellId(opts.regionName, fetchFn, now);
 
   const { time, byCell } = await loadWarnings(fetchFn, now);
-  const warnings = cellId !== null ? (byCell.get(cellId) ?? []) : [];
+  // Aggregate the resolved cell + its parent Landkreis cell, de-duplicated:
+  // DWD usually warns on the Landkreis cell, not the finer Gemeinde cell.
+  const warnings: DwdWarning[] = [];
+  if (cellId !== null) {
+    const seen = new Set<string>();
+    for (const c of candidateCells(cellId)) {
+      for (const w of byCell.get(c) ?? []) {
+        const k = `${w.event}|${w.level}|${w.start ?? ''}|${w.end ?? ''}`;
+        if (!seen.has(k)) {
+          seen.add(k);
+          warnings.push(w);
+        }
+      }
+    }
+  }
   return { cellId, regionName: opts.regionName, time, warnings };
 }
 

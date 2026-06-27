@@ -21,6 +21,52 @@ interface ChangelogEntry {
 function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '1.19.0',
+    items: [
+      t(
+        'Neuer Alert-Modus („Katastrophenschutz-Zentrale"): Bei einer DWD-Warnung ab Stufe Rot erscheint auf Startseite und Wetter-Tab ein auffälliges Panel mit Warnung, Handlungshinweis, Live-Werten (Gewitter, Wind, Niederschlag), 15-Minuten-Niederschlag und kompaktem Radar. Je Tab unter Darstellung abschaltbar.',
+        'New alert mode ("emergency center"): a DWD warning of level red or higher shows a prominent panel on the start page and Weather tab with the warning, advice, live values (thunderstorm, wind, precipitation), 15-minute precipitation and a compact radar. Can be turned off per tab under Appearance.',
+      ),
+      t(
+        'DWD-Unwetterwarnungen jetzt auch per Telegram: sofort bei neuer/eskalierter Warnung, alle 30 Minuten ein Lage-Update und automatische Entwarnung.',
+        'DWD severe-weather warnings now via Telegram too: immediately on a new/escalated warning, a situation update every 30 minutes, and an automatic all-clear.',
+      ),
+      t(
+        'Ort für DWD-Warnungen ist jetzt einstellbar (Einstellungen → Darstellung; Standard Berlin) und wird im Assistenten aus den Koordinaten vorgeschlagen. Warnungen werden auch auf Landkreis-Ebene erkannt.',
+        'The DWD warning location is now configurable (Settings → Appearance; default Berlin) and is suggested from the coordinates in the wizard. Warnings are also detected at district level.',
+      ),
+      t(
+        'Sofort-Warnung bei offenen Fenstern – besonders Dachfenstern – während Sturm oder Regen, über Telegram und Dashboard.',
+        'Immediate warning for open windows – especially roof windows – during storm or rain, via Telegram and the dashboard.',
+      ),
+      t(
+        'Regenradar: Verlauf, Jetzt und Vorhersage klar getrennt, plus ein neuer 2-Stunden-Niederschlags-Strip (Open-Meteo, 15-Minuten-Auflösung).',
+        'Rain radar: past, now and forecast clearly separated, plus a new 2-hour precipitation strip (Open-Meteo, 15-minute resolution).',
+      ),
+      t(
+        'Bewässerung: AUTO-Knopf im Planer legt die optimale Strategie an und berechnet täglich neu, ob/wann/wie lange jede Zone läuft.',
+        'Irrigation: an AUTO button in the planner sets the optimal strategy and recomputes daily whether/when/how long each zone runs.',
+      ),
+      t(
+        'Beschattung: „Forecast – Nächste 12 Stunden" heißt jetzt „Wettervorhersage – Nächste 12 Stunden".',
+        'Shading: "Forecast – next 12 hours" is now "Weather forecast – next 12 hours".',
+      ),
+    ],
+  },
+  {
+    version: '1.18.5',
+    items: [
+      t(
+        'Mobil: Der Automatik-Schalter in der Kopfzeile schrumpft auf dem Smartphone zum reinen Schalter (Beschriftung ausgeblendet), damit die Navigation wieder bedienbar ist.',
+        'Mobile: the automation switch in the header shrinks to just the toggle on phones (label hidden) so the navigation is usable again.',
+      ),
+      t(
+        '„Nächste Aktionen" und die 12-Stunden-Vorschau zeigen Fenster mit aktiver Übersteuerung oder ausgeschalteter Automatik jetzt als gehalten („keine Fahrt") an, statt eine geplante Fahrt, die gar nicht ausgeführt wird.',
+        '"Next actions" and the 12 h preview now show windows with an active override or with automation off as held ("no move"), instead of a planned move that will not run.',
+      ),
+    ],
+  },
+  {
     version: '1.18.4',
     items: [
       t(

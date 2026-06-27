@@ -37,6 +37,14 @@ export function AppearanceTab(_props: RoutableProps): JSX.Element {
     scheduleSave(next);
   };
 
+  const alertOnDashboard = config.value?.dwd?.alertOnDashboard ?? true;
+  const alertOnWeather = config.value?.dwd?.alertOnWeather ?? true;
+  const setAlert = (patch: Partial<Config['dwd']>): void => {
+    const c = config.value;
+    if (c === null) return;
+    scheduleSave({ ...c, dwd: { ...c.dwd, ...patch } });
+  };
+
   return (
     <section class="module-panel tab-appearance" data-testid="tab-appearance">
       <header class="module-panel__head">
@@ -115,6 +123,56 @@ export function AppearanceTab(_props: RoutableProps): JSX.Element {
             </button>
           ))}
         </div>
+      </article>
+
+      <article class="module-panel__card" data-testid="appearance-alert-mode">
+        <h3>{t('Alert-Modus (Unwetter)', 'Alert mode (severe weather)')}</h3>
+        <label class="appearance-field">
+          <span class="appearance-field__label">
+            {t('Ort für Unwetterwarnungen (DWD)', 'Location for severe-weather warnings (DWD)')}
+          </span>
+          <input
+            type="text"
+            class="appearance-field__input"
+            data-testid="dwd-region-input"
+            value={config.value?.dwd?.regionName ?? ''}
+            placeholder="Berlin"
+            disabled={config.value === null}
+            onChange={(e): void =>
+              setAlert({ regionName: (e.currentTarget as HTMLInputElement).value.trim() })
+            }
+          />
+        </label>
+        <p class="module-panel__hint">
+          {t(
+            'Gemeinde oder Landkreis für die DWD-Warnungen (Standard: Berlin). Der Einrichtungs-Assistent schlägt den Ort automatisch aus deinen Koordinaten vor. Warnungen werden auch auf Landkreis-Ebene erkannt.',
+            'Municipality or district for the DWD warnings (default: Berlin). The setup wizard suggests it automatically from your coordinates. Warnings are also detected at district level.',
+          )}
+        </p>
+        <label class="tab-rules__check">
+          <input
+            type="checkbox"
+            data-testid="alert-dashboard-toggle"
+            checked={alertOnDashboard}
+            disabled={config.value === null}
+            onChange={(e): void =>
+              setAlert({ alertOnDashboard: (e.currentTarget as HTMLInputElement).checked })
+            }
+          />
+          <span>{t('Auf der Startseite (Beschattung) anzeigen', 'Show on the start page (Shading)')}</span>
+        </label>
+        <label class="tab-rules__check">
+          <input
+            type="checkbox"
+            data-testid="alert-weather-toggle"
+            checked={alertOnWeather}
+            disabled={config.value === null}
+            onChange={(e): void =>
+              setAlert({ alertOnWeather: (e.currentTarget as HTMLInputElement).checked })
+            }
+          />
+          <span>{t('Im Wetter-Tab anzeigen', 'Show on the Weather tab')}</span>
+        </label>
       </article>
     </section>
   );

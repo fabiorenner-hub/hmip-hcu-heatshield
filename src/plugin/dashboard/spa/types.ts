@@ -133,6 +133,10 @@ export interface DashboardSnapshot {
   indoorPeakTempC?: number | null;
   roomsDetail?: RoomDetail[];
   forecastTimeline?: ForecastTimelineCard[];
+  /** 15-min precipitation outlook for the next ~2 h (Open-Meteo minutely_15). */
+  precipNowcast?: Array<{ ts: string; precipMm: number }>;
+  /** Active DWD warnings; `active` (max level ≥ 3) drives the Alert-Mode UI. */
+  weatherAlert?: WeatherAlert;
   plannedActions?: PlannedAction[];
   trajectories?: Trajectories;
   ventilation?: VentilationAdvice;
@@ -382,6 +386,24 @@ export interface RoomDetail {
    * hourly. Drives the scrub-based 12 h shutter preview in the house twin.
    */
   shutterForecast?: Array<{ ts: string; percent: number }>;
+}
+
+export interface WeatherWarning {
+  level: number;
+  event: string;
+  headline: string;
+  description: string;
+  instruction: string;
+  start: string | null;
+  end: string | null;
+}
+
+export interface WeatherAlert {
+  active: boolean;
+  maxLevel: number;
+  region: string;
+  updatedTs: string;
+  warnings: WeatherWarning[];
 }
 
 export interface ForecastTimelineCard {

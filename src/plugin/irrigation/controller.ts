@@ -802,6 +802,22 @@ export class IrrigationController {
     await this.persist();
   }
 
+  /**
+   * Reset the day-ahead plan to the pure AUTO strategy: drop every manual
+   * entry and every "pinned" (user-edited) auto entry, clear the deletion
+   * suppressions, then immediately re-seed the optimal per-zone waterings from
+   * the live ET/water-balance forecast. After this the plan is fully managed by
+   * the daily computation again (per plant, soil and sensor data).
+   */
+  public async resetPlanToAuto(): Promise<void> {
+    if (!this.loaded) await this.init();
+    this.state.plan = [];
+    this.state.suppressedPlanIds = [];
+    await this.runPlan(this.now()); // re-seed fresh auto entries right away
+    await this.persist();
+    this.log('info', 'irrigation plan reset to AUTO strategy');
+  }
+
   /** Add a manual plan entry for a zone at an absolute time. */
   public async addPlanEntry(zoneId: string, startTs: string, durationMin: number): Promise<void> {
     if (!this.cfg().zones.some((z) => z.id === zoneId)) throw new Error('Zone nicht gefunden');

@@ -61,6 +61,16 @@ export function AutomationLever(): JSX.Element {
         type="button"
         role="switch"
         aria-checked={enabled}
+        aria-label={
+          enabled
+            ? t('Automatik AKTIV', 'Automation ACTIVE')
+            : t('Automatik AUS — Konfigurationsmodus', 'Automation OFF — configuration mode')
+        }
+        title={
+          enabled
+            ? t('Automatik AKTIV — tippen zum Ausschalten', 'Automation ACTIVE — tap to turn off')
+            : t('Automatik AUS — tippen zum Einschalten', 'Automation OFF — tap to turn on')
+        }
         class="automation-lever__btn"
         data-testid="automation-lever-btn"
         onClick={(): void => {

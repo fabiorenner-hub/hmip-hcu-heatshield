@@ -322,6 +322,32 @@ export interface DashboardSnapshotV2 extends DashboardSnapshot {
     precipitationOrCloud01: number;
     pvForecastKw?: number;
   }>;
+  /**
+   * 15-minute precipitation outlook for the next ~2 h (Open-Meteo
+   * `minutely_15`). Complements the rain radar (which only nowcasts ~30 min)
+   * with a valid +2 h precipitation-intensity strip at the location.
+   */
+  precipNowcast?: Array<{ ts: string; precipMm: number }>;
+  /**
+   * Active DWD severe-weather warnings for the region. `active` (max level ≥ 3,
+   * Rot/Violett) switches the dashboard into the temporary Alert-Mode
+   * ("Katastrophenschutz-Zentrale") on the Beschattung + Wetter tabs.
+   */
+  weatherAlert?: {
+    active: boolean;
+    maxLevel: number;
+    region: string;
+    updatedTs: string;
+    warnings: Array<{
+      level: number;
+      event: string;
+      headline: string;
+      description: string;
+      instruction: string;
+      start: string | null;
+      end: string | null;
+    }>;
+  };
   /** Flat list of planned actions (Requirement 11.3, 17.3). */
   plannedActions?: PlannedAction[];
   /** Trajectories for the analysis charts (Requirement 13.2/13.3/13.5). */
@@ -618,6 +644,8 @@ export interface DashboardServerDeps {
     patch: { startTs?: string; durationMin?: number; enabled?: boolean },
   ) => Promise<void>;
   deleteIrrigationPlanEntry?: (entryId: string) => Promise<void>;
+  /** Reset the day-ahead plan to the pure AUTO strategy (re-seed). 503 when unwired. */
+  resetIrrigationPlanAuto?: () => Promise<void>;
   addIrrigationPlanEntry?: (
     zoneId: string,
     startTs: string,
@@ -1992,6 +2020,21 @@ export class DashboardServer {
       }
       try {
         await adder(parsed.data.zoneId, parsed.data.startTs, parsed.data.durationMin);
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+      return { ok: true };
+    });
+
+    this.app.post('/api/irrigation/plan/auto', async (_req, reply) => {
+      const resetter = deps.resetIrrigationPlanAuto;
+      if (resetter === undefined) {
+        return reply.code(503).send({
+          error: { code: 'irrigation_unavailable', message: 'Irrigation not wired' },
+        } satisfies ApiErrorBody);
+      }
+      try {
+        await resetter();
       } catch (err) {
         return this.sendInternalError(reply, err);
       }
