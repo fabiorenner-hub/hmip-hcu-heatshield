@@ -173,6 +173,35 @@ export function AppearanceTab(_props: RoutableProps): JSX.Element {
           />
           <span>{t('Im Wetter-Tab anzeigen', 'Show on the Weather tab')}</span>
         </label>
+        <label class="appearance-field">
+          <span class="appearance-field__label">
+            {t('Unwetterwarnung per Telegram', 'Severe-weather warning via Telegram')}
+          </span>
+          <select
+            class="appearance-field__input"
+            data-testid="dwd-telegram-mode"
+            value={config.value?.dwd?.telegramMode ?? '30'}
+            disabled={config.value === null}
+            onChange={(e): void =>
+              setAlert({
+                telegramMode: (e.currentTarget as HTMLSelectElement)
+                  .value as Config['dwd']['telegramMode'],
+              })
+            }
+          >
+            <option value="off">{t('Aus', 'Off')}</option>
+            <option value="changes">{t('Nur Änderungen', 'Changes only')}</option>
+            <option value="30">{t('Alle 30 Minuten', 'Every 30 minutes')}</option>
+            <option value="60">{t('Alle 60 Minuten', 'Every 60 minutes')}</option>
+            <option value="90">{t('Alle 90 Minuten', 'Every 90 minutes')}</option>
+          </select>
+        </label>
+        <p class="module-panel__hint">
+          {t(
+            'Bei einer aktiven Warnung (Stufe 3+) sendet das Plugin neue/verschärfte Warnungen sofort. „Nur Änderungen" verzichtet auf periodische Lage-Updates; 30/60/90 Minuten schicken zusätzlich einen Lage-Bericht in diesem Takt bis zur Entwarnung.',
+            'During an active warning (level 3+) the plugin sends new/escalated warnings immediately. "Changes only" skips the periodic situation updates; 30/60/90 minutes additionally send a situation report at that cadence until the all-clear.',
+          )}
+        </p>
       </article>
     </section>
   );

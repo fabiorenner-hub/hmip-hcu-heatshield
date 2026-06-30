@@ -184,13 +184,13 @@ describe('positionSelector — Properties 7–11', () => {
     );
   });
 
-  // Solar-benefit gate: when the room cannot be held comfortable AND there is
-  // no near-term solar load to block, the planner must NOT force the strongest
-  // close (closing a shutter cannot cool a non-solar heat load) — it opens for
-  // daylight instead. Mirrors the real "40 °C outside but cloudy now" case.
-  it('does not force-close when the room is hot but there is no near-term solar load', () => {
-    // Hot room (peak 30, above the 24.5 upper bound at every level) but zero
-    // heat load → no sun to block. Open-vs-closed makes no thermal difference.
+  // Shade-benefit gate: when the room cannot be held comfortable, the planner
+  // closes only if shading meaningfully lowers the horizon peak. With no gain
+  // to block (open ≈ closed peak: overcast/night) it HOLDS the current
+  // position instead of churning. Mirrors the "40 °C but overcast" case.
+  it('holds the current position when shading gives no benefit', () => {
+    // Hot room (peak 30 > bound) but open and closed reach the SAME peak →
+    // nothing to block. Must hold the current level, not force a move.
     const fn = (_level01: number): RoomTrajectory => ({
       roomId: 'r1',
       points: [
@@ -205,15 +205,15 @@ describe('positionSelector — Properties 7–11', () => {
       candidateLevels01: CANDIDATES, minSecondsBetweenMoves: 7200, movementBudgetPerInterval: 1,
     };
     const plan = selectPosition(ctx, fn, bounds, NOW);
-    // Most-open candidate (0), not the strongest close (0.95).
-    expect(plan.target01).toBe(0);
-    expect(plan.plannedActions[0]?.reason).toContain('keine Sonnenlast');
+    expect(plan.target01).toBe(0.95);
+    expect(plan.noMoveNeeded).toBe(true);
   });
 
-  it('still closes hard when the room is hot AND near-term solar load is present', () => {
-    // Hot room with real solar load → closing remains correct.
+  it('closes hard when the room is hot AND shading meaningfully lowers the peak', () => {
+    // Closing lowers the peak (gain to block, e.g. diffuse on an off-sun
+    // facade) → close, regardless of which facade the sun is on.
     const fn = (level01: number): RoomTrajectory => {
-      const peak = 30 - level01 * 2; // still above bound even fully closed
+      const peak = 30 - level01 * 2; // open peak 30, closed peak 28 → benefit 2 K
       return {
         roomId: 'r1',
         points: [

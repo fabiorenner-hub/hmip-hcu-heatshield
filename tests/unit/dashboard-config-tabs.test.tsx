@@ -56,6 +56,7 @@ const FIXTURE_CONFIG: Config = {
       targets: { target_c: 23, warning_c: 25, strong_shade_c: 26, critical_c: 27 },
       signals: {},
       occupancyMode: 'always_priority',
+      activeCooling: false,
     },
   ],
   windows: [],
@@ -106,6 +107,8 @@ const FIXTURE_CONFIG: Config = {
       summerPvKw: 2.0,
     },
     manualOverrideMinutes: 60,
+    floorShading: { enabled: true, leadByFloor: {} },
+    hotDay: { enabled: true, outdoorThresholdC: 35, maxOpenPercent: 50, minPvKw: 0.5 },
   },
   dashboard: { port: 8089, enabled: true },
   notifications: {
@@ -130,7 +133,7 @@ const FIXTURE_CONFIG: Config = {
     pollIntervalMinutes: 15,
     baseUrl: 'https://api.open-meteo.com',
   },
-  dwd: { enabled: true, regionName: 'Beispielstadt', warncellId: '', alertOnDashboard: true, alertOnWeather: true },
+  dwd: { enabled: true, regionName: 'Beispielstadt', warncellId: '', alertOnDashboard: true, alertOnWeather: true, telegramMode: '30' },
   gardena: {
     enabled: false,
     clientId: '',

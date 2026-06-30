@@ -353,6 +353,7 @@ export function RoomsTab(): JSX.Element {
         maxHeatProtectionLevel01: isRoof ? 1 : 0.95,
         sunPrelookMinutes: 60,
         lockoutProtection: true,
+        blockSchedules: [],
       };
       return [...prev, newWindow];
     });
@@ -391,6 +392,7 @@ export function RoomsTab(): JSX.Element {
       targets: addForm.targets,
       signals: {},
       occupancyMode: 'always_priority',
+      activeCooling: false,
       ...(floor.length > 0 ? { floor } : {}),
     };
     setDraftRooms((prev) => [...prev, newRoom]);
@@ -411,6 +413,7 @@ export function RoomsTab(): JSX.Element {
         targets: { ...DEFAULT_TARGETS },
         signals: {},
         occupancyMode: 'always_priority',
+        activeCooling: false,
       };
       return [...prev, newRoom];
     });
@@ -487,6 +490,26 @@ export function RoomsTab(): JSX.Element {
     touchedRef.current = true;
     setDraftWindows((prev) =>
       prev.map((w) => (w.id === windowId ? { ...w, automationBlocked: blocked } : w)),
+    );
+  };
+
+  // Toggle a room's "active cooling" marker (mobile AC). Excludes the room
+  // from the self-learning loop so skewed indoor temps don't corrupt the model.
+  const handleToggleActiveCooling = (roomId: string, on: boolean): void => {
+    touchedRef.current = true;
+    setDraftRooms((prev) =>
+      prev.map((r) => (r.id === roomId ? { ...r, activeCooling: on } : r)),
+    );
+  };
+
+  // Replace a window's per-window block schedules (weekday + clock-time).
+  const handleChangeBlockSchedules = (
+    windowId: string,
+    schedules: WindowDef['blockSchedules'],
+  ): void => {
+    touchedRef.current = true;
+    setDraftWindows((prev) =>
+      prev.map((w) => (w.id === windowId ? { ...w, blockSchedules: schedules } : w)),
     );
   };
 
@@ -728,6 +751,8 @@ export function RoomsTab(): JSX.Element {
                 handleChangeRoomSchedule(room.id, key, value)
               }
               onToggleWindowBlock={handleToggleWindowBlock}
+              onToggleActiveCooling={(on): void => handleToggleActiveCooling(room.id, on)}
+              onChangeBlockSchedules={handleChangeBlockSchedules}
               onChangeOrientation={handleChangeOrientation}
               onDelete={(): void => handleDeleteRoom(room.id)}
               onAssignContact={assignContact}
@@ -855,10 +880,108 @@ interface RoomCardProps {
     value: number | null,
   ) => void;
   onToggleWindowBlock: (windowId: string, blocked: boolean) => void;
+  onToggleActiveCooling: (on: boolean) => void;
+  onChangeBlockSchedules: (
+    windowId: string,
+    schedules: WindowDef['blockSchedules'],
+  ) => void;
   onChangeOrientation: (windowId: string, deg: number) => void;
   onDelete: () => void;
   onAssignContact: (windowId: string, deviceId: string) => void;
   onClearContact: (windowId: string) => void;
+}
+
+/** Weekday short labels for the per-window block editor (JS getDay order). */
+const BLOCK_WEEKDAYS: ReadonlyArray<{ idx: number; de: string; en: string }> = [
+  { idx: 1, de: 'Mo', en: 'Mon' },
+  { idx: 2, de: 'Di', en: 'Tue' },
+  { idx: 3, de: 'Mi', en: 'Wed' },
+  { idx: 4, de: 'Do', en: 'Thu' },
+  { idx: 5, de: 'Fr', en: 'Fri' },
+  { idx: 6, de: 'Sa', en: 'Sat' },
+  { idx: 0, de: 'So', en: 'Sun' },
+];
+
+/**
+ * Per-window movement block editor: a list of {weekdays + clock-time window}
+ * rules. Empty weekday selection = every day. STORM always overrides a block.
+ */
+function WindowBlockEditor(props: {
+  windowId: string;
+  schedules: WindowDef['blockSchedules'];
+  onChange: (schedules: WindowDef['blockSchedules']) => void;
+}): JSX.Element {
+  const list = props.schedules ?? [];
+  const update = (i: number, patch: Partial<WindowDef['blockSchedules'][number]>): void => {
+    props.onChange(list.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  };
+  const toggleDay = (i: number, day: number): void => {
+    const cur = list[i];
+    if (cur === undefined) return;
+    const has = cur.days.includes(day);
+    const days = has ? cur.days.filter((d) => d !== day) : [...cur.days, day].sort((a, b) => a - b);
+    update(i, { days });
+  };
+  return (
+    <div class="window-block" data-testid={`window-block-${props.windowId}`}>
+      <div class="window-block__head">
+        <span class="window-block__label">{t('Nicht bewegen', 'Do not move')}</span>
+        <button
+          type="button"
+          class="window-block__add"
+          data-testid={`window-block-add-${props.windowId}`}
+          onClick={(): void =>
+            props.onChange([...list, { days: [], start: '22:00', end: '10:00' }])
+          }
+        >
+          + {t('Zeitfenster', 'Time window')}
+        </button>
+      </div>
+      {list.map((s, i) => (
+        <div class="window-block__row" key={i} data-testid={`window-block-row-${props.windowId}-${i}`}>
+          <div class="window-block__days">
+            {BLOCK_WEEKDAYS.map((d) => (
+              <button
+                key={d.idx}
+                type="button"
+                class={`window-block__day${s.days.includes(d.idx) ? ' window-block__day--on' : ''}`}
+                title={t(d.de, d.en)}
+                onClick={(): void => toggleDay(i, d.idx)}
+              >
+                {t(d.de, d.en)}
+              </button>
+            ))}
+          </div>
+          <div class="window-block__times">
+            <input
+              type="time"
+              value={s.start}
+              aria-label={t('von', 'from')}
+              onInput={(e): void => update(i, { start: (e.currentTarget as HTMLInputElement).value })}
+            />
+            <span>–</span>
+            <input
+              type="time"
+              value={s.end}
+              aria-label={t('bis', 'to')}
+              onInput={(e): void => update(i, { end: (e.currentTarget as HTMLInputElement).value })}
+            />
+            <button
+              type="button"
+              class="window-block__del"
+              title={t('Zeitfenster entfernen', 'Remove time window')}
+              onClick={(): void => props.onChange(list.filter((_, idx) => idx !== i))}
+            >
+              ✕
+            </button>
+          </div>
+          {s.days.length === 0 && (
+            <span class="window-block__hint">{t('gilt täglich', 'applies daily')}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function RoomCard(props: RoomCardProps): JSX.Element {
@@ -993,6 +1116,21 @@ function RoomCard(props: RoomCardProps): JSX.Element {
         </label>
         <span class="room-card__schedule-hint">{t('Sturm ignoriert die Ruhezeit', 'Storm ignores the quiet hours')}</span>
       </div>
+      <label class="room-card__cooling" data-testid={`room-card-cooling-${room.id}`}>
+        <input
+          type="checkbox"
+          checked={room.activeCooling === true}
+          onChange={(e): void =>
+            props.onToggleActiveCooling((e.currentTarget as HTMLInputElement).checked)
+          }
+        />
+        <span>
+          {t('Aktiv gekühlt (mobile Klimaanlage)', 'Actively cooled (mobile AC)')}
+          <small class="room-card__cooling-hint">
+            {t('vom Lernen ausgenommen', 'excluded from learning')}
+          </small>
+        </span>
+      </label>
       <p class="room-card__indoor" data-testid={`room-card-indoor-${room.id}`}>
         {t('Innentemperatur:', 'Indoor temperature:')}{' '}
         {indoorLabel !== null ? (
@@ -1110,6 +1248,11 @@ function RoomCard(props: RoomCardProps): JSX.Element {
                   />
                   <span>{t('Automatik aus', 'Automation off')}</span>
                 </label>
+                <WindowBlockEditor
+                  windowId={w.id}
+                  schedules={w.blockSchedules ?? []}
+                  onChange={(s): void => props.onChangeBlockSchedules(w.id, s)}
+                />
               </li>
             );
           })}

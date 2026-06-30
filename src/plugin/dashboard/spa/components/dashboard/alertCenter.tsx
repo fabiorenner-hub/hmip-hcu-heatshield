@@ -13,6 +13,7 @@
  */
 
 import { h, type JSX } from 'preact';
+import { useState } from 'preact/hooks';
 
 import { snapshot } from '../../store.js';
 import { useConfig } from '../../hooks/useConfig.js';
@@ -21,18 +22,22 @@ import type { WeatherWarning } from '../../types.js';
 import { RadarMap } from './radarMap.js';
 import { PrecipOutlook } from './precipOutlook.js';
 
-/** DWD level → colour + bilingual label. */
+/** DWD warning level → colour + bilingual label, matching the official DWD
+ *  legend (Stufe 1 gelb · Stufe 2 orange · Stufe 3 rot · Stufe 4 dunkelviolett).
+ *  Alert mode only shows for level ≥ 3; lower levels are kept for the per-
+ *  warning badges. The border + text are tinted with this colour instead of a
+ *  fixed yellow. */
 function levelMeta(level: number): { color: string; label: () => string } {
-  switch (level) {
-    case 4:
-      return { color: '#a855f7', label: (): string => t('Extrem (Violett)', 'Extreme (violet)') };
-    case 3:
-      return { color: '#ef4444', label: (): string => t('Unwetter (Rot)', 'Severe (red)') };
-    case 2:
-      return { color: '#f59e0b', label: (): string => t('Markant (Orange)', 'Moderate (orange)') };
-    default:
-      return { color: '#eab308', label: (): string => t('Wetterwarnung (Gelb)', 'Minor (yellow)') };
+  if (level >= 4) {
+    return { color: '#7d0a46', label: (): string => t('Extremes Unwetter (Stufe 4)', 'Extreme severe weather (level 4)') };
   }
+  if (level >= 3) {
+    return { color: '#e3382b', label: (): string => t('Unwetterwarnung (Stufe 3)', 'Severe-weather warning (level 3)') };
+  }
+  if (level === 2) {
+    return { color: '#f7900a', label: (): string => t('Markantes Wetter (Stufe 2)', 'Marked weather (level 2)') };
+  }
+  return { color: '#fcdf00', label: (): string => t('Wetterwarnung (Stufe 1)', 'Weather warning (level 1)') };
 }
 
 function isThunder(w: WeatherWarning): boolean {
@@ -63,6 +68,30 @@ export function AlertCenter(props: {
   const meta = levelMeta(alert.maxLevel);
   const warnings = [...alert.warnings].sort((a, b) => b.level - a.level);
 
+  // Dismiss / minimize: the resident can collapse the panel to a tiny
+  // clickable disclaimer pill and reopen it. The dismissal auto-resets when
+  // the situation changes (new max level or fresh update timestamp) so an
+  // escalation always re-surfaces the full panel.
+  const alertKey = `${alert.maxLevel}|${alert.updatedTs}`;
+  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedKey, setCollapsedKey] = useState('');
+  const isCollapsed = collapsed && collapsedKey === alertKey;
+  if (isCollapsed) {
+    return (
+      <button
+        type="button"
+        class="alert-center__pill"
+        data-testid="alert-center-pill"
+        style={{ '--alert-color': meta.color } as JSX.CSSProperties}
+        title={t('Unwetterwarnung wieder einblenden', 'Show severe-weather warning again')}
+        onClick={(): void => setCollapsed(false)}
+      >
+        <span aria-hidden="true">⚠</span> {t('Unwetterwarnung', 'Severe-weather warning')} ·{' '}
+        {meta.label()}
+      </button>
+    );
+  }
+
   // Live safety metrics (permanently shown during the alert).
   const thunder = alert.warnings.some(isThunder);
   const windMs = snap?.environment?.windMs?.value ?? null;
@@ -88,13 +117,26 @@ export function AlertCenter(props: {
         </span>
         <div class="alert-center__headline">
           <span class="alert-center__title">
-            {t('Katastrophenschutz · Unwetterwarnung', 'Emergency mode · severe-weather warning')}
+            {t('Unwetterwarnung', 'Severe-weather warning')}
           </span>
           <span class="alert-center__sub">
             {meta.label()} · {alert.region} ·{' '}
             {t('aktualisiert', 'updated')} {fmtTime(alert.updatedTs)}
           </span>
         </div>
+        <button
+          type="button"
+          class="alert-center__close"
+          data-testid="alert-center-close"
+          title={t('Ausblenden', 'Dismiss')}
+          aria-label={t('Unwetterwarnung ausblenden', 'Dismiss severe-weather warning')}
+          onClick={(): void => {
+            setCollapsedKey(alertKey);
+            setCollapsed(true);
+          }}
+        >
+          ✕
+        </button>
       </header>
 
       {/* Live safety metrics the resident must see at a glance. */}
@@ -170,10 +212,25 @@ export function AlertCenter(props: {
       )}
 
       <p class="alert-center__foot">
-        {t(
-          'Quelle: Deutscher Wetterdienst (DWD). Lage-Updates per Telegram alle 30 Minuten, bis die Warnung aufgehoben ist.',
-          'Source: German Weather Service (DWD). Situation updates via Telegram every 30 minutes until the warning is lifted.',
-        )}
+        {((): string => {
+          const mode = config.value?.dwd?.telegramMode ?? '30';
+          if (mode === 'off') {
+            return t(
+              'Quelle: Deutscher Wetterdienst (DWD). Telegram-Lage-Updates sind ausgeschaltet.',
+              'Source: German Weather Service (DWD). Telegram situation updates are turned off.',
+            );
+          }
+          if (mode === 'changes') {
+            return t(
+              'Quelle: Deutscher Wetterdienst (DWD). Telegram meldet nur Änderungen, bis die Warnung aufgehoben ist.',
+              'Source: German Weather Service (DWD). Telegram reports changes only until the warning is lifted.',
+            );
+          }
+          return t(
+            `Quelle: Deutscher Wetterdienst (DWD). Lage-Updates per Telegram alle ${mode} Minuten, bis die Warnung aufgehoben ist.`,
+            `Source: German Weather Service (DWD). Situation updates via Telegram every ${mode} minutes until the warning is lifted.`,
+          );
+        })()}
       </p>
     </section>
   );

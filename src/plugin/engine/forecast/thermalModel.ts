@@ -38,6 +38,15 @@ const MIN_ELEVATION_DEG = 3;
  * earlier/harder.
  */
 const ROOF_SOLAR_BOOST = 1.3;
+/**
+ * Diffuse-radiation share that reaches a window regardless of orientation
+ * while the sun is up. The direct-beam term is a cosine projection that is
+ * ~0 for a facade the sun is not currently on (e.g. an east window in the
+ * afternoon) — but on a clear hot day that window still gains heat from
+ * diffuse sky radiation. Without this, the planner saw "0 load" for off-sun
+ * facades and wrongly opened them in a heatwave.
+ */
+const DIFFUSE_FRACTION = 0.22;
 
 export interface ThermalWindowInput {
   readonly orientationDeg: number;
@@ -147,9 +156,12 @@ function heatLoadAt(sun: SunPosition, env: HeatLoadEnv): number {
   for (const w of env.windows) {
     const angle = circularAngleDiff(sun.azimuthDeg, w.orientationDeg);
     const roofBoost = w.type === 'roof_window' ? ROOF_SOLAR_BOOST : 1;
-    const incidence = clamp01(1 - angle / 90) * elevationTerm * roofBoost;
+    const direct = clamp01(1 - angle / 90) * elevationTerm;
+    // Direct beam (facade-dependent) + diffuse sky (all facades). Both scale
+    // with sun elevation and get the roof boost (overhead glazing sees more).
+    const gain = clamp01((direct + DIFFUSE_FRACTION * elevationTerm) * roofBoost);
     const openFactor = 1 - clamp01(w.currentLevel01); // closed shutter blocks
-    weighted += w.areaM2 * incidence * openFactor;
+    weighted += w.areaM2 * gain * openFactor;
     areaSum += w.areaM2;
   }
   if (areaSum <= 0) {

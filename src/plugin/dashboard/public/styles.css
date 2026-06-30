@@ -1605,6 +1605,104 @@ h3 {
   opacity: 0.9;
 }
 
+/* Active-cooling (mobile AC) toggle on the room card. */
+.room-card__cooling {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  font-size: 12px;
+  color: var(--color-text);
+}
+.room-card__cooling-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--color-faint);
+}
+
+/* Per-window movement block editor (weekday + clock-time windows). */
+.window-block {
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--color-card-border);
+  font-size: 12px;
+}
+.window-block__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.window-block__label {
+  color: var(--color-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.window-block__add {
+  border: 1px solid var(--color-card-border);
+  background: var(--color-bg-elev);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--sp-2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.window-block__add:hover {
+  border-color: var(--color-accent);
+}
+.window-block__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.window-block__days {
+  display: inline-flex;
+  gap: 3px;
+}
+.window-block__day {
+  min-width: 26px;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-card-border);
+  background: var(--color-bg-elev);
+  color: var(--color-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.window-block__day--on {
+  background: linear-gradient(180deg, var(--color-accent-strong), var(--color-accent));
+  color: var(--color-accent-contrast);
+  border-color: var(--color-accent);
+  font-weight: 700;
+}
+.window-block__times {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.window-block__times input[type='time'] {
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 2px 4px;
+  min-height: 30px;
+}
+.window-block__del {
+  border: none;
+  background: transparent;
+  color: var(--color-danger);
+  cursor: pointer;
+  font-size: 13px;
+}
+.window-block__hint {
+  font-size: 11px;
+  color: var(--color-faint);
+}
+
 /* On narrow screens stack the window-table cells into blocks. */
 @media (max-width: 720px) {
   .window-table thead {
@@ -5836,7 +5934,7 @@ details[open] > .help-section__title::before {
 }
 .radar__map {
   width: 100%;
-  height: 360px;
+  height: 440px;
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--color-bg-elev);
@@ -6881,8 +6979,8 @@ textarea {
    from the warning level (red / violet).
    =================================================================== */
 @keyframes alert-pulse {
-  0%, 100% { box-shadow: 0 0 0 1px var(--alert-color), 0 0 18px rgba(239, 68, 68, 0.25); }
-  50%      { box-shadow: 0 0 0 2px var(--alert-color), 0 0 34px rgba(239, 68, 68, 0.55); }
+  0%, 100% { box-shadow: 0 0 0 1px var(--alert-color), 0 0 18px color-mix(in srgb, var(--alert-color) 28%, transparent); }
+  50%      { box-shadow: 0 0 0 2px var(--alert-color), 0 0 34px color-mix(in srgb, var(--alert-color) 55%, transparent); }
 }
 .alert-center {
   grid-column: 1 / -1; /* full width across the 3-column dashboard grid */
@@ -6892,10 +6990,51 @@ textarea {
   border-radius: var(--radius-lg);
   border: 1px solid var(--alert-color);
   background:
-    radial-gradient(120% 100% at 50% -20%, rgba(239, 68, 68, 0.14), transparent 60%),
+    radial-gradient(120% 100% at 50% -20%, color-mix(in srgb, var(--alert-color) 16%, transparent), transparent 60%),
     var(--color-card);
-  box-shadow: 0 0 0 1px var(--alert-color), 0 0 18px rgba(239, 68, 68, 0.25);
+  box-shadow: 0 0 0 1px var(--alert-color), 0 0 18px color-mix(in srgb, var(--alert-color) 28%, transparent);
   animation: alert-pulse 2s ease-in-out infinite;
+}
+.alert-center__close {
+  margin-left: auto;
+  align-self: flex-start;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--alert-color);
+  background: var(--color-bg-elev);
+  color: var(--alert-color);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.14s ease, transform 0.05s ease;
+}
+.alert-center__close:hover {
+  background: color-mix(in srgb, var(--alert-color) 18%, var(--color-bg-elev));
+}
+.alert-center__pill {
+  --alert-color: #e3382b;
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--alert-color);
+  background: color-mix(in srgb, var(--alert-color) 12%, var(--color-card));
+  color: var(--alert-color);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  width: fit-content;
+  transition: background 0.14s ease, transform 0.05s ease;
+}
+.alert-center__pill:hover {
+  background: color-mix(in srgb, var(--alert-color) 22%, var(--color-card));
 }
 .alert-center__head {
   display: flex;
@@ -6974,8 +7113,8 @@ textarea {
 .alert-warning__until { margin-left: auto; font-size: 12px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
 .alert-warning__instruction { margin: 4px 0 0; font-size: 13px; color: var(--color-text); line-height: 1.45; }
 .alert-center__radar { margin-top: var(--sp-3); }
-/* Keep the embedded start-page radar compact. */
-.alert-center__radar .radar__map { height: 220px; }
+/* Embedded start-page radar — taller for readability during an alert. */
+.alert-center__radar .radar__map { height: 360px; }
 .alert-center__foot { margin: var(--sp-3) 0 0; font-size: 11px; color: var(--color-faint); }
 
 @media (max-width: 640px) {

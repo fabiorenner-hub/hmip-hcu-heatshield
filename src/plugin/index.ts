@@ -728,9 +728,7 @@ class HeatShieldBoot {
       this.connect.start();
     }
     await this.dashboard.start();
-    const intervalMs = this.config.rules.automation.controlIntervalSeconds * 1000;
-    this.cycleTimer = setInterval(() => this.runCycleNow(), intervalMs);
-    this.cycleTimer.unref?.();
+    this.scheduleNextCycle();
     // Kick an initial cycle shortly after boot so the dashboard's planner data
     // (12 h forecast, per-room heat load, planned actions, shutter preview)
     // populates within seconds instead of only after a full
@@ -1100,6 +1098,34 @@ class HeatShieldBoot {
         error: err instanceof Error ? err.message : String(err),
       });
     });
+  }
+
+  /**
+   * Effective cycle interval (ms). During an active severe-weather alert
+   * (DWD level ≥ 3) the cadence is HALVED so the plugin reacts faster to
+   * fast-changing weather — but never below 300 s to avoid hammering the HCU.
+   */
+  private effectiveCycleIntervalMs(): number {
+    const base = this.config.rules.automation.controlIntervalSeconds * 1000;
+    if (this.dwdAlertActive) {
+      return Math.max(300_000, Math.floor(base / 2));
+    }
+    return base;
+  }
+
+  /**
+   * Self-rescheduling cycle timer. Re-evaluates the interval each tick so a
+   * transition into/out of alert mode immediately changes the cadence (the
+   * previous fixed `setInterval` could not adapt). Kicks the cycle, then
+   * schedules the next tick.
+   */
+  private scheduleNextCycle(): void {
+    if (this.stopping) return;
+    this.cycleTimer = setTimeout(() => {
+      this.runCycleNow();
+      this.scheduleNextCycle();
+    }, this.effectiveCycleIntervalMs());
+    this.cycleTimer.unref?.();
   }
 
   private async runCycleAsync(): Promise<void> {
@@ -1848,9 +1874,14 @@ class HeatShieldBoot {
       // later, while active ones stay deduped.
       this.dwdSeen = new Set(active.map(idOf));
       const en = this.config.notifications.language === 'en';
+      const tgMode = dwd.telegramMode ?? '30';
+      const tgEnabled = tgMode !== 'off';
+      const heartbeatMs =
+        tgMode === '60' ? 60 * 60_000 : tgMode === '90' ? 90 * 60_000 : 30 * 60_000;
+      const heartbeatOn = tgMode === '30' || tgMode === '60' || tgMode === '90';
 
       // New / escalated warnings → immediate notification.
-      if (fresh.length > 0) {
+      if (fresh.length > 0 && tgEnabled) {
         const title = en
           ? `⚠ Severe weather warning (${res.regionName})`
           : `⚠ Unwetterwarnung (${res.regionName})`;
@@ -1861,10 +1892,10 @@ class HeatShieldBoot {
       // Alert-Mode (≥ level 3 Rot): a temporary disaster-protection mode.
       const alertNow = maxLevel >= 3;
       if (alertNow) {
-        // Heartbeat: a situation update every 30 min until the alert clears.
+        // Heartbeat: a situation update every N min until the alert clears.
         if (this.dwdLastHeartbeatMs === 0) {
           this.dwdLastHeartbeatMs = nowMs;
-        } else if (nowMs - this.dwdLastHeartbeatMs >= 30 * 60_000) {
+        } else if (heartbeatOn && tgEnabled && nowMs - this.dwdLastHeartbeatMs >= heartbeatMs) {
           this.dwdLastHeartbeatMs = nowMs;
           const title = en
             ? `🛡 Situation update (${res.regionName})`
@@ -1874,11 +1905,13 @@ class HeatShieldBoot {
         }
       } else if (this.dwdAlertActive) {
         // Transition out of alert → all-clear.
-        const title = en ? `✅ All clear (${res.regionName})` : `✅ Entwarnung (${res.regionName})`;
-        const body = en
-          ? 'The severe-weather warning has been lifted.'
-          : 'Die Unwetterwarnung wurde aufgehoben.';
-        await this.emitWeatherMessage(title, body);
+        if (tgEnabled) {
+          const title = en ? `✅ All clear (${res.regionName})` : `✅ Entwarnung (${res.regionName})`;
+          const body = en
+            ? 'The severe-weather warning has been lifted.'
+            : 'Die Unwetterwarnung wurde aufgehoben.';
+          await this.emitWeatherMessage(title, body);
+        }
         this.dwdLastHeartbeatMs = 0;
       }
       this.dwdAlertActive = alertNow;
@@ -4017,11 +4050,19 @@ class HeatShieldBoot {
   private learnedBiasByRoom(): Record<string, number> {
     const out: Record<string, number> = {};
     for (const [id, model] of this.learnedModels) {
+      if (this.isActiveCoolingRoom(id)) continue; // AC-cooled → skip learning
       if (model.comfortBiasC !== 0) {
         out[id] = model.comfortBiasC;
       }
     }
     return out;
+  }
+
+  /** True when the room is marked as actively cooled (mobile AC) → exclude
+   *  it from the self-learning loop so its skewed indoor temperature does not
+   *  corrupt the thermal model. */
+  private isActiveCoolingRoom(roomId: string): boolean {
+    return this.config.rooms.find((r) => r.id === roomId)?.activeCooling === true;
   }
 
   /**
@@ -4070,6 +4111,7 @@ class HeatShieldBoot {
     }
     this.calibratedModels = new Map();
     for (const room of this.config.rooms) {
+      if (room.activeCooling === true) continue; // AC-cooled → no calibration
       const obs = byRoom.get(room.id) ?? [];
       const base = room.thermalInertiaMinutes ?? 120;
       this.calibratedModels.set(

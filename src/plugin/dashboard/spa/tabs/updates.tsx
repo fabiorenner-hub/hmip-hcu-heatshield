@@ -21,6 +21,44 @@ interface ChangelogEntry {
 function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '1.20.0',
+    items: [
+      t(
+        'Stockwerk-Beschattung: Obergeschosse (OG/DG) werden früher beschattet als Erd- und Kellergeschoss. Pro Stockwerk einstellbar (Regeln → Stockwerk-Beschattung); leer = automatisch.',
+        'Floor-based shading: upper floors (OG/DG) shade earlier than the ground floor and cellar. Configurable per floor (Rules → Floor-based shading); empty = automatic.',
+      ),
+      t(
+        'Hitzetag-Schutz: Ab 35 °C und anliegender PV-Leistung (Sonne) fahren Rollläden nicht weiter als 50 % auf, damit ein Grundschutz erhalten bleibt. Schwelle und Maximal-Öffnung einstellbar (Regeln → Hitzetag-Schutz).',
+        'Hot-day protection: at 35 °C or more with PV power present (sun) shutters open no further than 50 %, keeping a baseline of shade. Threshold and max opening configurable (Rules → Hot-day protection).',
+      ),
+      t(
+        'Räume mit mobiler Klimaanlage lassen sich als „aktiv gekühlt" markieren und werden dann vom Lernen ausgenommen, damit verfälschte Innentemperaturen das Modell nicht stören.',
+        'Rooms with a mobile AC can be marked "actively cooled" and are then excluded from learning so skewed indoor temperatures do not corrupt the model.',
+      ),
+      t(
+        'Alert-Modus: Titel jetzt „Unwetterwarnung". Rahmen und Text tragen die DWD-Warnstufenfarbe (gelb/orange/rot/violett) statt immer gelb. Mit ✕ ausblendbar und als kleiner Hinweis wieder einblendbar. Während einer Warnung halbiert sich das Automatik-Zyklusintervall (mindestens 300 s).',
+        'Alert mode: title is now "Severe-weather warning". Frame and text use the DWD warning-level colour (yellow/orange/red/violet) instead of always yellow. Dismiss with ✕ and reopen via a small pill. During a warning the automation cycle interval is halved (minimum 300 s).',
+      ),
+      t(
+        'Pro Rollladen lassen sich Sperrzeiten festlegen (Wochentage + Uhrzeit, z. B. „Dachfenster Mo–Fr 22:00–10:00 nicht bewegen"). Sturm hat weiterhin Vorrang.',
+        'Per-shutter block schedules (weekdays + time, e.g. "roof window Mon–Fri 22:00–10:00 do not move"). Storm still takes priority.',
+      ),
+      t(
+        'Telegram-Häufigkeit der Unwetterwarnung einstellbar: aus, nur Änderungen, oder alle 30/60/90 Minuten (Einstellungen → Darstellung).',
+        'Telegram frequency for severe-weather warnings is configurable: off, changes only, or every 30/60/90 minutes (Settings → Appearance).',
+      ),
+    ],
+  },
+  {
+    version: '1.19.1',
+    items: [
+      t(
+        'Alert-Modus: roter Rahmen auch bei DWD-Hitzewarnungen (deren hoher Level-Code wurde vorher fälschlich gelb dargestellt). Regenradar höher und besser ablesbar.',
+        'Alert mode: red frame for DWD heat warnings too (their high level code was previously shown yellow). Rain radar taller and easier to read.',
+      ),
+    ],
+  },
+  {
     version: '1.19.0',
     items: [
       t(

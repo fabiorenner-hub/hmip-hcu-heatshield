@@ -540,6 +540,147 @@ export function RulesTab(): JSX.Element {
           />
           <span>{t('Lern-Empfehlungen automatisch übernehmen', 'Apply learning recommendations automatically')}</span>
         </label>
+
+        <h3>{t('Hitzetag-Schutz', 'Hot-day protection')}</h3>
+        <label class="tab-rules__check">
+          <input
+            type="checkbox"
+            data-testid="rules-hotday-enabled"
+            checked={draftConfig.rules.hotDay?.enabled ?? true}
+            onChange={(e): void => {
+              const on = (e.currentTarget as HTMLInputElement).checked;
+              setDraftConfig((prev) =>
+                prev === null
+                  ? prev
+                  : { ...prev, rules: { ...prev.rules, hotDay: { ...prev.rules.hotDay, enabled: on } } },
+              );
+            }}
+          />
+          <span>
+            {t(
+              'Mindest-Beschattung an heißen, sonnigen Tagen',
+              'Minimum shading on hot, sunny days',
+            )}
+          </span>
+        </label>
+        <label class="tab-rules__field">
+          <span>{t('Aktiv ab Außentemperatur ≥ … °C', 'Active from outdoor temperature ≥ … °C')}</span>
+          <input
+            type="number"
+            min={20}
+            max={50}
+            step={1}
+            data-testid="rules-hotday-temp"
+            value={draftConfig.rules.hotDay?.outdoorThresholdC ?? 35}
+            onInput={(e): void => {
+              const v = Number.parseFloat((e.currentTarget as HTMLInputElement).value);
+              if (!Number.isFinite(v)) return;
+              setDraftConfig((prev) =>
+                prev === null
+                  ? prev
+                  : {
+                      ...prev,
+                      rules: {
+                        ...prev.rules,
+                        hotDay: { ...prev.rules.hotDay, outdoorThresholdC: Math.min(50, Math.max(20, v)) },
+                      },
+                    },
+              );
+            }}
+          />
+        </label>
+        <label class="tab-rules__field">
+          <span>{t('Maximal öffnen auf … %', 'Open at most … %')}</span>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={5}
+            data-testid="rules-hotday-maxopen"
+            value={draftConfig.rules.hotDay?.maxOpenPercent ?? 50}
+            onInput={(e): void => {
+              const v = Number.parseInt((e.currentTarget as HTMLInputElement).value, 10);
+              if (!Number.isFinite(v)) return;
+              setDraftConfig((prev) =>
+                prev === null
+                  ? prev
+                  : {
+                      ...prev,
+                      rules: {
+                        ...prev.rules,
+                        hotDay: { ...prev.rules.hotDay, maxOpenPercent: Math.min(100, Math.max(0, v)) },
+                      },
+                    },
+              );
+            }}
+          />
+        </label>
+        <p class="tab-rules__hint">
+          {t(
+            'Wenn es draußen so heiß ist und PV-Leistung anliegt (Sonne da), fährt kein Rollladen weiter als hier erlaubt auf. Sturm und Nachtauskühlung sind ausgenommen.',
+            'When it is this hot outside and PV power is present (sun), no shutter opens further than allowed here. Storm and night cooling are exempt.',
+          )}
+        </p>
+
+        <h3>{t('Stockwerk-Beschattung', 'Floor-based shading')}</h3>
+        <label class="tab-rules__check">
+          <input
+            type="checkbox"
+            data-testid="rules-floorshading-enabled"
+            checked={draftConfig.rules.floorShading?.enabled ?? true}
+            onChange={(e): void => {
+              const on = (e.currentTarget as HTMLInputElement).checked;
+              setDraftConfig((prev) =>
+                prev === null
+                  ? prev
+                  : {
+                      ...prev,
+                      rules: { ...prev.rules, floorShading: { ...prev.rules.floorShading, enabled: on } },
+                    },
+              );
+            }}
+          />
+          <span>{t('Obergeschosse früher beschatten als das Erdgeschoss', 'Shade upper floors earlier than the ground floor')}</span>
+        </label>
+        {[...new Set(draftConfig.rooms.map((r) => r.floor).filter((f): f is string => !!f))].map(
+          (floor) => (
+            <label class="tab-rules__field" key={floor}>
+              <span>{t(`Vorlauf „${floor}" (°C früher)`, `Lead "${floor}" (°C earlier)`)}</span>
+              <input
+                type="number"
+                min={0}
+                max={4}
+                step={0.1}
+                placeholder="auto"
+                data-testid={`rules-floor-lead-${floor}`}
+                value={draftConfig.rules.floorShading?.leadByFloor?.[floor] ?? ''}
+                onInput={(e): void => {
+                  const raw = (e.currentTarget as HTMLInputElement).value.trim();
+                  setDraftConfig((prev) => {
+                    if (prev === null) return prev;
+                    const lead = { ...(prev.rules.floorShading?.leadByFloor ?? {}) };
+                    if (raw === '') {
+                      delete lead[floor];
+                    } else {
+                      const v = Number.parseFloat(raw);
+                      if (Number.isFinite(v)) lead[floor] = Math.min(4, Math.max(0, v));
+                    }
+                    return {
+                      ...prev,
+                      rules: { ...prev.rules, floorShading: { ...prev.rules.floorShading, leadByFloor: lead } },
+                    };
+                  });
+                }}
+              />
+            </label>
+          ),
+        )}
+        <p class="tab-rules__hint">
+          {t(
+            'Höhere Stockwerke (OG/DG) heizen sich schneller auf. Der Vorlauf senkt die Komfortgrenze etwas, sodass dort früher beschattet wird. Leer = automatisch (DG +1,0 / OG +0,6 / EG 0).',
+            'Upper floors (OG/DG) heat up faster. The lead tightens the comfort bound slightly so they shade earlier. Empty = automatic (DG +1.0 / OG +0.6 / EG 0).',
+          )}
+        </p>
       </section>
 
       <aside class="tab-rules__probe" data-testid="rules-probe">

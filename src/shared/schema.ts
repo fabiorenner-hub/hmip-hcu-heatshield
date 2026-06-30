@@ -134,6 +134,33 @@ export const RoomSchema = z.object({
   // (predictive-control-dashboard Requirement 2.2). Higher = slower indoor
   // response. Default 120 min applied at read time; optional in config.
   thermalInertiaMinutes: z.number().min(15).max(1440).optional(),
+  // Active cooling marker (e.g. a mobile AC unit cools this room). When true
+  // the self-learning loop (thermal calibration + comfort-bias recommendations)
+  // IGNORES this room: an AC-cooled room's indoor temperature no longer
+  // reflects the shutter/solar response, so learning from it would corrupt the
+  // model. The room is still controlled and shown normally — only learning
+  // skips it. Default false.
+  activeCooling: z.boolean().default(false),
+});
+
+// ---------------------------------------------------------------------------
+// Per-window movement block schedule — "do not move this shutter on these
+// weekdays within this clock-time window" (e.g. roof window in the bedroom,
+// Mon–Fri 22:00–10:00). Multiple entries allowed per window. STORM safety
+// force-open always overrides a block. This is a finer-grained successor to
+// the per-room `noMoveBeforeHour`/`noMoveAfterHour` hour bounds.
+// ---------------------------------------------------------------------------
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/u;
+
+export const WindowBlockScheduleSchema = z.object({
+  // JS `Date.getDay()` weekdays the block applies to: 0=Sun … 6=Sat. Empty
+  // array = every day.
+  days: z.array(z.number().int().min(0).max(6)).default([]),
+  // Local clock-time window "HH:MM"–"HH:MM"; wraps across midnight when
+  // start > end (e.g. 22:00 → 10:00).
+  start: z.string().regex(HHMM, 'Erwartet "HH:MM" im 24h-Format').default('22:00'),
+  end: z.string().regex(HHMM, 'Erwartet "HH:MM" im 24h-Format').default('10:00'),
 });
 
 // ---------------------------------------------------------------------------
@@ -168,6 +195,10 @@ export const WindowSchema = z.object({
   // Glazing area in m² for the solar heat-load weighting
   // (predictive-control-dashboard Requirement 2.2). Default 1.5 at read time.
   areaM2: z.number().min(0.1).max(20).optional(),
+  // Per-window movement block schedules (weekday + clock-time windows). The
+  // engine dispatches NO automatic move for this shutter while now falls into
+  // any entry. STORM force-open always overrides. Empty = never blocked.
+  blockSchedules: z.array(WindowBlockScheduleSchema).default([]),
 });
 
 // ---------------------------------------------------------------------------
@@ -359,6 +390,48 @@ export const PlanningRulesSchema = z
   })
   .prefault({});
 
+// ---------------------------------------------------------------------------
+// Floor-based shading lead (Obergeschoss/Dachgeschoss shade earlier). Upper
+// floors heat up faster (warm-air stratification, roof proximity), so the
+// planner should close them a little earlier than the ground floor / cellar.
+// We express this as a per-floor "lead" in °C that TIGHTENS the room's upper
+// comfort bound (a smaller bound → the forecast planner shades sooner). Heat
+// and sun are still tracked per window; this only nudges the comfort target
+// per floor. `leadByFloor` is keyed by the room's free-form floor label; when
+// a label is missing the default classifier (DG/OG warmer, EG neutral, KG
+// cooler) supplies a sensible value.
+// ---------------------------------------------------------------------------
+
+export const FloorShadingSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    // Explicit per-floor lead in °C (0..4). Tighter upper comfort bound =
+    // shade earlier. Keyed by the room's floor label (e.g. "OG", "DG").
+    leadByFloor: z.record(z.string(), z.number().min(0).max(4)).default({}),
+  })
+  .prefault({});
+
+// ---------------------------------------------------------------------------
+// Hot-day minimum-shade floor. On very hot days with sun (PV power available),
+// keep a baseline of shading: never OPEN a shutter beyond `maxOpenPercent`
+// (i.e. hold it at least partly closed) so the room does not bake. Applies
+// only while the outdoor temperature is at/above `outdoorThresholdC` and PV
+// power signals real sun. STORM and NIGHT_COOLING are exempt.
+// ---------------------------------------------------------------------------
+
+export const HotDayRulesSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    // Outdoor temperature (°C) at/above which the floor applies.
+    outdoorThresholdC: z.number().min(20).max(50).default(35),
+    // Maximum allowed openness in percent (0=closed … 100=open). 50 = the
+    // shutter is held at least half closed while it is hot and sunny.
+    maxOpenPercent: z.number().int().min(0).max(100).default(50),
+    // Minimum PV power (kW) that counts as "sun is really shining".
+    minPvKw: z.number().min(0).max(50).default(0.5),
+  })
+  .prefault({});
+
 export const RulesSchema = z
   .object({
     profile: z
@@ -373,6 +446,8 @@ export const RulesSchema = z
     heatLoad: HeatLoadRulesSchema,
     thresholds: ModeThresholdsSchema,
     planning: PlanningRulesSchema.optional(),
+    floorShading: FloorShadingSchema,
+    hotDay: HotDayRulesSchema,
     // Pause window after detected manual operation of a shutter (7.4).
     manualOverrideMinutes: z.number().int().min(0).default(60),
   })
@@ -525,6 +600,14 @@ export const DwdSchema = z
     alertOnDashboard: z.boolean().default(true),
     /** Show the Alert-Mode panel on the Wetter tab. */
     alertOnWeather: z.boolean().default(true),
+    /**
+     * Telegram delivery for severe-weather warnings:
+     *  - 'off'     → no Telegram (changes still show in the dashboard).
+     *  - 'changes' → only new/escalated warnings + all-clear, no heartbeat.
+     *  - '30'/'60'/'90' → changes PLUS a situation update every N minutes
+     *    while an alert (level ≥ 3) is active. Default '30'.
+     */
+    telegramMode: z.enum(['off', 'changes', '30', '60', '90']).default('30'),
   })
   .prefault({});
 

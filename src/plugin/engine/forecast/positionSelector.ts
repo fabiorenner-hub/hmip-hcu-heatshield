@@ -62,26 +62,21 @@ const NO_HEAT_EPS = 0.02;
 /** Minimum closure reduction (percentage points) worth a daylight-open move. */
 const LIGHT_GAIN_MIN_PCT = 20;
 /**
- * Near-term look-ahead (ms) for the "is there any sun to block soon?" gate.
- * A shutter only blocks SOLAR gain; if even a fully-open window sees no
- * meaningful heat load within this window, closing now cannot cool the room
- * (the heat is from outdoor air / thermal mass, not the sun) — it would only
- * darken it. Two hours ≈ the planned min-interval between moves, so the next
- * cycle re-closes as soon as solar load actually appears.
+ * Minimum horizon-peak reduction (K) that makes shading worthwhile when the
+ * room can no longer be kept comfortable. If fully closing the shutter lowers
+ * the predicted peak by less than this, there is effectively no solar gain to
+ * block (overcast / night) and closing would only darken the room — so we hold
+ * the current position instead. This is a per-window, physical test: it does
+ * not care which facade the sun is on, only whether shading actually helps.
  */
-const NEAR_TERM_LOOKAHEAD_MS = 2 * 3600_000;
+const SHADE_BENEFIT_MIN_C = 0.3;
 
-/** Max heat load across trajectory points within the near-term look-ahead. */
-function nearTermMaxLoad(traj: RoomTrajectory, now: Date): number {
-  const cutoff = now.getTime() + NEAR_TERM_LOOKAHEAD_MS;
-  let max = 0;
+/** Highest predicted indoor temperature across the trajectory. */
+function peakTempC(traj: RoomTrajectory): number {
+  let max = Number.NEGATIVE_INFINITY;
   for (const p of traj.points) {
-    const t = Date.parse(p.ts);
-    if (Number.isFinite(t) && t > cutoff) {
-      continue;
-    }
-    if (p.heatLoad01 > max) {
-      max = p.heatLoad01;
+    if (p.indoorTempC > max) {
+      max = p.indoorTempC;
     }
   }
   return max;
@@ -184,26 +179,19 @@ export function selectPosition(
   // hysteresis / min-interval, so this only changes *where* a needed move
   // lands, never adds moves.
   let chosen: number;
-  let noSolarOpen = false;
   if (admissible.length > 0) {
     chosen = admissible.reduce((best, lvl) => (lvl < best ? lvl : best));
   } else {
-    // No single position holds comfort over the whole horizon. Before forcing
-    // the strongest close, check whether closing has any SOLAR load to block
-    // in the near term: a shutter only blocks sun, so if even a fully-open
-    // window sees no meaningful heat load soon, the room is hot for non-solar
-    // reasons (outdoor air, thermal mass) that closing cannot fix — it would
-    // only darken the room. In that case open for daylight instead of a
-    // pointless close; the next cycle re-closes the moment solar load appears.
+    // No single position holds comfort over the whole horizon → the room is
+    // hot. Shade only if it actually helps: compare the horizon PEAK of a
+    // fully-open vs a fully-closed shutter. A meaningful reduction means there
+    // is solar gain (direct OR diffuse) to block → close hard. If open and
+    // closed are ~equal (overcast / night — nothing to block), closing would
+    // only darken the room, so hold the current position instead of churning.
     const mostOpen = ctx.candidateLevels01.reduce((a, b) => (b < a ? b : a));
     const mostClosed = ctx.candidateLevels01.reduce((a, b) => (b > a ? b : a));
-    if (nearTermMaxLoad(trajectoryForLevel(mostOpen), now) <= NO_HEAT_EPS) {
-      chosen = mostOpen;
-      noSolarOpen = true;
-    } else {
-      // Solar load is present → close hard to minimize overheating.
-      chosen = mostClosed;
-    }
+    const benefitC = peakTempC(trajectoryForLevel(mostOpen)) - peakTempC(trajectoryForLevel(mostClosed));
+    chosen = benefitC >= SHADE_BENEFIT_MIN_C ? mostClosed : ctx.currentLevel01;
   }
 
   // No redundant move: if the chosen position equals the current one (in whole
@@ -227,9 +215,7 @@ export function selectPosition(
     reason:
       admissible.length > 0
         ? 'Vorausschauende Position hält Komfort über den Horizont'
-        : noSolarOpen
-          ? 'Geöffnet – aktuell keine Sonnenlast, Schließen würde nicht kühlen'
-          : 'Stärkstes Schließen, da keine Halteposition den Komfort wahrt',
+        : 'Stärkstes Schließen, da keine Halteposition den Komfort wahrt',
     state: 'scheduled',
   };
 

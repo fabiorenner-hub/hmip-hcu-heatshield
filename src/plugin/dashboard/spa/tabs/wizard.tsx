@@ -233,6 +233,7 @@ export function WizardTab(): JSX.Element {
       targets: { target_c: 23.0, warning_c: 25.0, strong_shade_c: 26.0, critical_c: 27.0 },
       signals: {},
       occupancyMode: 'always_priority',
+      activeCooling: false,
     };
     setDraftRooms([...draftRooms, newRoom]);
   };
@@ -271,6 +272,7 @@ export function WizardTab(): JSX.Element {
         maxHeatProtectionLevel01: isRoof ? 1 : 0.95,
         sunPrelookMinutes: 60,
         lockoutProtection: true,
+        blockSchedules: [],
       };
       return [...prev, newWindow];
     });

@@ -3,6 +3,23 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 1.20.0
+
+- **Stockwerk-Beschattung**: Obergeschosse (OG/DG) werden früher beschattet als Erd- und Kellergeschoss. Pro Stockwerk einstellbar (Regeln → Stockwerk-Beschattung); leer = automatischer Vorlauf (DG +1,0 / OG +0,6 / EG 0). Wärme und Sonne werden weiterhin pro Fenster verfolgt — der Vorlauf verschiebt nur die Komfortgrenze.
+- **Hitzetag-Schutz**: Ab 35 °C (einstellbar) und anliegender PV-Leistung (Sonne) fahren Rollläden nicht weiter als 50 % auf (einstellbar), damit ein Grundschutz erhalten bleibt. Sturm und Nachtauskühlung sind ausgenommen.
+- **Aktiv gekühlte Räume**: Räume mit mobiler Klimaanlage lassen sich markieren und werden vom Lernen (Kalibrierung + Komfort-Bias) ausgenommen, damit verfälschte Innentemperaturen das Modell nicht stören.
+- **Alert-Modus**: Titel jetzt „Unwetterwarnung". Rahmen, Text und Glühen tragen die DWD-Warnstufenfarbe (Stufe 1 gelb, 2 orange, 3 rot, 4 violett) statt immer gelb. Panel mit ✕ ausblendbar und als kompakter Hinweis wieder einblendbar (Eskalation blendet automatisch wieder ein). Während einer aktiven Warnung (Stufe ≥ 3) halbiert sich das Automatik-Zyklusintervall, mindestens 300 s.
+- **Sperrzeiten pro Rollladen**: Wochentage + Uhrzeit-Fenster (über Mitternacht hinweg), z. B. „Dachfenster Schlafzimmer Mo–Fr 22:00–10:00 nicht bewegen". Sturm hat weiterhin Vorrang. Verfeinerung der bisherigen Raum-Ruhezeiten.
+- **Telegram-Häufigkeit** der Unwetterwarnung einstellbar: aus, nur Änderungen, oder alle 30/60/90 Minuten.
+
+## 1.19.1
+
+- **Alert-Modus: roter Rahmen** auch bei DWD-Hitzewarnungen. Deren hoher
+  Level-Code (z. B. 51) fiel bisher auf die gelbe Standardfarbe zurück; ab
+  Stufe Rot ist der Rahmen jetzt immer rot (Violett nur bei Stufe 4).
+- **Regenradar höher** — die Karte (und das eingebettete Radar im Alert-Modus)
+  ist jetzt deutlich höher und besser ablesbar.
+
 ## 1.19.0
 
 - **Alert-Modus „Katastrophenschutz-Zentrale".** Bei einer aktiven DWD-Warnung

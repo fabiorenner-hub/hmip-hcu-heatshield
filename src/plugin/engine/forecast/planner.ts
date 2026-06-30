@@ -91,6 +91,46 @@ export function uncertaintyMarginC(confidence01: number): number {
   return Math.round((1 - c) * 1.0 * 100) / 100;
 }
 
+/**
+ * Default per-floor shading lead (K) derived from a free-form floor label.
+ * Upper floors heat up faster, so they shade earlier (larger lead → tighter
+ * upper comfort bound). Matched case-insensitively against common German
+ * level labels; unknown labels get 0 (neutral, like the ground floor).
+ *
+ *   DG / Dach / Spitzboden …  → 1.0 K   (attic, hottest)
+ *   OG / 1.OG / 2.OG / Ober … → 0.6 K   (upper floors)
+ *   EG / Erd / Parterre …     → 0.0 K   (ground, neutral)
+ *   KG / UG / Keller / Souter → 0.0 K   (cellar; cool already, no lead)
+ */
+export function defaultFloorLeadC(label: string | undefined): number {
+  if (label === undefined) return 0;
+  const s = label.trim().toLowerCase();
+  if (s.length === 0) return 0;
+  if (/(^|[^a-z])(dg|dach|spitzboden|attika)/u.test(s)) return 1.0;
+  if (/(^|[^a-z])(og|ober|dachge)/u.test(s) || /\d\s*\.?\s*og/u.test(s)) return 0.6;
+  return 0;
+}
+
+/**
+ * Resolve the shading lead (K) for a room's floor: an explicit per-floor value
+ * from config wins; otherwise the default classifier. Returns 0 when the
+ * feature is disabled. The lead TIGHTENS the upper comfort bound (shade
+ * earlier on higher floors).
+ */
+export function floorLeadFor(
+  floorLabel: string | undefined,
+  floorShading: Config['rules']['floorShading'] | undefined,
+): number {
+  if (floorShading === undefined || floorShading.enabled === false) return 0;
+  if (floorLabel !== undefined) {
+    const explicit = floorShading.leadByFloor?.[floorLabel];
+    if (typeof explicit === 'number' && Number.isFinite(explicit)) {
+      return Math.max(0, Math.min(4, explicit));
+    }
+  }
+  return defaultFloorLeadC(floorLabel);
+}
+
 function comfortBoundsFor(_targetC: number, warningC: number, biasC = 0): ComfortBounds {
   // Movement-minimization only guards against OVERHEATING (upper bound).
   // The cold/lower side is owned by the existing winter-insulation rule in
@@ -370,7 +410,8 @@ export function runForecastPlanner(
     const bounds = comfortBoundsFor(
       roomData.targets.target_c,
       roomData.targets.warning_c,
-      (deps.comfortBiasByRoom?.[roomId] ?? 0) +
+      (deps.comfortBiasByRoom?.[roomId] ?? 0) -
+        floorLeadFor(roomCfg?.floor, config.rules.floorShading) +
         uncertaintyMarginC(baseTraj?.confidence01 ?? 0.9),
     );
 

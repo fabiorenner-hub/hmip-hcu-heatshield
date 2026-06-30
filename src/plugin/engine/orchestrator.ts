@@ -447,6 +447,72 @@ function roomHourBlocked(
   return false;
 }
 
+/** Local weekday (0=Sun…6=Sat) and minutes-since-midnight in the home tz. */
+function localWeekdayMinutes(
+  now: Date,
+  timezone: string,
+): { weekday: number; minutes: number } {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(now);
+    const wdMap: Record<string, number> = {
+      Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    };
+    const wd = parts.find((p) => p.type === 'weekday')?.value ?? '';
+    let hh = Number.parseInt(parts.find((p) => p.type === 'hour')?.value ?? '', 10);
+    const mm = Number.parseInt(parts.find((p) => p.type === 'minute')?.value ?? '', 10);
+    if (hh === 24) hh = 0; // some engines render midnight as 24
+    const weekday = wdMap[wd] ?? now.getDay();
+    const minutes =
+      (Number.isFinite(hh) ? hh : now.getHours()) * 60 +
+      (Number.isFinite(mm) ? mm : now.getMinutes());
+    return { weekday, minutes };
+  } catch {
+    return { weekday: now.getDay(), minutes: now.getHours() * 60 + now.getMinutes() };
+  }
+}
+
+/** Parse "HH:MM" → minutes since midnight, or null when malformed. */
+function hhmmToMinutes(s: string): number | null {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/u.exec(s);
+  if (m === null) return null;
+  return Number.parseInt(m[1]!, 10) * 60 + Number.parseInt(m[2]!, 10);
+}
+
+/**
+ * Per-window block schedules: true when `now` (home tz) falls inside any
+ * configured weekday + clock-time block. Empty `days` = every day; the time
+ * window wraps across midnight when start > end. STORM ignores this.
+ */
+function windowScheduleBlocked(
+  now: Date,
+  timezone: string,
+  schedules: ReadonlyArray<{ days: ReadonlyArray<number>; start: string; end: string }> | undefined,
+): boolean {
+  if (schedules === undefined || schedules.length === 0) return false;
+  const { weekday, minutes } = localWeekdayMinutes(now, timezone);
+  for (const sched of schedules) {
+    const start = hhmmToMinutes(sched.start);
+    const end = hhmmToMinutes(sched.end);
+    if (start === null || end === null || start === end) continue;
+    // The block "owns" the day on which it STARTS. For a wrapping window
+    // (22:00→10:00) the active weekday is the start day; the early-morning
+    // tail belongs to the previous day's entry.
+    const inTime = start < end ? minutes >= start && minutes < end : minutes >= start || minutes < end;
+    if (!inTime) continue;
+    if (sched.days.length === 0) return true;
+    // Determine which calendar day this instant belongs to for the schedule.
+    const ownerDay = start < end || minutes >= start ? weekday : (weekday + 6) % 7;
+    if (sched.days.includes(ownerDay)) return true;
+  }
+  return false;
+}
+
 /** Map the configured PV array orientation hint to a centre azimuth (deg). */
 function pvLobeCenterFor(hint: string): number {
   switch (hint) {
@@ -774,10 +840,33 @@ export async function runCycle(
     const heatCap =
       winCfg.maxHeatProtectionLevel01 ??
       (winCfg.type === 'roof_window' ? 1 : 0.95);
-    const cappedTarget01 =
+    let cappedTarget01 =
       modeDecision.mode !== 'NIGHT_COOLING' && safety.target01 > heatCap
         ? heatCap
         : safety.target01;
+
+    // --- Step 3d¾: hot-day minimum-shade floor --------------------------
+    // On very hot, sunny days keep a baseline of shading: never OPEN a
+    // shutter beyond `maxOpenPercent` (hold it at least partly closed) so the
+    // room does not bake. Gated on outdoor ≥ threshold AND real PV power (sun
+    // actually shining). STORM (safety force-open) and NIGHT_COOLING are
+    // exempt. Only ever raises the target (more closed).
+    const hotDay = deps.config.rules.hotDay;
+    if (
+      hotDay?.enabled === true &&
+      modeDecision.mode !== 'STORM' &&
+      modeDecision.mode !== 'NIGHT_COOLING' &&
+      snapshot.outdoorTempC !== null &&
+      snapshot.outdoorTempC >= hotDay.outdoorThresholdC &&
+      snapshot.pvSmoothedKw !== null &&
+      snapshot.pvSmoothedKw >= hotDay.minPvKw
+    ) {
+      const floor01 = (100 - hotDay.maxOpenPercent) / 100;
+      const cap = Math.min(floor01, heatCap); // never exceed the heat-stau cap
+      if (cappedTarget01 < cap) {
+        cappedTarget01 = cap;
+      }
+    }
 
     // --- Step 3e: hysteresis §15 ----------------------------------------
     const hysteresis = applyHysteresis({
@@ -843,6 +932,24 @@ export async function runCycle(
           windowId: winCfg.id,
           roomId: winCfg.roomId,
           localHour,
+        });
+      }
+    } else if (
+      modeDecision.mode !== 'STORM' &&
+      windowScheduleBlocked(
+        snapshot.now,
+        deps.config.location.timezone,
+        winCfg.blockSchedules,
+      )
+    ) {
+      // Per-window block schedule (weekday + clock-time window). Hold the
+      // position; STORM is exempt (guarded above).
+      moved = false;
+      blockedBy = 'pause';
+      if (log !== undefined) {
+        log('info', 'window held by per-window block schedule', {
+          windowId: winCfg.id,
+          roomId: winCfg.roomId,
         });
       }
     } else if (hysteresis.shouldMove) {
