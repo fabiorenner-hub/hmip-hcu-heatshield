@@ -78,10 +78,13 @@ export function strongestFacade(facades?: {
 
 export function RoomsAndFacadesPanel(props: {
   snapshot: DashboardSnapshot;
+  /** When provided, room rows become clickable and call this with the room id. */
+  onSelectRoom?: (roomId: string) => void;
 }): JSX.Element {
   const facades = props.snapshot.facades;
   const rooms = props.snapshot.roomsDetail ?? [];
   const strongest = strongestFacade(facades);
+  const selectable = props.onSelectRoom !== undefined;
 
   return (
     <section class="rooms-panel" data-testid="rooms-panel">
@@ -130,7 +133,25 @@ export function RoomsAndFacadesPanel(props: {
               </tr>
             ) : (
               rooms.map((r) => (
-                <tr key={r.id} data-testid={`room-row-${r.id}`}>
+                <tr
+                  key={r.id}
+                  data-testid={`room-row-${r.id}`}
+                  class={selectable ? 'rooms-table__row--clickable' : undefined}
+                  {...(selectable
+                    ? {
+                        role: 'button',
+                        tabIndex: 0,
+                        'aria-label': r.name,
+                        onClick: (): void => props.onSelectRoom?.(r.id),
+                        onKeyDown: (e: KeyboardEvent): void => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            props.onSelectRoom?.(r.id);
+                          }
+                        },
+                      }
+                    : {})}
+                >
                   <td class="rooms-table__room" title={r.name}>
                     {r.floor !== undefined && r.floor !== '' && (
                       <span class="rooms-table__floor">{r.floor}</span>

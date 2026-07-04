@@ -412,6 +412,50 @@ describe('HcuSourceCache — tolerance to malformed input', () => {
     // Numeric manufacturerCode is coerced to string in meta.
     expect(cache.getDevice('shutter')?.manufacturerCode).toBe('1');
   });
+
+  it('classifies HmIP-HDM1 shading modules (primaryShadingLevel) as shutter-like', () => {
+    const cache = new HcuSourceCache({
+      now: () => new Date('2026-06-21T10:00:00.000Z'),
+    });
+    cache.applySystemState({
+      devices: {
+        roller: {
+          id: 'roller',
+          type: 'BRAND_SHUTTER',
+          functionalChannels: {
+            '1': { shutterLevel: 0.4, functionalChannelType: 'SHUTTER_CHANNEL' },
+          },
+        },
+        hdm1: {
+          id: 'hdm1',
+          type: 'HDM',
+          modelType: 'HmIP-HDM1',
+          functionalChannels: {
+            '1': {
+              primaryShadingLevel: 0.7,
+              functionalChannelType: 'SHADING_CHANNEL',
+            },
+          },
+        },
+      },
+    });
+
+    // getShutterLevel abstracts over shutterLevel vs primaryShadingLevel.
+    expect(cache.getShutterLevel('roller')?.value).toBe(0.4);
+    expect(cache.getShutterLevel('hdm1')?.value).toBe(0.7);
+
+    // Drive-type auto-detection.
+    expect(cache.getShutterDriveType('roller')).toBe('shutter');
+    expect(cache.getShutterDriveType('hdm1')).toBe('shading');
+    // Unknown device defaults to the classic shutter path.
+    expect(cache.getShutterDriveType('nope')).toBe('shutter');
+
+    // findShutterLikeDevices unions both families (de-duplicated).
+    const ids = cache.findShutterLikeDevices().map((d) => d.deviceId);
+    expect(ids).toContain('roller');
+    expect(ids).toContain('hdm1');
+    expect(ids).toHaveLength(2);
+  });
 });
 
 // ---------------------------------------------------------------------------

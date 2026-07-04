@@ -20,6 +20,8 @@ export type IconName =
   | 'forecast'
   | 'automation'
   | 'einstellungen'
+  | 'pinsel'
+  | 'warnung'
   | 'sonne'
   | 'uv'
   | 'wind'
@@ -56,6 +58,24 @@ function paths(name: IconName): JSX.Element {
         <g>
           <path d="M12 2.5 4.5 5.5v6c0 4.6 3.2 7.9 7.5 9.5 4.3-1.6 7.5-4.9 7.5-9.5v-6L12 2.5Z" />
           <path d="M8.4 12.2c1.2 1.4 2.3 2 3.6 2s2.4-.6 3.6-2" />
+        </g>
+      );
+    case 'pinsel':
+      return (
+        <g>
+          {/* handle */}
+          <path d="M19.5 4.5a1.8 1.8 0 0 0-2.5 0L10 11.5l2.5 2.5 7-7a1.8 1.8 0 0 0 0-2.5Z" />
+          <path d="M11 10.5l2.5 2.5" />
+          {/* bristles / paint blob */}
+          <path d="M10 11.5 8.4 13a3.2 3.2 0 0 0-.9 2.2c0 .8-.6 1.3-1.3 1.6-.7.3-.9 1.2-.4 1.8 1 1.2 2.7 1.7 4.2 1.2a3.4 3.4 0 0 0 2.2-3.2c0-.9-.4-1.7-1-2.3" />
+        </g>
+      );
+    case 'warnung':
+      return (
+        <g>
+          <path d="M12 3.2 21 19.5H3L12 3.2Z" />
+          <path d="M12 9.5v4.2" />
+          <path d="M12 16.6v.1" />
         </g>
       );
     case 'beschattung':

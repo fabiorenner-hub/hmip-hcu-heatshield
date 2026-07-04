@@ -376,20 +376,20 @@ export function TemperatureChart(props: {
 
   const series: ChartSeries[] = [];
   if (outdoorPts.length > 0) {
-    series.push({ label: t('Außen', 'Outdoor'), color: '#f59e0b', points: outdoorPts });
+    series.push({ label: t('Außen', 'Outdoor'), color: '#ff9d2e', points: outdoorPts });
   }
   // Measured indoor average as a short solid anchor at "now".
   if (indoorAvg !== null) {
     series.push({
       label: t('Innen gemessen', 'Indoor measured'),
-      color: '#e8edf6',
+      color: '#f4f7fb',
       points: [{ t: nowMs, v: indoorAvg }],
     });
   }
   if (withShadePts.length > 0) {
     series.push({
       label: t('Innen mit Beschattung', 'Indoor with shading'),
-      color: '#22c55e',
+      color: '#66d66b',
       dashed: true,
       points: withShadePts,
     });
@@ -397,7 +397,7 @@ export function TemperatureChart(props: {
   if (noShadePts.length > 0) {
     series.push({
       label: t('Innen ohne Beschattung', 'Indoor without shading'),
-      color: '#ef4444',
+      color: '#ff5d57',
       dashed: true,
       points: noShadePts,
     });
@@ -430,7 +430,7 @@ export function PvHistoryChart(props: {
 }): JSX.Element {
   const series: ChartSeries = {
     label: 'PV',
-    color: '#f59e0b',
+    color: '#ff9d2e',
     points: props.history,
   };
   return (
@@ -450,7 +450,7 @@ export function HeatLoadChart(props: {
   const traj = props.snapshot.trajectories;
   const series: ChartSeries = {
     label: t('Wärmelast', 'Heat load'),
-    color: '#a855f7',
+    color: '#9b7cff',
     points: (traj?.heatLoadForecast ?? []).map((p) => ({
       t: Date.parse(p.ts),
       v: Math.round(p.load01 * 100),
@@ -471,10 +471,10 @@ export function heatmapColor(percent: number): string {
   const p = Math.max(0, Math.min(100, percent)) / 100;
   if (p <= 0.5) {
     // blue → cyan
-    return mix('#3b82f6', '#22d3ee', p / 0.5);
+    return mix('#4a8cff', '#35d6e7', p / 0.5);
   }
   // cyan → yellow
-  return mix('#22d3ee', '#eab308', (p - 0.5) / 0.5);
+  return mix('#35d6e7', '#ffd45a', (p - 0.5) / 0.5);
 }
 
 function mix(a: string, b: string, t: number): string {

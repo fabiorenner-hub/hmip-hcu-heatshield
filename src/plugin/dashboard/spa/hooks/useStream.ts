@@ -7,6 +7,9 @@
  *   - `cycle.completed`   → update snapshot + per-window risk
  *                           breakdowns when the orchestrator
  *                           publishes them.
+ *   - `building.revision` → record the latest committed building
+ *                           revision so the Studio can offer a
+ *                           non-destructive reload.
  *   - any other event     → ignored at the SPA layer, future
  *                           features can branch on the string.
  *
@@ -17,7 +20,7 @@
 
 import { useEffect } from 'preact/hooks';
 
-import { connectionState, lastError, setRiskBreakdowns, snapshot } from '../store.js';
+import { connectionState, lastError, latestBuildingRevision, setRiskBreakdowns, snapshot } from '../store.js';
 import { refreshMessages } from './useMessages.js';
 import type {
   DashboardSnapshot,
@@ -105,6 +108,16 @@ function handleEvent(event: DashboardStreamEvent): void {
   if (event.type === 'message.created') {
     // A new in-app notification was emitted — refresh the bell + list.
     void refreshMessages();
+    return;
+  }
+  if (event.type === 'building.revision') {
+    // The building model was committed elsewhere (another session or a
+    // history restore). Record the latest revision so the Studio can offer a
+    // non-destructive reload without clobbering local edits.
+    const rev = (event.payload as { revision?: unknown }).revision;
+    if (typeof rev === 'number' && Number.isFinite(rev)) {
+      latestBuildingRevision.value = rev;
+    }
   }
 }
 

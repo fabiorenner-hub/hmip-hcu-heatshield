@@ -21,6 +21,61 @@ interface ChangelogEntry {
 function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '2.0.2',
+    items: [
+      t(
+        'Hausübersicht neu: Raum-Kacheln im klaren 4×3-Raster mit reichem Klick-Popup samt manueller Steuerung (Auf/50 %/Zu) – ohne 3D-Haus im Hintergrund; der obere Bereich füllt den freien Platz.',
+        'New house overview: room tiles in a clean 4×3 grid with a rich click popup incl. manual control (open/50 %/closed) — without the 3D house behind it; the hero above fills the free space.',
+      ),
+      t(
+        'Popup und Detailansicht jetzt im Liquid-Glass-Design; Kacheln im Glas-Look passend zu den Räumen. Einstellungs-Seiten durchgängig im V2-Glas-Design (inkl. High-FPS-Optionen).',
+        'Popup and detail view now in Liquid Glass design; tiles in a glass look matching the rooms. Settings pages consistently in V2 glass design (incl. high-FPS options).',
+      ),
+      t(
+        'Darstellung erweitert: konfigurierbare Status-Farbpalette, Theme-Import/-Export und Überspeichern eigener Presets.',
+        'Appearance extended: configurable status colour palette, theme import/export and overwriting your own presets.',
+      ),
+      t(
+        'Unterstützung für HmIP-HDM1 Beschattungsmodule (Hunter Douglas / erfal).',
+        'Support for HmIP-HDM1 shading modules (Hunter Douglas / erfal).',
+      ),
+    ],
+  },
+  {
+    version: '2.0.1',
+    items: [
+      t(
+        'Hausübersicht zeigt jederzeit alle Räume – ohne Scrollen. Das Kachelraster teilt sich die Kartenhöhe und verdichtet sich bei vielen Räumen, sodass die Basis-Ansicht auf einen Blick sichtbar bleibt (volle Details je Raum im Popup).',
+        'House overview shows all rooms at all times — without scrolling. The tile grid shares the card height and condenses when there are many rooms, so the Basic view stays visible at a glance (full per-room detail in the popup).',
+      ),
+    ],
+  },
+  {
+    version: '2.0.0',
+    items: [
+      t(
+        'Komplett neue Oberfläche „Liquid Glass" – jetzt Standard für alle Installationen. Die klassische 1.20-Oberfläche bleibt unter Einstellungen wählbar.',
+        'A completely new "Liquid Glass" interface — now the default for every installation. The classic 1.20 interface remains available under Settings.',
+      ),
+      t(
+        'Frosted-Glass-Design mit linker Seitenleiste. Jede Seite hat eine ruhige Basis- und eine tiefe Experten-Ansicht (Rohwerte, alle geplanten Aktionen, Risiko je Fenster, Lernmodell, manuelle Steuerung mit Sturmschutz-Vorrang).',
+        'Frosted-glass design with a left sidebar. Every page has a calm Basic view and a deep Expert view (raw values, all planned actions, per-window risk, learned model, manual control with storm-protection precedence).',
+      ),
+      t(
+        'Voll konfigurierbare Darstellung: Vorlagen (inkl. eigener), Akzentfarbe, Hell/Dunkel/Auto, Hintergrundbild, Glas-Stärke und Symbol-Kacheln — plus Performance-Optionen (Statisches Glas, High FPS Mode) für flüssiges Scrollen.',
+        'Fully configurable appearance: presets (incl. your own), accent colour, light/dark/auto, wallpaper, glass strength and icon tiles — plus performance options (Static Glass, High FPS mode) for smooth scrolling.',
+      ),
+      t(
+        'Neuer geführter Einrichtungs-Assistent: Standort (auch per Gerätestandort), PV-Anlage (FusionSolar oder ein anderes HMIP-Watt-Gerät), GARDENA-Bewässerung, Räume und Rollläden per Auswahlmenü. Durchgängig zweisprachig (DE/EN).',
+        'New guided setup wizard: location (also via device location), PV system (FusionSolar or another HMIP watt device), GARDENA irrigation, rooms and shutters via dropdown. Bilingual throughout (DE/EN).',
+      ),
+      t(
+        'Unterstützung für HmIP-HDM1 Beschattungsmodule (Hunter Douglas / erfal): Sie werden automatisch erkannt und wie Rollläden für den Hitzeschutz angesteuert.',
+        'Support for HmIP-HDM1 shading modules (Hunter Douglas / erfal): they are detected automatically and driven like shutters for heat protection.',
+      ),
+    ],
+  },
+  {
     version: '1.20.0',
     items: [
       t(

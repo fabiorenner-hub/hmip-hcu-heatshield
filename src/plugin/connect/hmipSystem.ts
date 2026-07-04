@@ -183,6 +183,18 @@ const REQUEST_TIMEOUT_MS = 5_000;
 const SET_SHUTTER_LEVEL_PATH = '/hmip/device/control/setShutterLevel';
 
 /**
+ * Spec path for `setPrimaryShadingLevel` (Connect API §6.8.1.23).
+ * Used for HmIP-HDM1 (Hunter Douglas / erfal) shading modules, whose
+ * SHADING_CHANNEL is driven by `primaryShadingLevel` instead of the
+ * classic `shutterLevel`. Inner body shape (spec example):
+ * `{ primaryShadingLevel: number, channelIndex: number, deviceId: string }`.
+ * The `primaryShadingLevel` uses the same 0.0..1.0 convention as
+ * `shutterLevel` (1 = fully closed), so the engine drives both alike.
+ */
+const SET_PRIMARY_SHADING_LEVEL_PATH =
+  '/hmip/device/control/setPrimaryShadingLevel';
+
+/**
  * Spec path for `setSwitchState` (Connect API §6.8.1.31). Turns a
  * Homematic IP switching device (or a plugin-external SWITCH such as
  * a Gardena valve bridged by the Gardena Connect plugin) on or off.
@@ -394,11 +406,25 @@ export class HmipSystemAdapter extends EventEmitter<HmipSystemAdapterEvents> {
 
     this.emit('shutterCommanded', cmd);
 
-    const id = this.sendRequest(SET_SHUTTER_LEVEL_PATH, {
-      shutterLevel: level01,
-      channelIndex,
-      deviceId,
-    });
+    // Route HmIP-HDM1 (Hunter Douglas / erfal) shading modules through
+    // the spec's `setPrimaryShadingLevel` path — they report and accept
+    // `primaryShadingLevel`, not `shutterLevel`. The drive type is
+    // auto-detected from the live device feature set (see
+    // `HcuSourceCache.getShutterDriveType`), so no config field is
+    // required and existing installs keep the classic path.
+    const driveType = this.cache.getShutterDriveType(deviceId);
+    const { path, body } =
+      driveType === 'shading'
+        ? {
+            path: SET_PRIMARY_SHADING_LEVEL_PATH,
+            body: { primaryShadingLevel: level01, channelIndex, deviceId },
+          }
+        : {
+            path: SET_SHUTTER_LEVEL_PATH,
+            body: { shutterLevel: level01, channelIndex, deviceId },
+          };
+
+    const id = this.sendRequest(path, body);
     const response = await this.awaitResponse(id);
     if (response.code !== 200) {
       throw new Error(
@@ -565,8 +591,12 @@ export class HmipSystemAdapter extends EventEmitter<HmipSystemAdapterEvents> {
   /**
    * Walk every `eventTransaction.events.*.device.functionalChannels.*`
    * channel in `body` and call {@link evaluateManualOverride} for each
-   * channel that carries a numeric `shutterLevel`. Tolerant of
-   * malformed input — non-object branches are skipped silently.
+   * channel that carries a numeric shutter position. Recognises both
+   * the classic `shutterLevel` (roller/venetian actuators) and
+   * `primaryShadingLevel` (HmIP-HDM1 shading modules); both use the
+   * same 0..1 scale and feed the same manual-override baseline.
+   * Tolerant of malformed input — non-object branches are skipped
+   * silently.
    */
   private detectManualOverrides(body: unknown): void {
     if (body === null || typeof body !== 'object') {
@@ -605,8 +635,15 @@ export class HmipSystemAdapter extends EventEmitter<HmipSystemAdapterEvents> {
         if (channel === null || typeof channel !== 'object') {
           continue;
         }
-        const observed = (channel as Record<string, unknown>)['shutterLevel'];
-        if (typeof observed !== 'number') {
+        const chan = channel as Record<string, unknown>;
+        const rawShutter = chan['shutterLevel'];
+        const observed =
+          typeof rawShutter === 'number'
+            ? rawShutter
+            : typeof chan['primaryShadingLevel'] === 'number'
+              ? (chan['primaryShadingLevel'] as number)
+              : undefined;
+        if (observed === undefined) {
           continue;
         }
         this.evaluateManualOverride(deviceId, observed);

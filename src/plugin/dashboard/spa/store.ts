@@ -70,3 +70,12 @@ export function setRiskBreakdowns(rows: WindowRiskBreakdown[]): void {
  */
 export const messages = signal<Message[]>([]);
 export const unreadMessages = signal<number>(0);
+
+/**
+ * Latest building-model revision known to have been committed on the server,
+ * as broadcast over the SSE feed (`building.revision` events). The Building
+ * Studio compares this against its loaded revision to show a non-destructive
+ * "changed elsewhere — reload" banner when another session (or a restore)
+ * advances the model underneath it. `null` until the first event arrives.
+ */
+export const latestBuildingRevision = signal<number | null>(null);

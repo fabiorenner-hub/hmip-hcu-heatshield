@@ -24,14 +24,14 @@ interface TrendSample {
 }
 
 const ROOM_COLORS = [
-  '#2563eb',
-  '#db2777',
-  '#16a34a',
-  '#d97706',
-  '#7c3aed',
-  '#0891b2',
-  '#dc2626',
-  '#4d7c0f',
+  '#4a8cff',
+  '#ff5d57',
+  '#66d66b',
+  '#ff9d2e',
+  '#9b7cff',
+  '#35d6e7',
+  '#ffd45a',
+  '#ffc45b',
 ];
 
 export function TrendCard(props: {

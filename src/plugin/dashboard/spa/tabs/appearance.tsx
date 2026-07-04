@@ -7,14 +7,76 @@
  */
 
 import { h, type JSX } from 'preact';
+import { useState } from 'preact/hooks';
 
 import { t, langPref, setLangPref, type LangPref } from '../i18n.js';
 import { ambientEnabled, setAmbientEnabled } from '../ambient.js';
 import { useConfig } from '../hooks/useConfig.js';
+import { getFlag, setFlag, type FeatureFlag } from '../featureFlags.js';
 import type { Config } from '../../../../shared/types.js';
 
 interface RoutableProps {
   path?: string;
+}
+
+const PREVIEW_FLAGS: Array<{ flag: FeatureFlag; de: string; en: string; hintDe: string; hintEn: string }> = [
+  {
+    flag: 'buildingStudioV2',
+    de: 'Gebäude-Studio (Grundriss-Editor)',
+    en: 'Building Studio (floor-plan editor)',
+    hintDe: 'Zeichne Wände, Räume und Stockwerke. Erscheint unter Einstellungen.',
+    hintEn: 'Draw walls, rooms and storeys. Appears under Settings.',
+  },
+  {
+    flag: 'premiumUiV2',
+    de: 'Premium-Desktop-Shell',
+    en: 'Premium desktop shell',
+    hintDe: 'Seitenleisten-Layout ab Tablet-Breite.',
+    hintEn: 'Sidebar layout at tablet width and up.',
+  },
+  {
+    flag: 'mobileUiV2',
+    de: 'Mobile Touch-Navigation',
+    en: 'Mobile touch navigation',
+    hintDe: '5-Punkt-Leiste unten auf Smartphone-Breite.',
+    hintEn: '5-item bottom bar at phone width.',
+  },
+];
+
+function PreviewFeaturesCard(): JSX.Element {
+  // Local mirror so the checkboxes reflect immediately; a reload applies the
+  // flag app-wide (routes/nav/shells read the flag at render).
+  const [, force] = useState(0);
+  return (
+    <article class="module-panel__card" data-testid="appearance-preview-flags">
+      <h3>{t('Vorschau-Funktionen', 'Preview features')}</h3>
+      <p class="module-panel__hint">
+        {t(
+          'Experimentelle Funktionen pro Gerät ein-/ausschalten. Die Seite lädt danach neu.',
+          'Enable/disable experimental features per device. The page reloads afterwards.',
+        )}
+      </p>
+      {PREVIEW_FLAGS.map((f) => (
+        <label key={f.flag} class="tab-rules__check">
+          <input
+            type="checkbox"
+            data-testid={`flag-${f.flag}`}
+            checked={getFlag(f.flag)}
+            onChange={(e): void => {
+              setFlag(f.flag, (e.currentTarget as HTMLInputElement).checked);
+              force((n) => n + 1);
+              setTimeout(() => window.location.reload(), 150);
+            }}
+          />
+          <span>
+            {t(f.de, f.en)}
+            <br />
+            <small class="module-panel__hint">{t(f.hintDe, f.hintEn)}</small>
+          </span>
+        </label>
+      ))}
+    </article>
+  );
 }
 
 const LANG_OPTIONS: Array<{ value: LangPref; label: string }> = [
@@ -100,6 +162,8 @@ export function AppearanceTab(_props: RoutableProps): JSX.Element {
           </span>
         </label>
       </article>
+
+      <PreviewFeaturesCard />
 
       <article class="module-panel__card" data-testid="appearance-notif-language">
         <h3>{t('Sprache der Benachrichtigungen', 'Notification language')}</h3>

@@ -64,6 +64,15 @@ export interface HouseDigitalTwinProps {
   scrubAt?: Date | null;
   /** Per-window risk breakdown (from the SSE store) for the detail popover. */
   riskByWindow?: Record<string, WindowRiskBreakdown>;
+  /**
+   * Layout variant:
+   *   - `'full'` (default): the complete digital twin (house, sun arc,
+   *     facades, draggable badges).
+   *   - `'chips'`: just the room chips in a responsive grid (no house /
+   *     sun / facades) plus the same rich click popover with manual control.
+   *     Used by the Liquid Glass V2 overview "Hausübersicht".
+   */
+  variant?: 'full' | 'chips';
 }
 
 /** Absolute badge position as percentages of the twin container. */
@@ -241,6 +250,7 @@ export function HouseDigitalTwin(props: HouseDigitalTwinProps): JSX.Element {
   const sun = getSunPosition(effectiveAt, latitude, longitude);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedElRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useIsMobile();
   const [positions, setPositions] = useState<Record<string, BadgePos>>(loadPositions);
   const [locked, setLocked] = useState<boolean>(loadLocked);
@@ -314,6 +324,48 @@ export function HouseDigitalTwin(props: HouseDigitalTwinProps): JSX.Element {
       opacity: (0.5 + lowFactor * 0.4).toFixed(2),
     };
   })();
+
+  // Chips variant: the classic room chips + rich popover (with manual
+  // control), laid out in a responsive grid WITHOUT the house / sun / facades.
+  if (props.variant === 'chips') {
+    return (
+      <div class="twin-chips" data-testid="twin-chips" ref={containerRef}>
+        {rooms.map((room) => (
+          <RoomBadge
+            key={room.id}
+            room={room}
+            left={0}
+            top={0}
+            locked
+            heatmapOn={false}
+            previewPercent={null}
+            selected={selected === room.id}
+            isStatic
+            onSelect={(el): void => {
+              selectedElRef.current = el;
+              setSelected((cur) => (cur === room.id ? null : room.id));
+            }}
+          />
+        ))}
+        {selectedRoom !== null && (
+          <RoomPopover
+            room={selectedRoom}
+            risk={riskForSelected}
+            pos={{ left: 50, top: 50 }}
+            containerRef={containerRef}
+            scrubbing={scrubbing}
+            effectiveAt={effectiveAt}
+            anchorRect={(): DOMRect | null =>
+              selectedElRef.current?.getBoundingClientRect() ?? null
+            }
+            onClose={(): void => setSelected(null)}
+            onOpenDetail={(): void => setDetailId(selectedRoom.id)}
+          />
+        )}
+        {detailModal}
+      </div>
+    );
+  }
 
   if (isMobile) {
     return (
@@ -483,13 +535,13 @@ function SunArc(props: {
     >
       <defs>
         <linearGradient id="sunArcStroke" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stop-color="#fb923c" stop-opacity="0.35" />
-          <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.95" />
-          <stop offset="100%" stop-color="#fb923c" stop-opacity="0.35" />
+          <stop offset="0%" stop-color="var(--color-accent)" stop-opacity="0.35" />
+          <stop offset="50%" stop-color="var(--color-accent-strong)" stop-opacity="0.95" />
+          <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0.35" />
         </linearGradient>
         <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#fde68a" stop-opacity="0.9" />
-          <stop offset="100%" stop-color="#fbbf24" stop-opacity="0" />
+          <stop offset="0%" stop-color="var(--color-accent-soft)" stop-opacity="0.9" />
+          <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0" />
         </radialGradient>
       </defs>
       <path
@@ -504,7 +556,7 @@ function SunArc(props: {
         y1={0}
         x2={handleX}
         y2={H}
-        stroke="#ffffff44"
+        stroke="color-mix(in srgb, var(--color-text) 27%, transparent)"
         stroke-dasharray="4 4"
         data-testid="sunarc-nowline"
       />
@@ -514,8 +566,8 @@ function SunArc(props: {
         cx={handleX}
         cy={handleY}
         r={7}
-        fill={isDay ? '#fbbf24' : '#64748b'}
-        stroke="#fff7e0"
+        fill={isDay ? 'var(--color-accent-strong)' : 'var(--color-muted)'}
+        stroke="var(--color-accent-soft)"
         stroke-width={1.5}
         data-testid="sunarc-handle"
       />
@@ -781,9 +833,12 @@ function RoomBadge(props: {
   heatmapOn: boolean;
   previewPercent: number | null;
   selected: boolean;
-  onPointerDown: (ev: JSX.TargetedPointerEvent<HTMLDivElement>) => void;
-  onPointerMove: (ev: JSX.TargetedPointerEvent<HTMLDivElement>) => void;
-  onPointerUp: (ev: JSX.TargetedPointerEvent<HTMLDivElement>) => void;
+  /** Static grid mode (chips overview): no absolute position, no drag. */
+  isStatic?: boolean;
+  onSelect?: (el: HTMLDivElement) => void;
+  onPointerDown?: (ev: JSX.TargetedPointerEvent<HTMLDivElement>) => void;
+  onPointerMove?: (ev: JSX.TargetedPointerEvent<HTMLDivElement>) => void;
+  onPointerUp?: (ev: JSX.TargetedPointerEvent<HTMLDivElement>) => void;
 }): JSX.Element {
   const { room } = props;
   const livePct = clampPct(room.shutterPercent);
@@ -799,24 +854,40 @@ function RoomBadge(props: {
   const tempStr = room.indoorTempC === null || !Number.isFinite(animTemp) ? '–' : `${animTemp.toFixed(1)}°`;
   const pctStr = `${Math.round(animPct)} %`;
 
+  const isStatic = props.isStatic === true;
   return (
     <div
       class={[
         'room-badge',
         `room-badge--${status}`,
-        props.locked ? '' : 'room-badge--draggable',
+        isStatic ? 'room-badge--static' : props.locked ? '' : 'room-badge--draggable',
         props.selected ? 'room-badge--selected' : '',
         preview ? 'room-badge--preview' : '',
         band !== null ? `room-badge--heat-${band}` : '',
       ]
         .filter(Boolean)
         .join(' ')}
-      style={{ left: `${props.left}%`, top: `${props.top}%` }}
+      style={isStatic ? undefined : { left: `${props.left}%`, top: `${props.top}%` }}
       data-room={room.id}
       data-testid={`room-badge-${room.id}`}
-      onPointerDown={props.onPointerDown}
-      onPointerMove={props.onPointerMove}
-      onPointerUp={props.onPointerUp}
+      {...(isStatic
+        ? {
+            role: 'button',
+            tabIndex: 0,
+            onClick: (ev: JSX.TargetedMouseEvent<HTMLDivElement>): void =>
+              props.onSelect?.(ev.currentTarget),
+            onKeyDown: (ev: JSX.TargetedKeyboardEvent<HTMLDivElement>): void => {
+              if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                props.onSelect?.(ev.currentTarget);
+              }
+            },
+          }
+        : {
+            onPointerDown: props.onPointerDown,
+            onPointerMove: props.onPointerMove,
+            onPointerUp: props.onPointerUp,
+          })}
       title={title}
     >
       <ShutterGlyph percent={pct} roof={room.roof === true} running={status === 'executing'} />
@@ -1009,6 +1080,8 @@ function RoomPopover(props: {
   containerRef: { current: HTMLDivElement | null };
   scrubbing: boolean;
   effectiveAt: Date;
+  /** Chips mode: anchor to the clicked chip's live rect instead of pos%. */
+  anchorRect?: () => DOMRect | null;
   onClose: () => void;
   onOpenDetail: () => void;
 }): JSX.Element {
@@ -1036,14 +1109,20 @@ function RoomPopover(props: {
       const vh = window.innerHeight;
       const margin = 12;
       const gap = 14;
-      const anchorX = cr.left + (props.pos.left / 100) * cr.width;
-      const anchorY = cr.top + (props.pos.top / 100) * cr.height;
+      // Anchor to the clicked chip's real rect (chips mode) when provided,
+      // otherwise to the badge's percentage position within the container
+      // (full twin mode — unchanged). A zero-height anchor (pos% point)
+      // behaves exactly as before.
+      const ar = props.anchorRect?.() ?? null;
+      const anchorX = ar !== null ? ar.left + ar.width / 2 : cr.left + (props.pos.left / 100) * cr.width;
+      const anchorTop = ar !== null ? ar.top : cr.top + (props.pos.top / 100) * cr.height;
+      const anchorBottom = ar !== null ? ar.bottom : anchorTop;
       const pw = pop.offsetWidth;
       const ph = pop.offsetHeight;
-      const spaceBelow = vh - anchorY - gap - margin;
-      const spaceAbove = anchorY - gap - margin;
-      // Prefer opening on the side with more room; bias by the badge half.
-      const preferBelow = props.pos.top < 50;
+      const spaceBelow = vh - anchorBottom - gap - margin;
+      const spaceAbove = anchorTop - gap - margin;
+      // Prefer opening on the side with more room; bias by the anchor half.
+      const preferBelow = ar !== null ? anchorTop < vh / 2 : props.pos.top < 50;
       let placement: 'above' | 'below';
       if (preferBelow) {
         placement = ph <= spaceBelow || spaceBelow >= spaceAbove ? 'below' : 'above';
@@ -1052,7 +1131,7 @@ function RoomPopover(props: {
       }
       const maxHeight = Math.max(160, vh - 2 * margin);
       let top =
-        placement === 'below' ? anchorY + gap : anchorY - gap - Math.min(ph, maxHeight);
+        placement === 'below' ? anchorBottom + gap : anchorTop - gap - Math.min(ph, maxHeight);
       top = clamp(top, margin, Math.max(margin, vh - Math.min(ph, maxHeight) - margin));
       let left = anchorX - pw / 2;
       left = clamp(left, margin, Math.max(margin, vw - pw - margin));
@@ -1280,7 +1359,7 @@ function ScoreRing(props: { score: number }): JSX.Element {
   const r = 13;
   const c = 2 * Math.PI * r;
   const frac = clamp(animated / 100, 0, 1);
-  const color = props.score >= 70 ? '#22c55e' : props.score >= 45 ? '#f0b300' : '#ef4444';
+  const color = props.score >= 70 ? 'var(--color-success)' : props.score >= 45 ? 'var(--color-warn)' : 'var(--color-danger)';
   return (
     <span class="twin-score" title={t('Schutz-Score: wie gut die Räume aktuell vor Wärmelast geschützt sind', 'Protection score: how well the rooms are currently protected against heat load')}>
       <svg viewBox="0 0 32 32" width={30} height={30} aria-hidden="true">
@@ -1325,7 +1404,7 @@ function TwinToolbar(props: {
         {insights.score !== null && <ScoreRing score={insights.score} />}
         {max12 !== null && (
           <span class="twin-insight twin-insight--wide" title={t('Außentemperatur-Prognose der nächsten 12 h', 'Outdoor temperature forecast for the next 12 h')}>
-            <Sparkline values={tempSeries} width={72} height={20} stroke="#fb923c" />
+            <Sparkline values={tempSeries} width={72} height={20} stroke="var(--color-accent)" />
             <span class="twin-insight__value">{max12}°</span>
           </span>
         )}

@@ -47,14 +47,14 @@ const RANGES: RangeOption[] = [
 
 // A small, colour-blind-friendly palette cycled across room series.
 const ROOM_COLORS = [
-  '#2563eb',
-  '#db2777',
-  '#16a34a',
-  '#d97706',
-  '#7c3aed',
-  '#0891b2',
-  '#dc2626',
-  '#4d7c0f',
+  '#4a8cff',
+  '#ff5d57',
+  '#66d66b',
+  '#ff9d2e',
+  '#9b7cff',
+  '#35d6e7',
+  '#ffd45a',
+  '#ffc45b',
 ];
 
 function groupByKey(samples: TrendSample[]): Map<string, Array<{ t: number; v: number }>> {
@@ -130,15 +130,15 @@ export function HistoryTab(): JSX.Element {
     const series: ChartSeries[] = [];
     const outdoor = grouped.get('outdoor');
     if (outdoor !== undefined && outdoor.length > 0) {
-      series.push({ label: t('Außen', 'Outdoor'), color: '#e2e8f0', points: outdoor });
+      series.push({ label: t('Außen', 'Outdoor'), color: '#f4f7fb', points: outdoor });
     }
     const front = grouped.get('outdoorFront');
     if (front !== undefined && front.length > 0) {
-      series.push({ label: t('Außen vorne', 'Outdoor front'), color: '#94a3b8', points: front });
+      series.push({ label: t('Außen vorne', 'Outdoor front'), color: '#9eb0c0', points: front });
     }
     const back = grouped.get('outdoorBack');
     if (back !== undefined && back.length > 0) {
-      series.push({ label: t('Außen hinten', 'Outdoor back'), color: '#64748b', points: back });
+      series.push({ label: t('Außen hinten', 'Outdoor back'), color: '#71869b', points: back });
     }
     let ci = 0;
     for (const [key, pts] of grouped) {
@@ -161,7 +161,7 @@ export function HistoryTab(): JSX.Element {
     if (pv === undefined || pv.length === 0) {
       return [];
     }
-    return [{ label: t('PV-Leistung', 'PV power'), color: '#f59e0b', points: pv }];
+    return [{ label: t('PV-Leistung', 'PV power'), color: '#ff9d2e', points: pv }];
   }, [grouped]);
 
   // Combined "12 h zurück + 12 h voraus" series: measured history (solid)
@@ -176,13 +176,13 @@ export function HistoryTab(): JSX.Element {
       (p) => p.t >= past12Ms && p.t <= nowMs,
     );
     if (outdoorPast.length > 0) {
-      out.push({ label: t('Außen gemessen', 'Outdoor measured'), color: '#f59e0b', points: outdoorPast });
+      out.push({ label: t('Außen gemessen', 'Outdoor measured'), color: '#ff9d2e', points: outdoorPast });
     }
     const outdoorFc = fcCards
       .map((c) => ({ t: Date.parse(c.ts), v: c.tempC }))
       .filter((p) => Number.isFinite(p.t) && p.t >= nowMs);
     if (outdoorFc.length > 0) {
-      out.push({ label: t('Außen Prognose', 'Outdoor forecast'), color: '#fbbf24', dashed: true, points: outdoorFc });
+      out.push({ label: t('Außen Prognose', 'Outdoor forecast'), color: '#ffb259', dashed: true, points: outdoorFc });
     }
     return out;
   }, [grouped, fcCards, nowMs, past12Ms]);
@@ -191,14 +191,14 @@ export function HistoryTab(): JSX.Element {
     const out: ChartSeries[] = [];
     const pvPast = (grouped.get('pv') ?? []).filter((p) => p.t >= past12Ms && p.t <= nowMs);
     if (pvPast.length > 0) {
-      out.push({ label: t('PV gemessen', 'PV measured'), color: '#f59e0b', points: pvPast });
+      out.push({ label: t('PV gemessen', 'PV measured'), color: '#ff9d2e', points: pvPast });
     }
     const pvFc = fcCards
       .filter((c) => c.pvForecastKw !== undefined)
       .map((c) => ({ t: Date.parse(c.ts), v: c.pvForecastKw as number }))
       .filter((p) => Number.isFinite(p.t) && p.t >= nowMs);
     if (pvFc.length > 0) {
-      out.push({ label: t('PV erwartet', 'PV expected'), color: '#38bdf8', dashed: true, points: pvFc });
+      out.push({ label: t('PV erwartet', 'PV expected'), color: '#35d6e7', dashed: true, points: pvFc });
     }
     return out;
   }, [grouped, fcCards, nowMs, past12Ms]);

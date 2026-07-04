@@ -12,6 +12,11 @@
 try {
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem('heatshield.lang', 'de');
+    // The production default UI version is now v2 (Liquid Glass). The existing
+    // suites assert the v1 chrome/views by default and pin v2 explicitly where
+    // needed, so pin the test-suite default to v1 before any module loads.
+    // (Individual tests still call setUiVersion('v2') to exercise v2.)
+    localStorage.setItem('heatshield.uiVersion', 'v1');
   }
 } catch {
   /* node environment: no localStorage, i18n falls back to German anyway */

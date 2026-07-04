@@ -295,6 +295,47 @@ export function RoomsTab(): JSX.Element {
     );
   };
 
+  // Assign a discovered shutter to a room (creating the window on first
+  // assignment) — the dropdown-based equivalent of dragging the shutter onto a
+  // room card. `roomId === VIRTUAL_UNASSIGNED_ROOM_ID` detaches it again.
+  const assignShutterToRoom = (deviceId: string, roomId: string): void => {
+    touchedRef.current = true;
+    setWindowAssignments((prev) => ({ ...prev, [deviceId]: roomId }));
+    if (roomId === VIRTUAL_UNASSIGNED_ROOM_ID) {
+      return;
+    }
+    setDraftWindows((prev) => {
+      const existing = prev.find((w) => w.id === deviceId || w.shutterDeviceId === deviceId);
+      if (existing !== undefined) {
+        return prev.map((w) =>
+          w.id === deviceId || w.shutterDeviceId === deviceId ? { ...w, roomId } : w,
+        );
+      }
+      // Synthesise a brand-new window for a freshly assigned discovered device.
+      // Field defaults match `WindowSchema`.
+      const meta = discoveredShutters.find((d) => d.deviceId === deviceId);
+      const orientationDeg = 180; // default S; user picks orientation later
+      const friendly = (meta?.friendlyName ?? '').toLowerCase();
+      const isRoof = /dach|velux|roto/.test(friendly);
+      const newWindow: WindowDef = {
+        id: deviceId,
+        roomId,
+        shutterDeviceId: deviceId,
+        automationBlocked: false,
+        orientationDeg,
+        type: isRoof ? 'roof_window' : 'facade',
+        isDoor: false,
+        canMoveWhenOpen: true,
+        maxPositionWhenOpenPct: 60,
+        maxHeatProtectionLevel01: isRoof ? 1 : 0.95,
+        sunPrelookMinutes: 60,
+        lockoutProtection: true,
+        blockSchedules: [],
+      };
+      return [...prev, newWindow];
+    });
+  };
+
   const onDragOverRoom = (e: DragEvent, roomId: string): void => {
     e.preventDefault();
     setDragHoverRoomId(roomId);
@@ -322,41 +363,7 @@ export function RoomsTab(): JSX.Element {
       return;
     }
     // Default / 'shutter': assign or create the window for this room.
-    const deviceId = payload.deviceId;
-    setWindowAssignments((prev) => ({ ...prev, [deviceId]: roomId }));
-    setDraftWindows((prev) => {
-      const existing = prev.find((w) => w.id === deviceId || w.shutterDeviceId === deviceId);
-      if (existing !== undefined) {
-        return prev.map((w) => {
-          if (w.id === deviceId || w.shutterDeviceId === deviceId) {
-            return { ...w, roomId };
-          }
-          return w;
-        });
-      }
-      // Synthesise a brand-new window for a freshly dropped
-      // discovered device. Field defaults match `WindowSchema`.
-      const meta = discoveredShutters.find((d) => d.deviceId === deviceId);
-      const orientationDeg = 180; // default S; user picks orientation later
-      const friendly = (meta?.friendlyName ?? '').toLowerCase();
-      const isRoof = /dach|velux|roto/.test(friendly);
-      const newWindow: WindowDef = {
-        id: deviceId,
-        roomId,
-        shutterDeviceId: deviceId,
-        automationBlocked: false,
-        orientationDeg,
-        type: isRoof ? 'roof_window' : 'facade',
-        isDoor: false,
-        canMoveWhenOpen: true,
-        maxPositionWhenOpenPct: 60,
-        maxHeatProtectionLevel01: isRoof ? 1 : 0.95,
-        sunPrelookMinutes: 60,
-        lockoutProtection: true,
-        blockSchedules: [],
-      };
-      return [...prev, newWindow];
-    });
+    assignShutterToRoom(payload.deviceId, roomId);
   };
 
   const onDropUnassigned = (e: DragEvent): void => {
@@ -437,6 +444,19 @@ export function RoomsTab(): JSX.Element {
     }
     return out;
   }, [draftRooms]);
+
+  // Which room currently uses each window contact, so the per-window dropdown
+  // can flag a sensor that is already bound elsewhere (picking it moves it).
+  const contactUsage = useMemo<Map<string, string>>(() => {
+    const out = new Map<string, string>();
+    for (const w of draftWindows) {
+      if (w.contactDeviceId !== undefined) {
+        const assignedRoom = windowAssignments[w.id] ?? w.roomId;
+        out.set(w.contactDeviceId, roomNameById.get(assignedRoom) ?? assignedRoom);
+      }
+    }
+    return out;
+  }, [draftWindows, windowAssignments, roomNameById]);
 
   const handleRenameRoom = (roomId: string, name: string): void => {
     touchedRef.current = true;
@@ -745,6 +765,7 @@ export function RoomsTab(): JSX.Element {
               shutters={discoveredShutters}
               tempSensors={discovery.temperatureSources.value}
               contacts={discovery.contactSources.value}
+              contactUsage={contactUsage}
               onRename={(name): void => handleRenameRoom(room.id, name)}
               onChangeFloor={(floor): void => handleChangeFloor(room.id, floor)}
               onChangeSchedule={(key, value): void =>
@@ -780,8 +801,8 @@ export function RoomsTab(): JSX.Element {
           {discoveredShutters.length === 0 ? (
             <p class="tab-rooms__hint" data-testid="rooms-discover-empty">
               {t(
-                '„Geräte suchen" ausführen, um HMIP-Rollläden (Geräte mit shutterLevel-Feature) auf der HCU zu finden.',
-                'Run "Discover devices" to find HMIP shutters (devices with a shutterLevel feature) on the HCU.',
+                '„Geräte suchen" ausführen, um HMIP-Rollläden und Beschattungsmodule (z. B. HmIP-HDM1) auf der HCU zu finden.',
+                'Run "Discover devices" to find HMIP shutters and shading modules (e.g. HmIP-HDM1) on the HCU.',
               )}
             </p>
           ) : (
@@ -793,6 +814,10 @@ export function RoomsTab(): JSX.Element {
                   assignedRoomId === VIRTUAL_UNASSIGNED_ROOM_ID
                     ? t('Nicht zugewiesen', 'Unassigned')
                     : roomNameById.get(assignedRoomId) ?? assignedRoomId;
+                const selectValue =
+                  assignedRoomId === undefined || assignedRoomId === VIRTUAL_UNASSIGNED_ROOM_ID
+                    ? ''
+                    : assignedRoomId;
                 return (
                   <li
                     key={d.deviceId}
@@ -802,6 +827,26 @@ export function RoomsTab(): JSX.Element {
                   >
                     <strong>{deviceLabel(d)}</strong>
                     <small>{t('Raum:', 'Room:')} {label}</small>
+                    <label class="tab-rooms__assign">
+                      <span class="tab-rooms__assign-label">{t('Raum wählen', 'Choose room')}</span>
+                      <select
+                        class="tab-rooms__assign-select"
+                        data-testid={`rooms-device-assign-${d.deviceId}`}
+                        value={selectValue}
+                        onChange={(e): void => {
+                          const v = (e.currentTarget as HTMLSelectElement).value;
+                          assignShutterToRoom(d.deviceId, v === '' ? VIRTUAL_UNASSIGNED_ROOM_ID : v);
+                        }}
+                      >
+                        <option value="">{t('— nicht zugewiesen —', '— unassigned —')}</option>
+                        {draftRooms.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                            {r.floor !== undefined ? ` (${r.floor})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </li>
                 );
               })}
@@ -836,8 +881,8 @@ export function RoomsTab(): JSX.Element {
           {discovery.contactSources.value.length === 0 ? (
             <p class="tab-rooms__hint" data-testid="rooms-contacts-empty">
               {t(
-                '„Geräte suchen" ausführen, um Fensterkontakte (mit windowState-Feature) zu finden. Auf einen Rollladen ziehen, um ihn als Fenstersensor für die Lüften-Erkennung zuzuweisen.',
-                'Run "Discover devices" to find window contacts (with a windowState feature). Drag onto a shutter to assign it as the window sensor for ventilation detection.',
+                '„Geräte suchen" ausführen, um Fensterkontakte (mit windowState-Feature) zu finden. Zuweisen am einfachsten direkt an der Raumkarte über die Auswahl „Fensterkontakt" je Rollladen (oder per Ziehen auf einen Rollladen).',
+                'Run "Discover devices" to find window contacts (with a windowState feature). Assign them most easily on the room card via the "Window contact" dropdown per shutter (or by dragging onto a shutter).',
               )}
             </p>
           ) : (
@@ -850,7 +895,7 @@ export function RoomsTab(): JSX.Element {
                   onDragStart={(e): void => onDragStartContact(e as DragEvent, d.deviceId)}
                 >
                   <strong>{deviceLabel(d)}</strong>
-                  <small>{t('Auf einen Rollladen ziehen → Fensterkontakt', 'Drag onto a shutter → window contact')}</small>
+                  <small>{t('Am Rollladen per Auswahl „Fensterkontakt" zuweisen', 'Assign via the "Window contact" dropdown on a shutter')}</small>
                 </li>
               ))}
             </ul>
@@ -870,6 +915,7 @@ interface RoomCardProps {
   shutters: DiscoveredDevice[];
   tempSensors: DiscoveredDevice[];
   contacts: DiscoveredDevice[];
+  contactUsage: ReadonlyMap<string, string>;
   onDragOver: (e: DragEvent) => void;
   onDragLeave: () => void;
   onDrop: (e: DragEvent) => void;
@@ -1211,29 +1257,44 @@ function RoomCard(props: RoomCardProps): JSX.Element {
                     ))}
                   </select>
                 </label>
-                <span
+                <label
                   class="room-card__window-contact"
                   data-testid={`room-card-window-contact-${w.id}`}
                 >
-                  {contactLabel !== null ? (
-                    <Fragment>
-                      <span class="room-card__contact-name">📭 {contactLabel}</span>
-                      <button
-                        type="button"
-                        class="room-card__contact-clear"
-                        data-testid={`room-card-window-contact-clear-${w.id}`}
-                        title={t('Fensterkontakt entfernen', 'Remove window contact')}
-                        onClick={(): void => props.onClearContact(w.id)}
-                      >
-                        ✕
-                      </button>
-                    </Fragment>
-                  ) : (
-                    <span class="room-card__contact-none">
-                      {t('kein Fensterkontakt (Sensor hierher ziehen)', 'no window contact (drag a sensor here)')}
-                    </span>
-                  )}
-                </span>
+                  <span class="room-card__window-contact-label">
+                    {t('Fensterkontakt', 'Window contact')}
+                  </span>
+                  <select
+                    class="room-card__contact-select"
+                    data-testid={`room-card-window-contact-select-${w.id}`}
+                    value={w.contactDeviceId ?? ''}
+                    aria-label={t(`Fensterkontakt für ${name}`, `Window contact for ${name}`)}
+                    onChange={(e): void => {
+                      const v = (e.currentTarget as HTMLSelectElement).value;
+                      if (v === '') {
+                        props.onClearContact(w.id);
+                      } else {
+                        props.onAssignContact(w.id, v);
+                      }
+                    }}
+                  >
+                    <option value="">{t('— keiner —', '— none —')}</option>
+                    {w.contactDeviceId !== undefined &&
+                      !props.contacts.some((c) => c.deviceId === w.contactDeviceId) && (
+                        <option value={w.contactDeviceId}>{contactLabel}</option>
+                      )}
+                    {props.contacts.map((c) => {
+                      const usedBy = props.contactUsage.get(c.deviceId);
+                      const usedElsewhere = usedBy !== undefined && c.deviceId !== w.contactDeviceId;
+                      return (
+                        <option key={c.deviceId} value={c.deviceId}>
+                          {deviceLabel(c)}
+                          {usedElsewhere ? t(` (belegt: ${usedBy})`, ` (in use: ${usedBy})`) : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
                 <label class="room-card__window-block">
                   <input
                     type="checkbox"

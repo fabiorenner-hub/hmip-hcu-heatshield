@@ -272,7 +272,7 @@ export function LineChart(props: LineChartProps): JSX.Element {
               x2={xAt(nowT)}
               y2={viewH - PAD_B}
               class="line-chart__nowline"
-              stroke="#ffffff88"
+              stroke="color-mix(in srgb, var(--color-text) 53%, transparent)"
               stroke-dasharray="3 3"
               vector-effect="non-scaling-stroke"
               data-testid="line-chart-nowline"

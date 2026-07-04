@@ -75,9 +75,9 @@ function fmtEta(hours: number | null): string {
 }
 
 function gaugeColor(pct: number): string {
-  if (pct >= 60) return '#34d399';
-  if (pct >= 35) return '#fbbf24';
-  return '#f87171';
+  if (pct >= 60) return '#66d66b';
+  if (pct >= 35) return '#ffd45a';
+  return '#ff5d57';
 }
 
 function ZoneCard(props: { zone: IrrigationZoneView }): JSX.Element {
@@ -179,7 +179,7 @@ function ZoneCard(props: { zone: IrrigationZoneView }): JSX.Element {
                 })
                 .join(' ')}
               fill="none"
-              stroke="#38bdf8"
+              stroke="#35d6e7"
               stroke-width="1.5"
             />
           </svg>

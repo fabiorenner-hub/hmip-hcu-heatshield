@@ -1,0 +1,681 @@
+/*
+ * Heat Shield — "Liquid Glass" demo (Apple-styled 360° rework).
+ *
+ * A full-screen, from-scratch reimagining of the overview in Apple's design
+ * language: neutral graphite surfaces, true Apple system label greys, Apple
+ * system colours (systemOrange accent), SF-Pro system type, translucent glass
+ * used for chrome/hierarchy while content leads. Everything is scoped under
+ * `.lg-demo` so it never collides with the shipped styles or `--hs-*` tokens.
+ * This is the DEMO route (/liquid-glass); the production overview is untouched.
+ *
+ * Layout mirrors the approved reference mock 1:1 (sidebar · header+weather ·
+ * hero with photo + metric strip · "next actions" + house twin · 4 KPI cards),
+ * only re-skinned in the Apple palette.
+ */
+
+/* ================================================================== *
+ * 1. Tokens — Apple dark is the base; light mirrors at the bottom
+ * ================================================================== */
+
+.lg-demo {
+  /* Type — SF Pro / system. */
+  --lg-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Segoe UI', Roboto, system-ui, sans-serif;
+
+  /* Surfaces — neutral graphite (Apple "elevated" greys, faint cool tint). */
+  --lg-bg: #08080a;
+  --lg-sidebar: rgba(20, 20, 23, 0.72);
+  --lg-panel: rgba(30, 30, 33, 0.55);
+  --lg-panel-2: rgba(44, 44, 47, 0.5);
+  --lg-inset: rgba(16, 16, 18, 0.55);
+  --lg-inset-2: rgba(255, 255, 255, 0.04);
+  --lg-active: rgba(120, 120, 128, 0.24); /* Apple selected-row fill */
+
+  /* Hairlines + inner light (refraction). */
+  --lg-hairline: rgba(255, 255, 255, 0.09);
+  --lg-hairline-2: rgba(255, 255, 255, 0.14);
+  --lg-highlight: rgba(255, 255, 255, 0.4);
+  --lg-sheen: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.03) 30%,
+    rgba(255, 255, 255, 0) 60%
+  );
+
+  /* Blur + saturation. */
+  --lg-blur: 30px;
+  --lg-blur-lg: 42px;
+  --lg-sat: 1.8;
+
+  /* Labels — Apple dark-mode label hierarchy. */
+  --lg-label-1: #ffffff;
+  --lg-label-2: rgba(235, 235, 245, 0.6);
+  --lg-label-3: rgba(235, 235, 245, 0.32);
+  --lg-label-4: rgba(235, 235, 245, 0.18);
+
+  /* Apple system colours (dark). */
+  --lg-orange: #ff9f0a;
+  --lg-orange-2: #ffb84d;
+  --lg-green: #30d158;
+  --lg-red: #ff453a;
+  --lg-blue: #0a84ff;
+  --lg-cyan: #64d2ff;
+  --lg-yellow: #ffd60a;
+  --lg-accent: var(--lg-orange);
+  --lg-on-accent: #2a1800;
+  --lg-focus: rgba(255, 159, 10, 0.55);
+
+  /* Shadows — soft, layered. */
+  --lg-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 34px rgba(0, 0, 0, 0.42);
+  --lg-shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.34), 0 26px 70px rgba(0, 0, 0, 0.5);
+  --lg-inner: inset 0 1px 0 var(--lg-highlight), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+
+  /* Radii — Apple continuous-corner feel. */
+  --lg-r-sm: 12px;
+  --lg-r: 18px;
+  --lg-r-lg: 24px;
+  --lg-r-xl: 28px;
+  --lg-r-pill: 999px;
+
+  /* Spacing (8pt-ish). */
+  --lg-s1: 6px;
+  --lg-s2: 10px;
+  --lg-s3: 14px;
+  --lg-s4: 20px;
+  --lg-s5: 28px;
+  --lg-s6: 40px;
+
+  /* Motion — short, natural spring. */
+  --lg-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --lg-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --lg-fast: 0.16s;
+  --lg-dur: 0.26s;
+
+  color-scheme: dark;
+  font-family: var(--lg-font);
+  -webkit-font-smoothing: antialiased;
+  color: var(--lg-label-1);
+}
+
+/*
+ * Full-bleed shell. NB: the app applies `.app__main > * { max-width:1200px;
+ * margin:0 auto; padding:16px }` to every routed child — we neutralise that
+ * here (same specificity, later source order wins) so the demo fills the area.
+ * We deliberately do NOT use position:fixed (fragile inside the shell); the app
+ * header is hidden via `body.lg-demo-open` while this view is mounted.
+ */
+.lg-demo {
+  position: relative;
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  min-height: 100vh;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--lg-bg);
+}
+
+/* Hide the surrounding app chrome so the demo reads as a full-page interface. */
+body.lg-demo-open .app__header { display: none !important; }
+body.lg-demo-open .app__main { padding: 0 !important; max-width: none !important; }
+
+/* Decorative wallpaper — gives the glass colour/light to refract (restrained). */
+.lg-demo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(90% 60% at 88% -8%, rgba(255, 159, 10, 0.12), transparent 60%),
+    radial-gradient(80% 60% at 0% 110%, rgba(10, 132, 255, 0.1), transparent 60%),
+    linear-gradient(180deg, #0b0c10 0%, #070709 100%);
+}
+
+/* ================================================================== *
+ * 2. Sidebar (left nav) — translucent glass rail
+ * ================================================================== */
+
+.lg-side {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg-s2);
+  padding: var(--lg-s4) var(--lg-s3);
+  background: var(--lg-sidebar);
+  border-right: 1px solid var(--lg-hairline);
+  -webkit-backdrop-filter: blur(var(--lg-blur-lg)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur-lg)) saturate(var(--lg-sat));
+}
+
+.lg-side__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--lg-s2);
+  padding: var(--lg-s1) var(--lg-s2) var(--lg-s4);
+}
+.lg-side__logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--lg-orange);
+  background: rgba(255, 159, 10, 0.14);
+  border: 1px solid rgba(255, 159, 10, 0.28);
+  flex: 0 0 auto;
+}
+.lg-side__brand-name { font-size: 1.02rem; font-weight: 640; letter-spacing: -0.01em; }
+.lg-side__brand-sub { font-size: 11.5px; color: var(--lg-label-3); margin-top: 1px; }
+
+.lg-nav { display: flex; flex-direction: column; gap: 2px; }
+.lg-nav__item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--lg-label-2);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 550;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: var(--lg-s2);
+  padding: 9px var(--lg-s2);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color var(--lg-fast) var(--lg-ease), color var(--lg-fast) var(--lg-ease);
+}
+.lg-nav__item svg { color: var(--lg-label-3); transition: color var(--lg-fast) var(--lg-ease); }
+@media (hover: hover) {
+  .lg-nav__item:hover { background: rgba(255, 255, 255, 0.05); color: var(--lg-label-1); }
+  .lg-nav__item:hover svg { color: var(--lg-label-2); }
+}
+.lg-nav__item--active {
+  background: var(--lg-active);
+  color: var(--lg-label-1);
+  font-weight: 600;
+}
+.lg-nav__item--active svg { color: var(--lg-orange); }
+
+.lg-side__spacer { flex: 1 1 auto; }
+.lg-side__foot { display: flex; flex-direction: column; gap: 2px; }
+.lg-side__status-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--lg-green);
+  box-shadow: 0 0 6px rgba(48, 209, 88, 0.7);
+}
+.lg-side__clock {
+  padding: var(--lg-s3) var(--lg-s2) 0;
+  margin-top: var(--lg-s2);
+  border-top: 1px solid var(--lg-hairline);
+}
+.lg-side__time { font-size: 1.35rem; font-weight: 640; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lg-side__date { font-size: 12px; color: var(--lg-label-3); margin-top: 2px; }
+
+/* ================================================================== *
+ * 3. Main scroll area + page header
+ * ================================================================== */
+
+.lg-main {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  overflow-x: hidden;
+  padding: var(--lg-s5) var(--lg-s6) var(--lg-s6);
+}
+
+.lg-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--lg-s4);
+  margin-bottom: var(--lg-s5);
+}
+.lg-header__title { margin: 0; font-size: 1.9rem; font-weight: 680; letter-spacing: -0.025em; }
+.lg-header__sub { margin: 4px 0 0; font-size: 0.98rem; color: var(--lg-label-2); }
+
+/* Weather chip (top-right). */
+.lg-weather {
+  display: flex;
+  align-items: center;
+  gap: var(--lg-s2);
+  padding: var(--lg-s2) var(--lg-s3);
+  border-radius: var(--lg-r);
+  background: var(--lg-sheen), var(--lg-panel);
+  border: 1px solid var(--lg-hairline);
+  box-shadow: var(--lg-inner), var(--lg-shadow);
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+}
+.lg-weather__icon { color: var(--lg-yellow); flex: 0 0 auto; }
+.lg-weather__cond { font-size: 0.9rem; font-weight: 600; }
+.lg-weather__vals { font-size: 12px; color: var(--lg-label-2); margin-top: 1px; font-variant-numeric: tabular-nums; }
+
+/* ================================================================== *
+ * 4. Shared glass card recipe
+ * ================================================================== */
+
+.lg-card {
+  position: relative;
+  background: var(--lg-sheen), var(--lg-panel);
+  border: 1px solid var(--lg-hairline);
+  border-radius: var(--lg-r-lg);
+  box-shadow: var(--lg-inner), var(--lg-shadow);
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  overflow: hidden;
+}
+/* Specular rim highlight (decorative). */
+.lg-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg, var(--lg-highlight), rgba(255, 255, 255, 0) 42%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.lg-card__title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+}
+
+.lg-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg-s4);
+}
+
+/* ================================================================== *
+ * 5. Hero — photo right, text left, metric strip bottom
+ * ================================================================== */
+
+.lg-hero { padding: 0; margin-bottom: var(--lg-s4); }
+.lg-hero__top {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 232px;
+}
+.lg-hero__photo {
+  position: absolute;
+  inset: 0 0 0 42%;
+  /* PNG referenced via CSS url() only (never a JS import) — see the runtime
+     asset guard + stability-integration-guide.md. Apple-tuned hero generated
+     via the offline Stability pipeline (houseapple, HERO_SEED=77). */
+  background-image: url('/assets/hero/overview-house-apple.png');
+  background-size: cover;
+  background-position: center right;
+  /* Fade the photo into the card on its left edge (readable text). */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
+}
+.lg-hero__body {
+  position: relative;
+  z-index: 1;
+  padding: var(--lg-s5) var(--lg-s5) var(--lg-s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg-s3);
+  max-width: 30ch;
+}
+.lg-hero__badge {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+  color: var(--lg-orange);
+  background: rgba(255, 159, 10, 0.16);
+  border: 1px solid rgba(255, 159, 10, 0.3);
+}
+.lg-hero__headline {
+  margin: 0;
+  font-size: 1.55rem;
+  line-height: 1.16;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.lg-hero__lead { margin: 0; font-size: 0.98rem; color: var(--lg-label-2); }
+.lg-hero__benefit { font-size: 0.98rem; color: var(--lg-label-2); }
+.lg-hero__benefit b {
+  display: block;
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--lg-orange);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+/* Metric strip inside the hero. */
+.lg-strip {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--lg-inset);
+  border-top: 1px solid var(--lg-hairline);
+}
+.lg-strip__cell {
+  padding: var(--lg-s3) var(--lg-s4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.lg-strip__cell + .lg-strip__cell { border-left: 1px solid var(--lg-hairline); }
+.lg-strip__label { font-size: 11.5px; font-weight: 600; color: var(--lg-label-3); text-transform: none; }
+.lg-strip__main { display: flex; align-items: center; justify-content: space-between; gap: var(--lg-s2); }
+.lg-strip__value {
+  font-size: 1.5rem;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.lg-strip__value--sm { font-size: 1.05rem; font-weight: 620; }
+.lg-strip__hint { font-size: 11.5px; color: var(--lg-label-2); }
+.lg-strip__mode { display: inline-flex; align-items: center; gap: var(--lg-s1); color: var(--lg-green); }
+
+/* ================================================================== *
+ * 6. Two-column: Nächste Aktionen + Hausübersicht
+ * ================================================================== */
+
+.lg-two {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+  gap: var(--lg-s4);
+  margin-bottom: var(--lg-s4);
+}
+.lg-two > .lg-card { padding: var(--lg-s4); display: flex; flex-direction: column; gap: var(--lg-s3); }
+
+/* Action list. */
+.lg-actions { display: flex; flex-direction: column; gap: var(--lg-s2); }
+.lg-action {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: var(--lg-s3);
+  padding: var(--lg-s2) var(--lg-s3);
+  border-radius: var(--lg-r);
+  background: var(--lg-inset-2);
+  border: 1px solid var(--lg-hairline);
+}
+.lg-action__time {
+  font-size: 12px;
+  color: var(--lg-label-2);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  min-width: 42px;
+}
+.lg-action__time b { display: block; color: var(--lg-label-1); font-weight: 640; font-size: 13px; }
+.lg-action__icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--lg-hairline);
+  color: var(--lg-orange-2);
+  flex: 0 0 auto;
+}
+.lg-action__body { min-width: 0; }
+.lg-action__name { font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg-action__detail { font-size: 12px; color: var(--lg-label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--lg-r-pill);
+  font-size: 12px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  color: var(--lg-green);
+  background: rgba(48, 209, 88, 0.14);
+  border: 1px solid rgba(48, 209, 88, 0.28);
+  white-space: nowrap;
+}
+.lg-badge--prep { color: var(--lg-cyan); background: rgba(100, 210, 255, 0.14); border-color: rgba(100, 210, 255, 0.28); }
+
+.lg-linkrow {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--lg-orange);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--lg-s2) var(--lg-s3);
+  border-radius: var(--lg-r);
+  cursor: pointer;
+  transition: background-color var(--lg-fast) var(--lg-ease);
+}
+@media (hover: hover) { .lg-linkrow:hover { background: rgba(255, 255, 255, 0.05); } }
+
+/* House stage — self-contained isometric render + floating room chips. */
+.lg-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 300px;
+  border-radius: var(--lg-r);
+  background:
+    radial-gradient(70% 60% at 50% 26%, rgba(255, 159, 10, 0.1), transparent 70%),
+    var(--lg-inset);
+  border: 1px solid var(--lg-hairline);
+  overflow: hidden;
+}
+.lg-stage__img {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  transform: translate(-50%, -50%);
+  width: 74%;
+  max-width: 460px;
+  height: auto;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+}
+.lg-stage__sun {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  color: var(--lg-yellow);
+  filter: drop-shadow(0 0 10px rgba(255, 214, 10, 0.5));
+}
+.lg-room-chip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--lg-sheen), var(--lg-panel-2);
+  border: 1px solid var(--lg-hairline-2);
+  box-shadow: var(--lg-inner), 0 6px 16px rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(16px) saturate(var(--lg-sat));
+  backdrop-filter: blur(16px) saturate(var(--lg-sat));
+  white-space: nowrap;
+  z-index: 1;
+}
+.lg-room-chip__temp { font-size: 1.05rem; font-weight: 680; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.lg-room-chip__name { font-size: 11.5px; color: var(--lg-label-2); }
+.lg-room-chip__tone { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--lg-label-3); font-weight: 550; }
+
+/* ================================================================== *
+ * 7. KPI cards (bottom row of four)
+ * ================================================================== */
+
+.lg-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--lg-s4);
+}
+.lg-kpi { padding: var(--lg-s4); display: flex; flex-direction: column; gap: var(--lg-s2); }
+.lg-kpi__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--lg-s2); }
+.lg-kpi__label { font-size: 12px; font-weight: 600; color: var(--lg-label-3); }
+.lg-kpi__icon { color: var(--lg-label-2); flex: 0 0 auto; }
+.lg-kpi__value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.lg-kpi__value--accent { color: var(--lg-orange); }
+.lg-kpi__value--sm { font-size: 1.2rem; }
+.lg-kpi__hint { font-size: 11.5px; color: var(--lg-label-2); }
+.lg-kpi__spark { margin-top: auto; height: 40px; }
+
+/* ================================================================== *
+ * 8. Sparklines, donut, dots
+ * ================================================================== */
+
+.lg-spark { display: block; width: 100%; height: 100%; overflow: visible; }
+.lg-donut { flex: 0 0 auto; }
+
+.lg-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.lg-dot--ok { background: var(--lg-green); }
+.lg-dot--mid { background: var(--lg-orange); }
+.lg-dot--hot { background: var(--lg-red); }
+
+.lg-legend { display: flex; flex-wrap: wrap; gap: var(--lg-s3); font-size: 11.5px; color: var(--lg-label-2); }
+.lg-legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+.lg-mini-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--lg-label-2);
+  font-weight: 550;
+}
+
+/* ================================================================== *
+ * 9. Interactions + focus
+ * ================================================================== */
+
+.lg-card--interactive { transition: transform var(--lg-dur) var(--lg-spring), box-shadow var(--lg-dur) var(--lg-ease), border-color var(--lg-dur) var(--lg-ease); }
+@media (hover: hover) {
+  .lg-card--interactive:hover { transform: translateY(-2px); border-color: var(--lg-hairline-2); box-shadow: var(--lg-inner), var(--lg-shadow-lg); }
+}
+.lg-demo :focus-visible { outline: none; box-shadow: 0 0 0 3px var(--lg-focus); border-radius: var(--lg-r-sm); }
+
+/* Skeleton. */
+.lg-sk { position: relative; overflow: hidden; background: rgba(255, 255, 255, 0.05); border-radius: var(--lg-r-lg); }
+.lg-sk::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent); background-size: 300% 100%; animation: lg-sh 1.4s var(--lg-ease) infinite; }
+@keyframes lg-sh { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* ================================================================== *
+ * 10. Responsive
+ * ================================================================== */
+
+@media (max-width: 1180px) {
+  .lg-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 1000px) {
+  .lg-two { grid-template-columns: 1fr; }
+  .lg-main { padding: var(--lg-s5) var(--lg-s4) var(--lg-s5); }
+}
+@media (max-width: 820px) {
+  .lg-demo { grid-template-columns: 1fr; }
+  .lg-side {
+    position: fixed;
+    inset: auto 0 0 0;
+    height: auto;
+    top: auto;
+    z-index: 210;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--lg-s2);
+    padding: var(--lg-s2) var(--lg-s3);
+    border-right: 0;
+    border-top: 1px solid var(--lg-hairline);
+    overflow-x: auto;
+  }
+  .lg-side__brand, .lg-side__spacer, .lg-side__foot, .lg-side__clock { display: none; }
+  .lg-nav { flex-direction: row; gap: 2px; }
+  .lg-nav__item span { display: none; }
+  .lg-nav__item { padding: 10px; }
+  .lg-main { padding-bottom: 84px; }
+  .lg-hero__top { grid-template-columns: 1fr; min-height: 0; }
+  .lg-hero__photo { inset: 0 0 auto 0; height: 150px; position: relative; -webkit-mask-image: linear-gradient(180deg, #000 40%, transparent); mask-image: linear-gradient(180deg, #000 40%, transparent); }
+  .lg-hero__body { max-width: none; margin-top: -60px; }
+  .lg-strip { grid-template-columns: repeat(2, 1fr); }
+  .lg-strip__cell:nth-child(3), .lg-strip__cell:nth-child(4) { border-top: 1px solid var(--lg-hairline); }
+  .lg-strip__cell:nth-child(3) { border-left: 0; }
+}
+@media (max-width: 560px) {
+  .lg-header { flex-direction: column; }
+  .lg-kpis { grid-template-columns: 1fr; }
+  .lg-main { padding-left: var(--lg-s3); padding-right: var(--lg-s3); }
+}
+
+/* ================================================================== *
+ * 11. Light mode (auto via OS preference) — Apple light greys
+ * ================================================================== */
+
+@media (prefers-color-scheme: light) {
+  .lg-demo {
+    color-scheme: light;
+    --lg-bg: #f2f2f7;
+    --lg-sidebar: rgba(255, 255, 255, 0.72);
+    --lg-panel: rgba(255, 255, 255, 0.66);
+    --lg-panel-2: rgba(255, 255, 255, 0.8);
+    --lg-inset: rgba(120, 120, 128, 0.08);
+    --lg-inset-2: rgba(120, 120, 128, 0.06);
+    --lg-active: rgba(120, 120, 128, 0.16);
+    --lg-hairline: rgba(60, 60, 67, 0.14);
+    --lg-hairline-2: rgba(60, 60, 67, 0.22);
+    --lg-highlight: rgba(255, 255, 255, 0.9);
+    --lg-sheen: linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.1) 55%);
+    --lg-label-1: #1c1c1e;
+    --lg-label-2: rgba(60, 60, 67, 0.6);
+    --lg-label-3: rgba(60, 60, 67, 0.4);
+    --lg-label-4: rgba(60, 60, 67, 0.22);
+    --lg-orange: #ff9500;
+    --lg-green: #34c759;
+    --lg-red: #ff3b30;
+    --lg-blue: #007aff;
+    --lg-cyan: #32ade6;
+    --lg-yellow: #ffcc00;
+    --lg-on-accent: #ffffff;
+    --lg-shadow: 0 1px 2px rgba(60, 60, 67, 0.08), 0 12px 30px rgba(60, 60, 67, 0.12);
+    --lg-shadow-lg: 0 2px 6px rgba(60, 60, 67, 0.1), 0 26px 60px rgba(60, 60, 67, 0.18);
+    --lg-inner: inset 0 1px 0 var(--lg-highlight), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  }
+  .lg-demo::before {
+    background:
+      radial-gradient(90% 60% at 88% -8%, rgba(255, 149, 0, 0.1), transparent 60%),
+      radial-gradient(80% 60% at 0% 110%, rgba(0, 122, 255, 0.08), transparent 60%),
+      linear-gradient(180deg, #eef0f5 0%, #f2f2f7 100%);
+  }
+}
+
+/* ================================================================== *
+ * 12. Reduced transparency + reduced motion
+ * ================================================================== */
+
+@media (prefers-reduced-transparency: reduce) {
+  .lg-side, .lg-card, .lg-weather { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .lg-demo { --lg-sidebar: #16161a; --lg-panel: #1c1c1f; --lg-sheen: none; }
+}
+@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: light) {
+  .lg-demo { --lg-sidebar: #ffffff; --lg-panel: #ffffff; --lg-sheen: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg-demo *, .lg-demo *::before, .lg-demo *::after { animation: none !important; transition-duration: 0.01ms !important; }
+}

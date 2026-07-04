@@ -2,20 +2,22 @@
  * Heat Shield dashboard service worker.
  *
  * Goal: make the dashboard installable as a home-screen web app
- * (iOS / Android) and resilient to brief network drops — WITHOUT
+ * (iOS / Android) and resilient to brief network drops - without
  * ever serving stale live data.
  *
  * Strategy:
- *   - App shell (HTML, JS, CSS, icon, manifest): stale-while-
- *     revalidate. Fast load from cache, refreshed in the background.
- *   - Everything under /api/ (state, stream, discover, config, …):
+ *   - App shell (HTML, JS, CSS, icon, manifest): network-first, with
+ *     the cache as an offline fallback (avoids stale JS/CSS after an
+ *     update).
+ *   - Everything under /api/ (state, stream, discover, config, ...):
  *     network-only. Live data and SSE must never be cached.
  *   - Navigation requests: try network first, fall back to the
  *     cached shell so the installed app opens offline.
  */
 
-const CACHE = 'heatshield-shell-v1';
-const SHELL = ['/', '/app.js', '/styles.css', '/manifest.webmanifest', '/icon.svg'];
+const CACHE = 'heatshield-shell-v116';
+
+const SHELL = ['/', '/app.js', '/styles.css', '/liquid-glass.css', '/liquid-glass2.css', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -53,19 +55,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static shell assets: stale-while-revalidate.
+  // Static shell assets: network-first (always latest when online, cache is a
+  // fallback for offline). Avoids serving stale JS/CSS after an update.
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.status === 200) {
-            const copy = res.clone();
-            void caches.open(CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    }),
+    fetch(req)
+      .then((res) => {
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          void caches.open(CACHE).then((c) => c.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req).then((cached) => cached || Response.error())),
   );
 });

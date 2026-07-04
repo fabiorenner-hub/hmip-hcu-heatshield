@@ -3,6 +3,34 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.2
+
+- **Hausübersicht neu aufgebaut.** Die Räume erscheinen als klares Kachelraster (max. 4×3 = 12 Räume; darüber scrollt das Raster in der Karte) mit farbigem Status-Balken. Ein Klick öffnet ein reiches Popup mit Werten und **manueller Steuerung** (Auf / 50 % / Zu, Slider) sowie „Detailansicht öffnen". Das frühere 3D-Haus im Hintergrund entfällt; der **Hero oben** ist ein flexibler Platzhalter, der den freien Platz füllt, sodass die Kacheln nur so hoch sind wie nötig.
+- **Popup & Detailansicht im Liquid-Glass-Design (V2).** Beide werden per Portal außerhalb der Shell gerendert; die V2-Tokens werden jetzt auf `<body>` gespiegelt, sodass sie dem aktiven Theme (Akzent, Glas, Hell/Dunkel) folgen. Die Chips nutzen denselben Glas-Hintergrund wie die Räume-Liste.
+- **Darstellung erweitert:** konfigurierbare **Status-Farbpalette** (Gering/Warnung/Hoch/Info), **Theme-Import/-Export** (JSON, kopieren + herunterladen / einfügen + anwenden) und **Überspeichern** eigener Presets bei Änderungen.
+- **HmIP-HDM1** Beschattungsmodule (Hunter Douglas / erfal) werden erkannt und wie Rollläden angesteuert.
+- Leerzustand „Keine Räume konfiguriert" zentriert. Fix: beschädigter Service-Worker-Kommentar bereinigt.
+
+## 2.0.2
+
+- **Hausübersicht neu gestaltet.** Die Raum-Kacheln erscheinen in einem klaren **4×3-Raster** (max. 12 Räume sichtbar, darüber scrollt die Karte) mit einem **reichen Klick-Popup** samt manueller Steuerung (Auf / 50 % / Zu, Slider) – **ohne** das 3D-Haus im Hintergrund. Der obere „Hero"-Bereich ist ein flexibler Platzhalter und füllt den freien Platz, sodass keine leere Zeile entsteht.
+- **Durchgängiges V2-Design.** Popup und Detailansicht nutzen jetzt das Liquid-Glass-Design; die Kacheln haben den gleichen Glas-Look wie die Räume-Zeilen. **Alle Einstellungs-Seiten** (inkl. Einstellungs-Hub, Diagnose, Logs, Bewässerung, Quellen …) sind auf die Glas-Optik vereinheitlicht und die **High-FPS-Optionen** greifen auch dort.
+- **Darstellung erweitert.** Konfigurierbare **Status-Farbpalette** (Gering/Warnung/Hoch/Info), **Theme-Import/-Export** (JSON) und **Überspeichern** eigener Presets bei Änderungen.
+- **HmIP-HDM1** Beschattungsmodule (Hunter Douglas / erfal) werden unterstützt (automatische Erkennung, Steuerung via `setPrimaryShadingLevel`).
+- Fix: beschädigter Service-Worker-Kommentar (Mojibake) bereinigt.
+
+## 2.0.1
+
+- **Hausübersicht zeigt jederzeit alle Räume – ohne Scrollen.** Das Kachelraster teilt sich die Kartenhöhe und passt sich der Raumanzahl an: In der Basis-Ansicht schrumpfen die Kacheln so weit, dass **alle** Räume auf einen Blick sichtbar bleiben, statt innerhalb der Karte zu scrollen. Bei vielen Räumen (ab drei Zeilen) verdichtet sich die Kachel automatisch (Name, Risiko-Ampel und Temperatur bleiben lesbar; die Rollladen-Zeile wandert in das Detail-Popup). In der Experten-Ansicht behalten die Kacheln ihre volle Höhe und die Seite scrollt wie gewohnt.
+
+## 2.0.0
+
+- **Komplett neue Oberfläche „Liquid Glass" – jetzt Standard für alle Installationen.** Frosted-Glass-Design mit linker Seitenleiste (keine obere Navigation). Jede Seite hat eine ruhige **Basis-Ansicht** und eine tiefe **Experten-Ansicht** (Rohwerte, alle geplanten Aktionen, Risiko je Fenster, Lernmodell je Raum, manuelle Rollladen-/Ventilsteuerung mit Sturmschutz-Vorrang). Die klassische **1.20-Oberfläche** bleibt unter *Einstellungen → Darstellung & Sprache* wählbar.
+- **Voll konfigurierbare Darstellung.** Vorlagen inkl. eigener Presets (Standard „Glass", zusätzlich „White"), Akzentfarbe, Hell-/Dunkel-/Auto-Schema, Hintergrundbild, Glas-Stärke und Symbol-Kacheln — dazu Performance-Optionen (**Statisches Glas**, **High FPS Mode** mit granularen Schaltern) für flüssiges Scrollen. Das Darstellungs-Menü ist neu in Abschnitte gegliedert.
+- **Neuer geführter Einrichtungs-Assistent.** Führt beim ersten Start Schritt für Schritt durch die komplette Einrichtung: Standort (auch per Gerätestandort), **PV-Anlage** (FusionSolar oder ein anderes HMIP-Watt-Gerät, z. B. vom Modbus-Plugin), **GARDENA-Bewässerung**, **Räume** und **Rollläden** per Auswahlmenü. Fensterkontakte werden ohne Drag-and-drop über Auswahlmenüs zugewiesen.
+- **Unterstützung für HmIP-HDM1 Beschattungsmodule** (Hunter Douglas / erfal): Sie werden automatisch erkannt (feature-basiert über `primaryShadingLevel`) und spec-konform über `setPrimaryShadingLevel` wie Rollläden für den Hitzeschutz angesteuert — ohne zusätzliche Konfiguration, auch für bestehende Installationen.
+- **Warnungen grafisch neu** (Hero-Bild je Warnart, DWD-Warnstufenfarben) und ein **Tagesplan-Editor** für die Bewässerung. Durchgängig zweisprachig (DE/EN); ehrliche „–"-Platzhalter statt erfundener Werte.
+
 ## 1.20.0
 
 - **Stockwerk-Beschattung**: Obergeschosse (OG/DG) werden früher beschattet als Erd- und Kellergeschoss. Pro Stockwerk einstellbar (Regeln → Stockwerk-Beschattung); leer = automatischer Vorlauf (DG +1,0 / OG +0,6 / EG 0). Wärme und Sonne werden weiterhin pro Fenster verfolgt — der Vorlauf verschiebt nur die Komfortgrenze.

@@ -27,14 +27,14 @@ const FACTOR_ORDER: RiskFactorName[] = [
 ];
 
 const FACTOR_COLORS: Record<RiskFactorName, string> = {
-  sunFactor: '#f4b400',
-  roomTempFactor: '#db4437',
-  windowTypeFactor: '#9c27b0',
-  forecastTempFactor: '#3f51b5',
-  pvFactor: '#0f9d58',
-  radiationFactor: '#ff9800',
-  outdoorTempFactor: '#4285f4',
-  priorityFactor: '#8e8e8e',
+  sunFactor: '#ff9d2e',
+  roomTempFactor: '#ff5d57',
+  windowTypeFactor: '#9b7cff',
+  forecastTempFactor: '#4a8cff',
+  pvFactor: '#66d66b',
+  radiationFactor: '#ffc45b',
+  outdoorTempFactor: '#35d6e7',
+  priorityFactor: '#9eb0c0',
 };
 
 const FACTOR_LABELS: Record<RiskFactorName, () => string> = {

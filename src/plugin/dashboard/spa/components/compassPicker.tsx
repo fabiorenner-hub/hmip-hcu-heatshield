@@ -56,14 +56,14 @@ export function CompassPicker(props: Props): JSX.Element {
       data-value={String(props.value)}
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={c} cy={c} r={r + 8} fill="#0f172a" />
-        <circle cx={c} cy={c} r={r + 8} fill="none" stroke="#334155" stroke-width="2" />
+        <circle cx={c} cy={c} r={r + 8} fill="var(--color-bg)" />
+        <circle cx={c} cy={c} r={r + 8} fill="none" stroke="var(--color-card-border)" stroke-width="2" />
         {/* pointer to the selected direction */}
         {(() => {
           const rad = ((selected - 90) * Math.PI) / 180;
           const x = c + Math.cos(rad) * r;
           const y = c + Math.sin(rad) * r;
-          return <line x1={c} y1={c} x2={x} y2={y} stroke="#f59e0b" stroke-width="3" />;
+          return <line x1={c} y1={c} x2={x} y2={y} stroke="var(--color-accent)" stroke-width="3" />;
         })()}
         {POINTS.map((p) => {
           const rad = ((p.deg - 90) * Math.PI) / 180;
@@ -76,8 +76,8 @@ export function CompassPicker(props: Props): JSX.Element {
                 cx={x}
                 cy={y}
                 r={isSel ? 13 : 11}
-                fill={isSel ? '#f59e0b' : '#1e293b'}
-                stroke={isSel ? '#fff' : '#475569'}
+                fill={isSel ? 'var(--color-accent)' : 'var(--color-card)'}
+                stroke={isSel ? 'var(--color-text)' : 'var(--color-card-border-strong)'}
                 stroke-width="1.5"
                 style={props.disabled === true ? '' : 'cursor:pointer'}
                 data-testid={`compass-point-${p.label}`}
@@ -90,7 +90,7 @@ export function CompassPicker(props: Props): JSX.Element {
                 y={y + 4}
                 text-anchor="middle"
                 font-size="10"
-                fill={isSel ? '#0f172a' : '#cbd5e1'}
+                fill={isSel ? 'var(--color-accent-contrast)' : 'var(--color-muted)'}
                 style={props.disabled === true ? '' : 'cursor:pointer; user-select:none'}
                 onClick={(): void => {
                   if (props.disabled !== true) props.onChange(p.deg);

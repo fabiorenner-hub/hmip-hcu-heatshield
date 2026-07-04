@@ -140,21 +140,21 @@ export function IrrigationTab(_props: RoutableProps): JSX.Element {
     const pts = next24
       .filter((p) => Number.isFinite(p.t) && p.precip !== null)
       .map((p) => ({ t: p.t, v: p.precip as number }));
-    return pts.length >= 2 ? [{ label: t('Niederschlag', 'Precipitation'), color: '#38bdf8', points: pts }] : [];
+    return pts.length >= 2 ? [{ label: t('Niederschlag', 'Precipitation'), color: '#4a8cff', points: pts }] : [];
   }, [next24]);
 
   const probSeries: ChartSeries[] = useMemo(() => {
     const pts = next24
       .filter((p) => Number.isFinite(p.t) && p.prob !== null)
       .map((p) => ({ t: p.t, v: p.prob as number }));
-    return pts.length >= 2 ? [{ label: t('Regenwahrscheinlichkeit', 'Rain probability'), color: '#818cf8', points: pts }] : [];
+    return pts.length >= 2 ? [{ label: t('Regenwahrscheinlichkeit', 'Rain probability'), color: '#9b7cff', points: pts }] : [];
   }, [next24]);
 
   const dailySeries: ChartSeries[] = useMemo(() => {
     const pts = (data?.daily ?? [])
       .filter((d) => Number.isFinite(d.t) && d.sum !== null)
       .map((d) => ({ t: d.t, v: d.sum as number }));
-    return pts.length >= 2 ? [{ label: t('Tagessumme', 'Daily total'), color: '#0ea5e9', points: pts }] : [];
+    return pts.length >= 2 ? [{ label: t('Tagessumme', 'Daily total'), color: '#35d6e7', points: pts }] : [];
   }, [data]);
 
   const kpi = (label: string, value: string, testId: string, cls = ''): JSX.Element => (

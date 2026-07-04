@@ -316,11 +316,13 @@ describe('<RoomsTab/> (Task 12.1)', () => {
       expect(el).not.toBeNull();
       return el as HTMLElement;
     });
-    // Initially no contact.
-    expect(
-      document.querySelector('[data-testid="room-card-window-contact-shutter-1"]')?.textContent,
-    ).toContain('kein Fensterkontakt');
-    // Drop a contact payload onto the shutter row.
+    // Initially no contact: the per-window dropdown sits at its empty value.
+    const contactSelect = document.querySelector(
+      '[data-testid="room-card-window-contact-select-shutter-1"]',
+    ) as HTMLSelectElement | null;
+    expect(contactSelect).not.toBeNull();
+    expect(contactSelect?.value).toBe('');
+    // Drop a contact payload onto the shutter row (drag-and-drop still works).
     const dataTransfer = {
       getData: vi.fn(() => JSON.stringify({ kind: 'contact', deviceId: 'CONTACT-AAAA' })),
       setData: vi.fn(),
@@ -705,9 +707,9 @@ describe('App auto-redirect on CONFIG_REQUIRED', () => {
     ]);
     snapshot.value = FIXTURE_SNAPSHOT_CONFIG_REQUIRED;
     await act(async () => {
-      render(<App initialUrl="/live" />);
+      render(<App initialUrl="/uebersicht" />);
     });
-    expect(document.querySelector('[data-testid="tab-live"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="uebersicht-view"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="wizard-steps"]')).toBeNull();
   });
 });

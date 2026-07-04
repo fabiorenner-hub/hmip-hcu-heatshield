@@ -1,0 +1,3614 @@
+/* AUTO-COPIED from liquid-glass.css (route /liquid-glass2). Namespaced lg- -> lg2-. */
+/*
+ * Heat Shield — "Liquid Glass" demo (Apple-styled 360° rework).
+ *
+ * A full-screen, from-scratch reimagining of the overview in Apple's design
+ * language: neutral graphite surfaces, true Apple system label greys, Apple
+ * system colours (systemOrange accent), SF-Pro system type, translucent glass
+ * used for chrome/hierarchy while content leads. Everything is scoped under
+ * `.lg2-demo` so it never collides with the shipped styles or `--hs-*` tokens.
+ * This is the DEMO route (/liquid-glass); the production overview is untouched.
+ *
+ * Layout mirrors the approved reference mock 1:1 (sidebar · header+weather ·
+ * hero with photo + metric strip · "next actions" + house twin · 4 KPI cards),
+ * only re-skinned in the Apple palette.
+ */
+
+/* ================================================================== *
+ * 1. Tokens — Apple dark is the base; light mirrors at the bottom
+ * ================================================================== */
+
+/* `body.ui-v2` is included so PORTALLED surfaces (room-detail modal, twin
+   popover) — which render outside `.lg2-demo` on <body> — inherit the same
+   base --lg2-* tokens and therefore render in the Liquid Glass V2 look. The
+   theme-driven tokens (accent, glass, scrim, labels) are additionally mirrored
+   onto <body> by the shell so portals follow the live theme, not just the
+   defaults. */
+.lg2-demo,
+body.ui-v2 {
+  /* Type — SF Pro / system. */
+  --lg2-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Segoe UI', Roboto, system-ui, sans-serif;
+
+  /* Surfaces — neutral graphite (Apple "elevated" greys, faint cool tint). */
+  --lg2-bg: #05070c; /* darker graphite base */
+  /* Configurable knobs (overridden live by the Design configurator). */
+  --lg2-glass-rgb: 46, 54, 70; /* glass tint base (frost = 255,255,255) */
+  --lg2-glass-alpha: 0.42; /* card translucency */
+  --lg2-accent-rgb: 255, 159, 10; /* accent as r,g,b for tints */
+  --lg2-bg-image: url('/assets/lg2/backdrop.png');
+  --lg2-bg-opacity: 0.42;
+  --lg2-gap: 16px; /* uniform spacing between tiles (config: Kachel-Abstand) */
+  --lg2-aurora: 1; /* gradient bloom strength (config: Verlauf-Stärke) */
+  --lg2-hero-img: url('/assets/hero/overview-house-apple.png');
+  /* Frosted glass fills: single tint base + alpha (theme-driven). */
+  --lg2-sidebar: rgba(var(--lg2-glass-rgb), calc(var(--lg2-glass-alpha) + 0.13));
+  --lg2-panel: rgba(var(--lg2-glass-rgb), var(--lg2-glass-alpha));
+  --lg2-panel-2: rgba(var(--lg2-glass-rgb), calc(var(--lg2-glass-alpha) - 0.06));
+  --lg2-inset: rgba(8, 12, 20, calc(var(--lg2-glass-alpha) + 0.06));
+  --lg2-inset-2: rgba(255, 255, 255, 0.05);
+  --lg2-active: rgba(120, 150, 190, 0.24);
+  --lg2-hover: rgba(255, 255, 255, 0.07); /* configurable hover fill */
+
+  /* Local contrast backing (scrim): colour + alpha set by JS (textVars), alpha
+     grows as the glass gets more transparent so text stays readable over any
+     wallpaper region. Default alpha 0 = invisible until the theme sets it. */
+  --lg2-scrim-rgb: 8, 11, 17;
+  --lg2-scrim-a: 0;
+  --lg2-scrim: linear-gradient(rgba(var(--lg2-scrim-rgb), var(--lg2-scrim-a)), rgba(var(--lg2-scrim-rgb), var(--lg2-scrim-a)));
+
+  /* Hairlines + inner light (refraction) — stronger for the "wet glass" edge. */
+  --lg2-border-alpha: 0.55; /* contour strength (config: Kontur) */
+  --lg2-hairline: rgba(255, 255, 255, calc(0.05 + var(--lg2-border-alpha) * 0.16));
+  --lg2-hairline-2: rgba(255, 255, 255, calc(0.09 + var(--lg2-border-alpha) * 0.22));
+  --lg2-highlight: rgba(255, 255, 255, 0.55);
+  --lg2-sheen: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.05) 26%,
+    rgba(255, 255, 255, 0) 58%
+  );
+
+  /* Blur + saturation. Kept moderate: backdrop-filter blur is the dominant
+     GPU cost during scroll, and a very large radius (32px+) makes long glassy
+     lists janky. 20px still reads as frosted glass at a fraction of the cost. */
+  --lg2-blur: 20px;
+  --lg2-blur-lg: 28px;
+  --lg2-sat: 1.5;
+
+  /* Labels — Apple dark-mode label hierarchy. */
+  --lg2-label-1: #ffffff;
+  --lg2-label-2: rgba(235, 235, 245, 0.6);
+  --lg2-label-3: rgba(235, 235, 245, 0.32);
+  --lg2-label-4: rgba(235, 235, 245, 0.18);
+
+  /* Apple system colours (dark). */
+  --lg2-orange: #ff9f0a;
+  --lg2-orange-2: #ffb84d;
+  --lg2-green: #30d158;
+  --lg2-red: #ff453a;
+  --lg2-blue: #0a84ff;
+  --lg2-cyan: #64d2ff;
+  --lg2-yellow: #ffd60a;
+  /* Semantic hues as r,g,b for building translucent tints (fallback pass). */
+  --lg2-green-rgb: 48, 209, 88;
+  --lg2-red-rgb: 255, 69, 58;
+  --lg2-blue-rgb: 10, 132, 255;
+  --lg2-orange-rgb: 255, 159, 10;
+  --lg2-accent: var(--lg2-orange);
+  --lg2-on-accent: #2a1800;
+  --lg2-focus: rgba(255, 159, 10, 0.55);
+
+  /* Shadows — soft, layered. */
+  --lg2-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 34px rgba(0, 0, 0, 0.42);
+  --lg2-shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.34), 0 26px 70px rgba(0, 0, 0, 0.5);
+  /* Frosted-Glass signature bevel (1:1 from wessamlauf/frosted-glass): bright
+     top-left + bottom-right inset edges + soft inner glow + faint outer line. */
+  --lg2-bevel:
+    inset 3px 3px 0.5px -3.5px rgba(255, 255, 255, 0.3),
+    inset -2px -2px 0.5px -2px rgba(255, 255, 255, 0.3),
+    inset 0 0 8px 1px rgba(255, 255, 255, 0.1),
+    0 0 2px 0 rgba(0, 0, 0, 0.1);
+  --lg2-inner: var(--lg2-bevel);
+
+  /* Radii — Apple continuous-corner feel. */
+  --lg2-r-sm: 12px;
+  --lg2-r: 18px;
+  --lg2-r-lg: 24px;
+  --lg2-r-xl: 28px;
+  --lg2-r-pill: 999px;
+
+  /* Spacing (8pt-ish). */
+  --lg2-s1: 6px;
+  --lg2-s2: 10px;
+  --lg2-s3: 14px;
+  --lg2-s4: 20px;
+  --lg2-s5: 28px;
+  --lg2-s6: 40px;
+
+  /* Motion — short, natural spring. */
+  --lg2-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --lg2-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --lg2-fast: 0.16s;
+  --lg2-dur: 0.26s;
+
+  color-scheme: dark;
+  font-family: var(--lg2-font);
+  -webkit-font-smoothing: antialiased;
+  color: var(--lg2-label-1);
+}
+
+/*
+ * Full-bleed shell. NB: the app applies `.app__main > * { max-width:1200px;
+ * margin:0 auto; padding:16px }` to every routed child — we neutralise that
+ * here (same specificity, later source order wins) so the demo fills the area.
+ * We deliberately do NOT use position:fixed (fragile inside the shell); the app
+ * header is hidden via `body.lg2-demo-open` while this view is mounted.
+ */
+.lg2-demo {
+  position: relative;
+  display: grid;
+  grid-template-columns: clamp(160px, 10.5vw, 204px) 1fr;
+  height: 100vh;
+  /* Fullscreen up to 16:9 — the UI uses the whole width with NO side frame.
+     The centred ~82vw framed column only kicks in on ultrawide screens (wider
+     than 16:9), see the `min-aspect-ratio` query below. */
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  /* !important beats the app shell rule
+     `.app--ambient .app__main > *:not(.dashboard-grid){background:transparent}`,
+     which would otherwise let the app's blue ambient bg show through. */
+  background: var(--lg2-bg) !important;
+  overflow: hidden; /* single-screen dashboard — no page scroll */
+}
+
+/* Ultrawide ONLY (21:9 and wider): centre the UI in an ~82vw column with the
+   configurable outer frame. NB: CSS aspect-ratio measures the VIEWPORT, which
+   on a normal 16:9 monitor is ~1.9–2.1 after browser/OS chrome — so the
+   threshold must be ~21:9 (2.33), otherwise ordinary screens get framed too.
+   Everything up to 21:9 stays true fullscreen (no side frame). */
+@media (min-aspect-ratio: 21 / 9) {
+  .lg2-demo {
+    width: min(82vw, 1760px) !important;
+    box-shadow: var(--lg2-demo-shadow, none);
+  }
+}
+
+/* Hide the surrounding app chrome so the demo reads as a full-page interface. */
+body.lg2-demo-open .app__header { display: none !important; }
+/* Dark frame around the centred demo (kills the app's inline ambient gradient,
+   which was the only bright blue in the system). */
+body.lg2-demo-open .app__main {
+  padding: 0 !important;
+  max-width: none !important;
+  /* Fully configurable outer frame — colour / gradient / image / URL plus a
+     darken overlay, all composed in JS into `--lg2-frame-bg` (set on <body> so
+     this ancestor element can read it). Image frames use `fixed` cover, so they
+     line up pixel-for-pixel with the demo's own `fixed` wallpaper. */
+  background: var(--lg2-frame-bg, #05070d) !important;
+}
+body.lg2-demo-open .app,
+body.lg2-demo-open .app--ambient,
+body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
+
+/*
+ * Layered wallpaper the glass refracts. Performant: a STATIC generated backdrop
+ * (::before, no runtime blur/blend) + Apple-style colour blooms and a
+ * legibility veil (::after). Both sit behind the sidebar/main (z-index > 0).
+ */
+.lg2-demo::before {
+  content: '';
+  position: absolute;
+  /* Negative inset scales with the blur radius so the blurred edges stay behind
+     the demo's `overflow:hidden` clip — no transparent fringe at the borders. */
+  inset: calc(-2px - var(--lg2-bg-blur, 0px));
+  z-index: 0;
+  pointer-events: none;
+  /* Full configurable wallpaper paint (colour / gradient / image / URL). Images
+     use `fixed` cover so they line up seamlessly with the frame wallpaper. */
+  background: var(--lg2-bg-layer, transparent);
+  opacity: var(--lg2-bg-opacity, 1);
+  filter: blur(var(--lg2-bg-blur, 0px));
+}
+.lg2-demo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(105% 88% at 88% -12%, rgba(var(--lg2-accent-rgb), calc(0.26 * var(--lg2-aurora))), transparent 58%),
+    radial-gradient(100% 90% at -8% 114%, rgba(var(--lg2-accent-rgb), calc(0.16 * var(--lg2-aurora))), transparent 58%),
+    radial-gradient(60% 55% at 46% 44%, rgba(var(--lg2-accent-rgb), calc(0.05 * var(--lg2-aurora))), transparent 72%),
+    linear-gradient(180deg, rgba(4, 6, 12, 0.45) 0%, rgba(2, 4, 8, 0.84) 100%);
+}
+
+/* ================================================================== *
+ * 2. Sidebar (left nav) — translucent glass rail
+ * ================================================================== */
+
+/* Sidebar column is transparent; ONLY the nav links sit in a glass tile. */
+.lg2-side {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: clamp(10px, 1vw, 16px) 8px;
+  /* Share the adaptive readability scrim with the cards: at high glass opacity
+     the scrim alpha is 0 (fully transparent, unchanged), but as the glass gets
+     more transparent the scrim grows so the sidebar (nav icons, foot, clock)
+     stays exactly as readable as the content cards — no more light-on-light
+     icons at 0 % glass. */
+  background: var(--lg2-scrim);
+}
+
+/* The nav links grouped in one rounded, theme-driven glass tile. */
+.lg2-nav {
+  padding: 6px;
+  border-radius: var(--lg2-r-lg);
+  background: var(--lg2-sheen), var(--lg2-panel);
+  border: 1px solid var(--lg2-hairline);
+  box-shadow: var(--lg2-inner), var(--lg2-shadow);
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+}
+
+.lg2-side__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--lg2-s2);
+  padding: var(--lg2-s1) var(--lg2-s2) var(--lg2-s4);
+}
+.lg2-side__logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--lg2-orange);
+  background: rgba(var(--lg2-accent-rgb), 0.16);
+  border: 1px solid rgba(var(--lg2-accent-rgb), 0.32);
+  flex: 0 0 auto;
+}
+.lg2-side__brand-name { display: block; font-size: 1.02rem; font-weight: 640; letter-spacing: -0.01em; line-height: 1.15; }
+.lg2-side__brand-sub { display: block; font-size: 11.5px; color: var(--lg2-label-3); margin-top: 1px; line-height: 1.1; }
+
+.lg2-nav { display: flex; flex-direction: column; gap: 2px; }
+.lg2-nav__item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--lg2-label-1);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 550;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: var(--lg2-s2);
+  padding: 9px var(--lg2-s2);
+  /* Follow the glass radius so the hover fill matches the tile corners. */
+  border-radius: calc(var(--lg2-r-lg) - 8px);
+  cursor: pointer;
+  transition: background-color var(--lg2-fast) var(--lg2-ease), color var(--lg2-fast) var(--lg2-ease);
+}
+.lg2-nav__item svg { color: var(--lg2-label-2); transition: color var(--lg2-fast) var(--lg2-ease); }
+@media (hover: hover) {
+  .lg2-nav__item:hover { background: var(--lg2-hover); color: var(--lg2-label-1); }
+  .lg2-nav__item:hover svg { color: var(--lg2-label-2); }
+}
+.lg2-nav__item--active {
+  background: var(--lg2-active);
+  color: var(--lg2-label-1);
+  font-weight: 600;
+}
+.lg2-nav__item--active svg { color: var(--lg2-orange); }
+
+.lg2-side__spacer { flex: 1 1 auto; }
+.lg2-side__foot { display: flex; flex-direction: column; gap: 2px; }
+.lg2-side__status-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--lg2-green);
+  box-shadow: 0 0 6px rgba(48, 209, 88, 0.7);
+}
+.lg2-side__clock {
+  padding: var(--lg2-s3) var(--lg2-s2) 0;
+  margin-top: var(--lg2-s2);
+  border-top: 1px solid var(--lg2-hairline);
+}
+.lg2-side__time { font-size: 1.35rem; font-weight: 640; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lg2-side__date { font-size: 12px; color: var(--lg2-label-3); margin-top: 2px; }
+
+/* ================================================================== *
+ * 3. Main scroll area + page header
+ * ================================================================== */
+
+.lg2-main {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg2-gap);
+  padding: clamp(10px, 1vw, 18px) clamp(10px, 0.8vw, 16px);
+}
+
+.lg2-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--lg2-s4);
+}
+.lg2-header__title { margin: 0; font-size: 1.6rem; font-weight: 680; letter-spacing: -0.025em; }
+.lg2-header__sub { margin: 4px 0 0; font-size: 0.98rem; color: var(--lg2-label-2); }
+
+/* Weather chip (top-right). */
+.lg2-weather {
+  display: flex;
+  align-items: center;
+  gap: var(--lg2-s2);
+  padding: var(--lg2-s2) var(--lg2-s3);
+  border-radius: var(--lg2-r);
+  background: var(--lg2-sheen), var(--lg2-panel);
+  border: 1px solid var(--lg2-hairline);
+  box-shadow: var(--lg2-inner), var(--lg2-shadow);
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+}
+.lg2-weather__icon { color: var(--lg2-yellow); flex: 0 0 auto; }
+.lg2-weather__cond { font-size: 0.9rem; font-weight: 600; }
+.lg2-weather__vals { font-size: 12px; color: var(--lg2-label-2); margin-top: 1px; font-variant-numeric: tabular-nums; }
+
+/* ================================================================== *
+ * 4. Shared glass card recipe
+ * ================================================================== */
+
+.lg2-card {
+  position: relative;
+  background: var(--lg2-sheen), var(--lg2-scrim), var(--lg2-panel);
+  border: 1px solid var(--lg2-hairline);
+  border-radius: var(--lg2-r-lg);
+  box-shadow: var(--lg2-inner), var(--lg2-shadow);
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  overflow: hidden;
+}
+/* Specular rim highlight (decorative). */
+.lg2-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg, var(--lg2-highlight), rgba(255, 255, 255, 0) 42%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.lg2-card__title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+}
+
+.lg2-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg2-s4);
+}
+
+/* ================================================================== *
+ * 5. Hero — photo right, text left, metric strip bottom
+ * ================================================================== */
+
+/* The hero is the FLEXIBLE placeholder of the one-screen Basic layout: it
+   absorbs whatever vertical space the content below (house overview, KPIs)
+   doesn't need, so there is never an empty trailing row. It grows (flex-grow)
+   but keeps a sensible minimum. */
+.lg2-hero { flex: 1 1 auto; min-height: 0; padding: 0; display: flex; flex-direction: column; }
+.lg2-hero__top {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  /* Grows with the hero (fills leftover space by showing more of the house
+     photo); never shorter than this floor. The headline is clamped to 2 lines
+     and the type is vh-based, so the TEXT stays the same size across browsers —
+     only the photo area flexes. */
+  flex: 1 1 auto;
+  min-height: clamp(140px, 16vh, 190px);
+  overflow: hidden;
+}
+.lg2-hero__photo {
+  position: absolute;
+  inset: 0 0 0 42%;
+  /* PNG referenced via CSS url() only (never a JS import) — see the runtime
+     asset guard + stability-integration-guide.md. Apple-tuned hero generated
+     via the offline Stability pipeline (houseapple, HERO_SEED=77). */
+  /* Weather-/time-dependent hero image (set via --lg2-hero-img). */
+  background-image: var(--lg2-hero-img, url('/assets/hero/overview-house-apple.png'));
+  background-size: cover;
+  background-position: center right;
+  transition: filter var(--lg2-dur) var(--lg2-ease);
+  /* Fade the photo into the card on its left edge (readable text). */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
+}
+.lg2-hero[data-tod='night'] .lg2-hero__photo { filter: brightness(0.58) saturate(0.85) contrast(1.05); }
+.lg2-hero__body {
+  position: relative;
+  z-index: 1;
+  padding: clamp(12px, 1.6vh, 18px) 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(4px, 0.9vh, 9px);
+  /* px cap (not `ch`, which depends on the font's glyph width and so differs
+     between the desktop browser and the HCU webview → different wrap points). */
+  max-width: 460px;
+  min-height: 0;
+}
+/* (Hero text legibility is handled by the adaptive text colours + the card
+   scrim; no separate hero scrim overlay — it caused a visible dark band.) */
+.lg2-hero__badge {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+  color: var(--lg2-orange);
+  background: rgba(var(--lg2-accent-rgb), 0.18);
+  border: 1px solid rgba(var(--lg2-accent-rgb), 0.34);
+}
+.lg2-hero__headline {
+  margin: 0;
+  /* vh-based so the size matches across browsers; clamped to 2 lines so a
+     slightly wider font can never push the hero taller. */
+  font-size: clamp(1.12rem, 2.3vh, 1.42rem);
+  line-height: 1.15;
+  font-weight: 680;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.lg2-hero__lead { margin: 0; font-size: clamp(0.82rem, 1.5vh, 0.92rem); color: var(--lg2-label-2); }
+.lg2-hero__benefit { font-size: clamp(0.82rem, 1.5vh, 0.92rem); color: var(--lg2-label-2); }
+.lg2-hero__benefit b {
+  display: block;
+  font-size: clamp(1.4rem, 3vh, 1.8rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--lg2-orange);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.lg2-hero__badge { width: 34px; height: 34px; }
+
+/* Metric strip inside the hero — fixed height at the bottom; only the photo
+   area (__top) above it flexes. */
+.lg2-strip {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--lg2-inset);
+  border-top: 1px solid var(--lg2-hairline);
+}
+.lg2-strip__cell {
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.lg2-strip__cell + .lg2-strip__cell { border-left: 1px solid var(--lg2-hairline); }
+.lg2-strip__label { font-size: 11.5px; font-weight: 600; color: var(--lg2-label-3); text-transform: none; }
+.lg2-strip__main { display: flex; align-items: center; justify-content: space-between; gap: var(--lg2-s2); }
+.lg2-strip__value {
+  font-size: 1.25rem;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.lg2-strip__value--sm { font-size: 1.05rem; font-weight: 620; }
+.lg2-strip__hint { font-size: 11.5px; color: var(--lg2-label-2); }
+.lg2-strip__mode { display: inline-flex; align-items: center; gap: var(--lg2-s1); color: var(--lg2-green); }
+
+/* ================================================================== *
+ * 6. Two-column: Nächste Aktionen + Hausübersicht
+ * ================================================================== */
+
+.lg2-two {
+  /* Only as tall as its content needs (house overview + next actions). It may
+     shrink if the whole screen is tight (then the chips scroll internally), but
+     it never GROWS to eat space — that job belongs to the flexible hero above.*/
+  flex: 0 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+  gap: var(--lg2-gap);
+}
+.lg2-two > .lg2-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: hidden; }
+
+/* Action list. */
+.lg2-actions { display: flex; flex-direction: column; gap: var(--lg2-s2); }
+.lg2-action {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: var(--lg2-s3);
+  padding: var(--lg2-s2) var(--lg2-s3);
+  border-radius: var(--lg2-r);
+  background: var(--lg2-inset-2);
+  border: 1px solid var(--lg2-hairline);
+}
+.lg2-action__time {
+  font-size: 12px;
+  color: var(--lg2-label-2);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  min-width: 42px;
+}
+.lg2-action__time b { display: block; color: var(--lg2-label-1); font-weight: 640; font-size: 13px; }
+.lg2-action__icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--lg2-hairline);
+  color: var(--lg2-orange-2);
+  flex: 0 0 auto;
+}
+.lg2-action__body { min-width: 0; }
+.lg2-action__name { font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-action__detail { font-size: 12px; color: var(--lg2-label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--lg2-r-pill);
+  font-size: 12px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  color: var(--lg2-green);
+  background: rgba(48, 209, 88, 0.14);
+  border: 1px solid rgba(48, 209, 88, 0.28);
+  white-space: nowrap;
+}
+.lg2-badge--prep { color: var(--lg2-cyan); background: rgba(100, 210, 255, 0.14); border-color: rgba(100, 210, 255, 0.28); }
+
+.lg2-linkrow {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--lg2-orange);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--lg2-s2) var(--lg2-s3);
+  border-radius: var(--lg2-r);
+  cursor: pointer;
+  transition: background-color var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-linkrow:hover { background: rgba(255, 255, 255, 0.05); } }
+
+/* House stage — self-contained isometric render + floating room chips. */
+.lg2-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: var(--lg2-r);
+  background:
+    radial-gradient(70% 60% at 50% 26%, rgba(var(--lg2-accent-rgb), 0.1), transparent 70%),
+    var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+  overflow: hidden;
+}
+.lg2-stage__img {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  transform: translate(-50%, -50%);
+  width: 74%;
+  max-width: 460px;
+  height: auto;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+}
+.lg2-stage__sun {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  color: var(--lg2-yellow);
+  filter: drop-shadow(0 0 10px rgba(255, 214, 10, 0.5));
+}
+.lg2-room-chip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--lg2-sheen), var(--lg2-panel-2);
+  border: 1px solid var(--lg2-hairline-2);
+  box-shadow: var(--lg2-inner), 0 6px 16px rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  white-space: nowrap;
+  z-index: 1;
+}
+.lg2-room-chip__temp { font-size: 1.05rem; font-weight: 680; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.lg2-room-chip__name { font-size: 11.5px; color: var(--lg2-label-2); }
+.lg2-room-chip__tone { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--lg2-label-3); font-weight: 550; }
+
+/* ================================================================== *
+ * 7. KPI cards (bottom row of four)
+ * ================================================================== */
+
+.lg2-kpis {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--lg2-gap);
+}
+.lg2-kpi { padding: 13px 16px; display: flex; flex-direction: column; gap: 5px; }
+.lg2-kpi__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--lg2-s2); }
+.lg2-kpi__label { font-size: 12px; font-weight: 600; color: var(--lg2-label-3); }
+.lg2-kpi__icon { color: var(--lg2-label-2); flex: 0 0 auto; }
+.lg2-kpi__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.lg2-kpi__value--accent { color: var(--lg2-orange); }
+.lg2-kpi__value--sm { font-size: 1.1rem; }
+.lg2-kpi__hint { font-size: 11px; color: var(--lg2-label-2); }
+.lg2-kpi__spark { margin-top: auto; height: 26px; }
+
+/* ================================================================== *
+ * 8. Sparklines, donut, dots
+ * ================================================================== */
+
+.lg2-spark { display: block; width: 100%; height: 100%; overflow: visible; }
+.lg2-donut { flex: 0 0 auto; }
+
+.lg2-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.lg2-dot--ok { background: var(--lg2-green); }
+.lg2-dot--mid { background: var(--lg2-orange); }
+.lg2-dot--hot { background: var(--lg2-red); }
+
+.lg2-legend { display: flex; flex-wrap: wrap; gap: var(--lg2-s3); font-size: 11.5px; color: var(--lg2-label-2); }
+.lg2-legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+.lg2-mini-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--lg2-label-2);
+  font-weight: 550;
+}
+
+/* ================================================================== *
+ * 9. Interactions + focus
+ * ================================================================== */
+
+.lg2-card--interactive { transition: transform var(--lg2-dur) var(--lg2-spring), box-shadow var(--lg2-dur) var(--lg2-ease), border-color var(--lg2-dur) var(--lg2-ease); }
+@media (hover: hover) {
+  .lg2-card--interactive:hover { transform: translateY(-2px); border-color: var(--lg2-accent); box-shadow: var(--lg2-inner), var(--lg2-shadow-lg); }
+}
+.lg2-demo :focus-visible { outline: none; box-shadow: 0 0 0 3px var(--lg2-focus); border-radius: var(--lg2-r-sm); }
+
+/* Skeleton. */
+.lg2-sk { position: relative; overflow: hidden; background: rgba(255, 255, 255, 0.05); border-radius: var(--lg2-r-lg); }
+.lg2-sk::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent); background-size: 300% 100%; animation: lg2-sh 1.4s var(--lg2-ease) infinite; }
+@keyframes lg2-sh { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* ================================================================== *
+ * 10. Responsive
+ * ================================================================== */
+
+@media (max-width: 1180px) {
+  .lg2-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 1000px) {
+  .lg2-two { grid-template-columns: 1fr; }
+  .lg2-main { padding: var(--lg2-s5) var(--lg2-s4) var(--lg2-s5); }
+  /* Below 1000px: true fullscreen — no side frame, no drop shadow. */
+  .lg2-demo { width: 100% !important; box-shadow: none !important; }
+  body.lg2-demo-open .app__main { background: var(--lg2-bg) !important; }
+}
+@media (max-width: 820px) {
+  .lg2-demo { grid-template-columns: 1fr; }
+  .lg2-side {
+    position: fixed;
+    inset: auto 0 0 0;
+    height: auto;
+    top: auto;
+    margin: 0;
+    border-radius: 0;
+    z-index: 210;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--lg2-s2);
+    padding: var(--lg2-s2) var(--lg2-s3);
+    border-right: 0;
+    border-top: 1px solid var(--lg2-hairline);
+    overflow-x: auto;
+  }
+  .lg2-side__brand, .lg2-side__spacer, .lg2-side__foot, .lg2-side__clock { display: none; }
+  .lg2-nav { flex-direction: row; gap: 2px; }
+  .lg2-nav__item span { display: none; }
+  .lg2-nav__item { padding: 10px; }
+  .lg2-main { padding-bottom: 84px; }
+  /* Stacked hero on mobile: photo on top, body below — drop the fixed
+     one-screen height and the 2-line headline clamp so nothing is clipped. */
+  .lg2-hero__top { grid-template-columns: 1fr; min-height: 0; height: auto; overflow: visible; }
+  .lg2-hero__photo { inset: 0 0 auto 0; height: 150px; position: relative; -webkit-mask-image: linear-gradient(180deg, #000 40%, transparent); mask-image: linear-gradient(180deg, #000 40%, transparent); }
+  .lg2-hero__body { max-width: none; margin-top: -60px; }
+  .lg2-hero__headline { -webkit-line-clamp: unset; }
+  .lg2-strip { grid-template-columns: repeat(2, 1fr); }
+  .lg2-strip__cell:nth-child(3), .lg2-strip__cell:nth-child(4) { border-top: 1px solid var(--lg2-hairline); }
+  .lg2-strip__cell:nth-child(3) { border-left: 0; }
+}
+@media (max-width: 560px) {
+  .lg2-header { flex-direction: column; }
+  .lg2-kpis { grid-template-columns: 1fr; }
+  .lg2-main { padding-left: var(--lg2-s3); padding-right: var(--lg2-s3); }
+}
+
+/* ================================================================== *
+ * 11. Light mode (auto via OS preference) — Apple light greys
+ * ================================================================== */
+
+/* AUTO scheme follows the OS: on a light-mode OS (and no explicit scheme) the
+   Liquid Glass tokens switch to light. Explicit `.lg2-scheme-dark` /
+   `.lg2-scheme-light` override this. */
+@media (prefers-color-scheme: light) {
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light) {
+    color-scheme: light;
+    --lg2-bg: #d7dbe3;
+    --lg2-sidebar: rgba(255, 255, 255, 0.72);
+    --lg2-panel: rgba(255, 255, 255, 0.66);
+    --lg2-panel-2: rgba(255, 255, 255, 0.8);
+    --lg2-inset: rgba(120, 120, 128, 0.08);
+    --lg2-inset-2: rgba(120, 120, 128, 0.06);
+    --lg2-active: rgba(120, 120, 128, 0.16);
+    --lg2-hairline: rgba(60, 60, 67, 0.14);
+    --lg2-hairline-2: rgba(60, 60, 67, 0.22);
+    --lg2-highlight: rgba(255, 255, 255, 0.9);
+    --lg2-sheen: linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.1) 55%);
+    --lg2-label-1: #1c1c1e;
+    --lg2-label-2: rgba(60, 60, 67, 0.6);
+    --lg2-label-3: rgba(60, 60, 67, 0.4);
+    --lg2-label-4: rgba(60, 60, 67, 0.22);
+    --lg2-orange: #ff9500;
+    --lg2-green: #34c759;
+    --lg2-red: #ff3b30;
+    --lg2-blue: #007aff;
+    --lg2-cyan: #32ade6;
+    --lg2-yellow: #ffcc00;
+    --lg2-on-accent: #ffffff;
+    --lg2-shadow: 0 1px 2px rgba(60, 60, 67, 0.08), 0 12px 30px rgba(60, 60, 67, 0.12);
+    --lg2-shadow-lg: 0 2px 6px rgba(60, 60, 67, 0.1), 0 26px 60px rgba(60, 60, 67, 0.18);
+    --lg2-inner: inset 0 1px 0 var(--lg2-highlight), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  }
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light)::after {
+    /* Translucent light veil (rgba, NOT opaque hex) so the wallpaper stays
+       visible in light mode — an opaque gradient here hid the image entirely. */
+    background:
+      radial-gradient(95% 70% at 88% -10%, rgba(var(--lg2-accent-rgb), calc(0.1 * var(--lg2-aurora))), transparent 58%),
+      radial-gradient(90% 70% at -6% 112%, rgba(var(--lg2-accent-rgb), calc(0.07 * var(--lg2-aurora))), transparent 58%),
+      linear-gradient(180deg, rgba(234, 237, 242, 0.28) 0%, rgba(210, 215, 223, 0.66) 100%);
+  }
+}
+
+/* Manual light scheme (Design → Hell), mirrors the auto light values. */
+.lg2-demo.lg2-scheme-light {
+  color-scheme: light;
+  --lg2-bg: #d7dbe3;
+  --lg2-sidebar: rgba(255, 255, 255, calc(var(--lg2-glass-alpha) + 0.28));
+  --lg2-panel: rgba(255, 255, 255, calc(var(--lg2-glass-alpha) + 0.22));
+  --lg2-panel-2: rgba(255, 255, 255, calc(var(--lg2-glass-alpha) + 0.36));
+  --lg2-inset: rgba(120, 120, 128, 0.08);
+  --lg2-inset-2: rgba(120, 120, 128, 0.06);
+  --lg2-active: rgba(120, 120, 128, 0.16);
+  --lg2-hairline: rgba(60, 60, 67, 0.14);
+  --lg2-hairline-2: rgba(60, 60, 67, 0.22);
+  --lg2-highlight: rgba(255, 255, 255, 0.9);
+  --lg2-sheen: linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.1) 55%);
+  --lg2-label-1: #1c1c1e;
+  --lg2-label-2: rgba(60, 60, 67, 0.6);
+  --lg2-label-3: rgba(60, 60, 67, 0.4);
+  --lg2-label-4: rgba(60, 60, 67, 0.22);
+  --lg2-green: #34c759;
+  --lg2-red: #ff3b30;
+  --lg2-blue: #007aff;
+  --lg2-cyan: #32ade6;
+  --lg2-yellow: #ffcc00;
+  --lg2-on-accent: #ffffff;
+  --lg2-shadow: 0 1px 2px rgba(60, 60, 67, 0.08), 0 12px 30px rgba(60, 60, 67, 0.12);
+  --lg2-shadow-lg: 0 2px 6px rgba(60, 60, 67, 0.1), 0 26px 60px rgba(60, 60, 67, 0.18);
+  --lg2-inner: inset 0 1px 0 var(--lg2-highlight), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+.lg2-demo.lg2-scheme-light::after {
+  /* Translucent light veil so the wallpaper shows through in light mode. */
+  background:
+    radial-gradient(95% 70% at 88% -10%, rgba(var(--lg2-accent-rgb), calc(0.1 * var(--lg2-aurora))), transparent 58%),
+    radial-gradient(90% 70% at -6% 112%, rgba(var(--lg2-accent-rgb), calc(0.07 * var(--lg2-aurora))), transparent 58%),
+    linear-gradient(180deg, rgba(234, 237, 242, 0.28) 0%, rgba(210, 215, 223, 0.66) 100%);
+}
+
+/* Lite mode (Frosted-Glass "Lite"): drop the expensive blur, keep the glassy
+   look via more-opaque fills. Big perf win on low-end / ARM (HCU) devices. */
+.lg2-demo.lg2-lite .lg2-nav,
+.lg2-demo.lg2-lite .lg2-card,
+.lg2-demo.lg2-lite .lg2-weather,
+.lg2-demo.lg2-lite .lg2-room-chip {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* ================================================================== *
+ * 13. Design configurator panel
+ * ================================================================== */
+
+.lg2-cfg-btn {
+  appearance: none; cursor: pointer;
+  width: 40px; height: 40px; border-radius: var(--lg2-r-pill);
+  display: grid; place-items: center;
+  color: var(--lg2-label-1);
+  background: var(--lg2-sheen), var(--lg2-panel);
+  border: 1px solid var(--lg2-hairline);
+  box-shadow: var(--lg2-inner), var(--lg2-shadow);
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  transition: transform var(--lg2-fast) var(--lg2-spring), border-color var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-cfg-btn:hover { border-color: var(--lg2-accent); transform: translateY(-1px); } }
+
+.lg2-cfg-scrim { position: absolute; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.28); }
+.lg2-cfg {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 61;
+  width: min(360px, 92vw);
+  display: flex; flex-direction: column; gap: 18px;
+  padding: 22px;
+  overflow-y: auto;
+  /* Settings must ALWAYS be legible — give the panel a solid surface + its own
+     fixed contrast text (it must never fall victim to the transparency/scrim
+     system, since it's how you fix the theme). Dark surface by default. */
+  background: var(--lg2-sheen), #131a24;
+  color: #f4f7fb;
+  --lg2-label-1: #f4f7fb;
+  --lg2-label-2: rgba(236, 241, 248, 0.76);
+  --lg2-label-3: rgba(236, 241, 248, 0.56);
+  --lg2-label-4: rgba(236, 241, 248, 0.36);
+  --lg2-inset: rgba(255, 255, 255, 0.06);
+  --lg2-hairline: rgba(255, 255, 255, 0.14);
+  --lg2-hairline-2: rgba(255, 255, 255, 0.22);
+  --lg2-hover: rgba(255, 255, 255, 0.09);
+  --lg2-scrim-a: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: var(--lg2-shadow-lg);
+  animation: lg2-cfg-in var(--lg2-dur) var(--lg2-ease);
+}
+/* Light scheme (manual or auto): solid light panel + dark text. */
+.lg2-demo.lg2-scheme-light .lg2-cfg {
+  background: var(--lg2-sheen), #eef1f6;
+  color: #0e1622;
+  --lg2-label-1: #0e1622;
+  --lg2-label-2: rgba(14, 22, 34, 0.72);
+  --lg2-label-3: rgba(14, 22, 34, 0.52);
+  --lg2-label-4: rgba(14, 22, 34, 0.34);
+  --lg2-inset: rgba(20, 30, 50, 0.06);
+  --lg2-hairline: rgba(20, 30, 50, 0.14);
+  --lg2-hairline-2: rgba(20, 30, 50, 0.22);
+  --lg2-hover: rgba(20, 30, 50, 0.08);
+  border-left: 1px solid rgba(20, 30, 50, 0.14);
+}
+@media (prefers-color-scheme: light) {
+  .lg2-demo:not(.lg2-scheme-dark) .lg2-cfg {
+    background: var(--lg2-sheen), #eef1f6;
+    color: #0e1622;
+    --lg2-label-1: #0e1622;
+    --lg2-label-2: rgba(14, 22, 34, 0.72);
+    --lg2-label-3: rgba(14, 22, 34, 0.52);
+    --lg2-label-4: rgba(14, 22, 34, 0.34);
+    --lg2-inset: rgba(20, 30, 50, 0.06);
+    --lg2-hairline: rgba(20, 30, 50, 0.14);
+    --lg2-hairline-2: rgba(20, 30, 50, 0.22);
+    --lg2-hover: rgba(20, 30, 50, 0.08);
+    border-left: 1px solid rgba(20, 30, 50, 0.14);
+  }
+}
+@keyframes lg2-cfg-in { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+.lg2-cfg__head { display: flex; align-items: center; justify-content: space-between; }
+.lg2-cfg__head h3 { margin: 0; font-size: 1.1rem; font-weight: 660; }
+.lg2-cfg__close { appearance: none; cursor: pointer; box-sizing: border-box; border: 0; background: transparent; color: var(--lg2-label-2); font-size: 20px; line-height: 1; width: 32px; height: 32px; min-height: 0; padding: 0; margin: 0; border-radius: 8px; display: grid; place-items: center; }
+.lg2-cfg__group { display: flex; flex-direction: column; gap: 9px; }
+.lg2-cfg__label { font-size: 12px; font-weight: 600; color: var(--lg2-label-3); }
+.lg2-cfg__row { display: flex; align-items: center; gap: 10px; }
+.lg2-cfg__val { margin-left: auto; font-size: 12px; color: var(--lg2-label-2); font-variant-numeric: tabular-nums; }
+.lg2-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.lg2-swatch { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25); }
+.lg2-swatch--on { border-color: var(--lg2-label-1); }
+.lg2-cfg input[type='color'] { width: 34px; height: 30px; border: 1px solid var(--lg2-hairline); border-radius: 8px; background: transparent; padding: 2px; cursor: pointer; }
+.lg2-cfg input[type='range'] { flex: 1 1 auto; min-width: 0; box-sizing: border-box; height: 22px; margin: 0; padding: 0; vertical-align: middle; accent-color: var(--lg2-orange); }
+.lg2-cfg input[type='text'],
+.lg2-cfg__select {
+  width: 100%; box-sizing: border-box; padding: 8px 10px; min-height: 36px;
+  border-radius: var(--lg2-r-sm); border: 1px solid var(--lg2-hairline);
+  background: var(--lg2-inset); color: var(--lg2-label-1); font: inherit; font-size: 0.9rem;
+}
+.lg2-cfg__select { cursor: pointer; appearance: none; }
+.lg2-cfg__select option { background: #14283a; color: #f4f7fb; }
+/* Import/Export theme JSON field + status message. */
+.lg2-cfg__io {
+  width: 100%; box-sizing: border-box; margin: 6px 0; padding: 8px 10px;
+  border-radius: var(--lg2-r-sm); border: 1px solid var(--lg2-hairline);
+  background: var(--lg2-inset); color: var(--lg2-label-1);
+  font: inherit; font-size: 12px; font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  resize: vertical; min-height: 64px;
+}
+.lg2-cfg__iomsg { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: var(--lg2-green, #30d158); }
+.lg2-cfg__iomsg--err { color: var(--lg2-red, #ff453a); }
+.lg2-seg { display: inline-flex; padding: 3px; border-radius: var(--lg2-r-pill); background: rgba(0,0,0,0.18); border: 1px solid var(--lg2-hairline); }
+.lg2-scheme-light .lg2-seg { background: rgba(120,120,128,0.12); }
+/* Neutralise app-global button/input box model inside the demo config panel so
+   controls never render shifted (box-sizing, no stray margins, middle-aligned). */
+.lg2-cfg button, .lg2-cfg input, .lg2-cfg select { box-sizing: border-box; margin: 0; vertical-align: middle; }
+.lg2-seg { box-sizing: border-box; vertical-align: middle; }
+.lg2-seg__btn { appearance: none; cursor: pointer; box-sizing: border-box; margin: 0; border: 0; background: transparent; color: var(--lg2-label-2); font: inherit; font-size: 0.82rem; font-weight: 600; padding: 6px 12px; border-radius: var(--lg2-r-pill); }
+.lg2-seg__btn--on { background: rgba(var(--lg2-accent-rgb), 0.18); color: var(--lg2-accent); box-shadow: inset 0 0 0 1px rgba(var(--lg2-accent-rgb), 0.5); }
+.lg2-toggle { appearance: none; -webkit-appearance: none; cursor: pointer; box-sizing: border-box; width: 44px; height: 26px; min-height: 0; padding: 0; margin: 0; border-radius: 999px; background: rgba(120,120,128,0.34); border: 0; position: relative; transition: background var(--lg2-fast) var(--lg2-ease); flex: 0 0 auto; }
+/* Knob centred via top:50% + translateY so app-global button padding/height
+   can never push it off-centre (was "verschoben"). */
+.lg2-toggle::after { content: ''; position: absolute; top: 50%; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transform: translateY(-50%); transition: transform var(--lg2-dur) var(--lg2-spring); }
+.lg2-toggle--on { background: var(--lg2-orange); }
+.lg2-toggle--on::after { transform: translate(18px, -50%); }
+.lg2-cfg__reset { appearance: none; cursor: pointer; margin-top: 4px; padding: 9px 14px; border-radius: var(--lg2-r-pill); border: 1px solid var(--lg2-hairline); background: rgba(255,255,255,0.05); color: var(--lg2-label-1); font: inherit; font-weight: 600; font-size: 0.85rem; }
+
+/* ================================================================== *
+ * 12. Reduced transparency + reduced motion
+ * ================================================================== */
+
+@media (prefers-reduced-transparency: reduce) {
+  .lg2-nav, .lg2-card, .lg2-weather { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .lg2-demo { --lg2-glass-alpha: 0.9; --lg2-sheen: none; }
+}
+@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: light) {
+  .lg2-demo { --lg2-sidebar: #ffffff; --lg2-panel: #ffffff; --lg2-sheen: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg2-demo *, .lg2-demo *::before, .lg2-demo *::after { animation: none !important; transition-duration: 0.01ms !important; }
+}
+
+/* ================================================================== *
+ * Single-screen fit: restore normal scrolling on small / mobile screens
+ * (the fixed-viewport dashboard is intended for desktop resolutions).
+ * ================================================================== */
+@media (max-width: 900px), (max-height: 640px) {
+  .lg2-demo { height: auto; min-height: 100vh; overflow: visible; }
+  .lg2-main { height: auto; overflow: visible; }
+  .lg2-two > .lg2-card { overflow: visible; }
+  .lg2-stage { min-height: 260px; }
+}
+
+/* Preset chips in the configurator. */
+.lg2-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.lg2-preset {
+  appearance: none; cursor: pointer;
+  padding: 7px 13px; min-height: 34px;
+  border-radius: var(--lg2-r-pill);
+  border: 1px solid var(--lg2-hairline);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--lg2-label-2); font: inherit; font-size: 0.82rem; font-weight: 600;
+  transition: border-color var(--lg2-fast) var(--lg2-ease), color var(--lg2-fast) var(--lg2-ease), background var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-preset:hover { color: var(--lg2-label-1); border-color: var(--lg2-accent); background: var(--lg2-hover); } }
+.lg2-preset--on {
+  color: var(--lg2-on-accent);
+  background: linear-gradient(180deg, var(--lg2-orange-2), var(--lg2-orange));
+  border-color: transparent;
+}
+/* User-defined presets: chip + inline delete button. */
+.lg2-preset-wrap { display: inline-flex; align-items: center; }
+.lg2-preset-wrap .lg2-preset { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.lg2-preset-del {
+  appearance: none; cursor: pointer; box-sizing: border-box; margin: 0;
+  width: 24px; min-height: 34px; padding: 0; display: grid; place-items: center;
+  border: 1px solid var(--lg2-hairline); border-left: 0;
+  border-radius: 0 var(--lg2-r-pill) var(--lg2-r-pill) 0;
+  background: rgba(255, 255, 255, 0.05); color: var(--lg2-label-3); font-size: 15px; line-height: 1;
+  transition: color var(--lg2-fast) var(--lg2-ease), border-color var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-preset-del:hover { color: var(--lg2-red); border-color: var(--lg2-red); } }
+/* Save-preset row. */
+.lg2-preset-save { margin-top: 6px; }
+.lg2-cfg-savebtn {
+  appearance: none; cursor: pointer; box-sizing: border-box; flex: 0 0 auto; margin: 0;
+  padding: 8px 15px; min-height: 36px; white-space: nowrap;
+  border-radius: var(--lg2-r-sm); border: 1px solid rgba(var(--lg2-accent-rgb), 0.4);
+  background: rgba(var(--lg2-accent-rgb), 0.16); color: var(--lg2-accent);
+  font: inherit; font-weight: 640; font-size: 0.85rem;
+  transition: background var(--lg2-fast) var(--lg2-ease), border-color var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-cfg-savebtn:not(:disabled):hover { background: rgba(var(--lg2-accent-rgb), 0.26); } }
+.lg2-cfg-savebtn:disabled { opacity: 0.45; cursor: default; }
+
+/* ================================================================== *
+ * 14. Room list (Hausübersicht without the 3D house), nav-tile toggle,
+ *     auto-accent swatch, theme-aware backdrop, light-mode hover fixes
+ * ================================================================== */
+
+/* Classic "1.20" tile form: a simple responsive grid of fixed-size cards
+   (`auto-fill minmax`) that wrap. All rooms are shown; if there are more tiles
+   than fit the card height, the card scrolls internally — ONE contained
+   scrollbar, never the whole page. The tiles keep a constant, legible size
+   (no measuring / auto-shrinking, which caused clipped names and truncation). */
+.lg2-rooms {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-auto-rows: minmax(84px, auto);
+  align-content: start;
+  gap: clamp(8px, 0.7vw, 12px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--lg2-scrim-rgb, 8, 11, 17), 0.35) transparent;
+}
+.lg2-rooms::-webkit-scrollbar { width: 8px; }
+.lg2-rooms::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--lg2-accent), var(--lg2-orange-2, var(--lg2-accent)));
+  border-radius: 999px;
+}
+.lg2-rooms::-webkit-scrollbar-track { background: transparent; }
+
+.lg2-roomcard {
+  min-width: 0;
+  /* Width query container: on a very narrow tile the tone WORD is dropped so
+     the room name keeps the full width. */
+  container-type: inline-size;
+  padding: clamp(10px, 0.8vw, 14px);
+  border-radius: var(--lg2-r-sm);
+  background: var(--lg2-scrim), var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+  /* Left status bar coloured by tone (classic 1.20). */
+  border-left: 4px solid var(--lg2-label-3);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(4px, 0.5vh, 8px);
+  /* Clickable (opens the room detail popup) — reset native button styling. */
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color var(--lg2-fast) var(--lg2-ease), background var(--lg2-fast) var(--lg2-ease), transform var(--lg2-fast) var(--lg2-ease);
+}
+.lg2-roomcard--ok { border-left-color: var(--lg2-green); }
+.lg2-roomcard--mid { border-left-color: var(--lg2-orange); }
+.lg2-roomcard--hot { border-left-color: var(--lg2-red); }
+.lg2-roomcard--unknown { border-left-color: var(--lg2-label-3); }
+@media (hover: hover) {
+  .lg2-roomcard:hover { transform: translateY(-2px); background: var(--lg2-hover); border-color: var(--lg2-hairline-2, var(--lg2-hairline)); }
+}
+.lg2-roomcard:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--lg2-focus); }
+.lg2-roomcard__top { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.lg2-roomcard__name { min-width: 0; flex: 1 1 auto; font-weight: 620; font-size: clamp(0.82rem, 1.5vh, 0.96rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-roomcard__tone { display: inline-flex; align-items: center; gap: 5px; font-size: clamp(9.5px, 1.2vh, 11.5px); color: var(--lg2-label-3); font-weight: 600; white-space: nowrap; flex: 0 0 auto; }
+.lg2-roomcard__temp { display: flex; align-items: baseline; gap: 6px; font-size: clamp(1.1rem, 2.4vh, 1.44rem); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.lg2-roomcard__trend { font-size: 0.92rem; font-weight: 700; }
+.lg2-roomcard__trend--up { color: var(--lg2-red); }
+.lg2-roomcard__trend--down { color: var(--lg2-blue); }
+.lg2-roomcard__trend--flat { color: var(--lg2-label-3); }
+.lg2-roomcard__meta { font-size: clamp(10px, 1.2vh, 11.5px); color: var(--lg2-label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Very narrow tile: drop the tone WORD (the coloured dot + the legend below
+   carry the state) so the room name is never clipped by the label. */
+@container (max-width: 150px) {
+  .lg2-roomcard__tone-label { display: none; }
+}
+
+/* Nav-tile OFF: nav links sit directly on the sidebar (no glass card). */
+.lg2-demo.lg2-nav-plain .lg2-nav {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Auto-accent swatch (rainbow → "follows the weather"). */
+.lg2-swatch--auto {
+  background: conic-gradient(from 0deg, #ff453a, #ff9f0a, #ffd60a, #30d158, #35d6e7, #0a84ff, #bf5af2, #ff453a);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Backdrop image adapts to the theme scheme (brighten in light). */
+.lg2-demo.lg2-scheme-light::before { filter: brightness(1.75) saturate(0.7) contrast(0.92); }
+@media (prefers-color-scheme: light) {
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light)::before { filter: brightness(1.75) saturate(0.7) contrast(0.92); }
+}
+
+/* Light-mode hover legibility safeguard (keep text dark on hover). */
+.lg2-demo.lg2-scheme-light .lg2-nav__item:hover,
+.lg2-demo.lg2-scheme-light .lg2-preset:hover,
+.lg2-demo.lg2-scheme-light .lg2-seg__btn:hover { color: var(--lg2-label-1); }
+@media (prefers-color-scheme: light) {
+  .lg2-demo:not(.lg2-scheme-dark) .lg2-nav__item:hover,
+  .lg2-demo:not(.lg2-scheme-dark) .lg2-preset:hover,
+  .lg2-demo:not(.lg2-scheme-dark) .lg2-seg__btn:hover { color: var(--lg2-label-1); }
+}
+
+/* ================================================================== *
+ * 15. Sidebar scrollbar hidden + light-mode frosted glass fix
+ * ================================================================== */
+
+/* No visible scrollbar on the sidebar (still scrollable if it ever overflows). */
+.lg2-side { scrollbar-width: none; }
+.lg2-side::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* Light mode: make the glass tiles noticeably more translucent so the frosted
+   blur actually reads (they were near-opaque white before). */
+@media (prefers-color-scheme: light) {
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light) {
+    --lg2-sidebar: rgba(255, 255, 255, calc(var(--lg2-glass-alpha) + 0.2));
+    --lg2-panel: rgba(255, 255, 255, calc(var(--lg2-glass-alpha) + 0.12));
+    --lg2-panel-2: rgba(255, 255, 255, calc(var(--lg2-glass-alpha) + 0.05));
+    --lg2-inset: rgba(120, 130, 150, 0.12);
+  }
+}
+.lg2-demo.lg2-scheme-light {
+  --lg2-sidebar: rgba(255, 255, 255, calc(var(--lg2-glass-alpha) + 0.2));
+  --lg2-panel: rgba(255, 255, 255, calc(var(--lg2-glass-alpha) + 0.12));
+  --lg2-panel-2: rgba(255, 255, 255, calc(var(--lg2-glass-alpha) + 0.05));
+  --lg2-inset: rgba(120, 130, 150, 0.12);
+}
+
+/* ================================================================== *
+ * 16. Compact icon-only nav rail (VisionOS-style)
+ * ================================================================== */
+
+.lg2-demo.lg2-nav-rail { grid-template-columns: 72px 1fr; }
+.lg2-nav-rail .lg2-side { align-items: center; padding: 12px 8px; gap: 10px; }
+.lg2-nav-rail .lg2-side__brand { justify-content: center; padding: 4px 0 6px; gap: 0; }
+.lg2-nav-rail .lg2-side__brand > span:last-child { display: none; } /* brand name/sub */
+.lg2-nav-rail .lg2-nav { width: 100%; align-items: stretch; }
+.lg2-nav-rail .lg2-nav__item { justify-content: center; padding: 11px 0; gap: 0; }
+.lg2-nav-rail .lg2-nav__item > span { display: none; } /* labels */
+.lg2-nav-rail .lg2-side__foot { width: 100%; }
+.lg2-nav-rail .lg2-side__foot .lg2-nav__item { justify-content: center; padding: 11px 0; gap: 0; }
+.lg2-nav-rail .lg2-side__foot .lg2-nav__item > span { display: none; }
+.lg2-nav-rail .lg2-side__clock { display: none; }
+
+/* ================================================================== *
+ * 17. Räume (Liquid Glass V2 master-detail page /liquid-glass-raeume)
+ * ================================================================== */
+
+/* Inherits layout + padding from `.lg2-main` so the Räume page uses exactly the
+   same spacing as Übersicht (no extra gap between the sidebar and the content). */
+
+/* "Raum hinzufügen" pill button in the header. */
+.lg2-btn {
+  appearance: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 16px; border-radius: var(--lg2-r-pill); font: inherit; font-size: 0.86rem; font-weight: 620;
+  color: var(--lg2-label-1); background: var(--lg2-panel); border: 1px solid var(--lg2-hairline);
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat)); backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  box-shadow: var(--lg2-shadow); transition: border-color var(--lg2-fast) var(--lg2-ease), transform var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-btn:hover { border-color: var(--lg2-accent); transform: translateY(-1px); } }
+
+/* Master-detail split: room list (left) + detail (right). */
+.lg2-raeume__split { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: clamp(280px, 26vw, 380px) 1fr; gap: var(--lg2-gap); }
+.lg2-raeume__empty { display: grid; place-items: center; color: var(--lg2-label-2); }
+
+/* Left list card. */
+.lg2-roomlist { min-height: 0; display: flex; flex-direction: column; padding: clamp(8px, 0.8vw, 12px); }
+.lg2-roomlist__scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; }
+.lg2-roomlist__scroll::-webkit-scrollbar { width: 8px; }
+.lg2-roomlist__scroll::-webkit-scrollbar-thumb { background: var(--lg2-hairline-2); border-radius: 999px; }
+
+.lg2-roomrow {
+  appearance: none; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%;
+  display: flex; align-items: center; gap: 12px; padding: 12px 13px;
+  border-radius: var(--lg2-r); background: var(--lg2-scrim), var(--lg2-inset); border: 1px solid var(--lg2-hairline);
+  transition: border-color var(--lg2-fast) var(--lg2-ease), background var(--lg2-fast) var(--lg2-ease), transform var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-roomrow:hover { background: var(--lg2-hover); border-color: var(--lg2-accent); transform: translateY(-1px); } }
+.lg2-roomrow:focus-visible { outline: none; box-shadow: var(--lg2-focus); }
+.lg2-roomrow--on { border-color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.1); box-shadow: inset 0 0 0 1px rgba(var(--lg2-accent-rgb), 0.4); }
+/* Room icons — normal (accent-tinted) look. The unified "icon tile" style is
+   applied on top via `.lg2-icons-tile` when that option is enabled. */
+.lg2-roomrow__icon {
+  flex: 0 0 auto; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+  color: var(--lg2-accent);
+  background: rgba(var(--lg2-accent-rgb), 0.14);
+  border: 1px solid rgba(var(--lg2-accent-rgb), 0.28);
+}
+.lg2-roomrow__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.lg2-roomrow__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lg2-roomrow__name { font-weight: 640; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-roomrow__temps { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.lg2-roomrow__temp { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lg2-roomrow__temp small { font-size: 0.7rem; font-weight: 600; color: var(--lg2-label-2); }
+.lg2-roomrow__temp-lbl { font-size: 11px; color: var(--lg2-label-3); }
+.lg2-roomrow__shutter { margin-left: auto; font-size: 11px; color: var(--lg2-label-2); white-space: nowrap; }
+.lg2-roomrow__next { font-size: 11.5px; color: var(--lg2-accent); font-weight: 600; }
+.lg2-roomrow__next--none { color: var(--lg2-label-3); font-weight: 500; }
+
+/* Risk badge (list) + risk pill (detail header). */
+.lg2-risk { font-size: 11px; font-weight: 650; padding: 2px 9px; border-radius: 999px; white-space: nowrap; display: inline-flex; align-items: center; }
+.lg2-risk--high { color: #ff8c42; background: rgba(255, 140, 66, 0.16); }
+.lg2-risk--mid { color: #ffcf5b; background: rgba(255, 207, 91, 0.16); }
+.lg2-risk--low { color: #66d66b; background: rgba(102, 214, 107, 0.16); }
+.lg2-risk--vlow { color: #35d6e7; background: rgba(53, 214, 231, 0.16); }
+
+/* Right detail column. */
+.lg2-raeume__detail { min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--lg2-gap); scrollbar-width: thin; }
+.lg2-roomhead { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+.lg2-roomhead__icon {
+  flex: 0 0 auto; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center;
+  color: var(--lg2-accent);
+  background: rgba(var(--lg2-accent-rgb), 0.14);
+  border: 1px solid rgba(var(--lg2-accent-rgb), 0.28);
+}
+.lg2-roomhead__id { flex: 1 1 auto; min-width: 0; }
+.lg2-roomhead__id h2 { margin: 0; font-size: 1.25rem; font-weight: 680; letter-spacing: -0.01em; }
+.lg2-roomhead__id p { margin: 2px 0 0; font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-riskpill { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 999px; font-size: 0.82rem; font-weight: 640; }
+.lg2-riskpill--high { color: #ff8c42; background: rgba(255, 140, 66, 0.16); border: 1px solid rgba(255, 140, 66, 0.34); }
+.lg2-riskpill--mid { color: #ffcf5b; background: rgba(255, 207, 91, 0.14); border: 1px solid rgba(255, 207, 91, 0.3); }
+.lg2-riskpill--low { color: #66d66b; background: rgba(102, 214, 107, 0.14); border: 1px solid rgba(102, 214, 107, 0.3); }
+.lg2-riskpill--vlow { color: #35d6e7; background: rgba(53, 214, 231, 0.14); border: 1px solid rgba(53, 214, 231, 0.3); }
+
+/* Three KPI cards. */
+.lg2-roomkpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--lg2-gap); }
+.lg2-roomkpi { padding: 15px 17px; display: flex; flex-direction: column; gap: 3px; }
+.lg2-roomkpi--accent { box-shadow: inset 0 0 0 1px rgba(var(--lg2-accent-rgb), 0.3), var(--lg2-shadow); }
+.lg2-roomkpi__head { display: flex; align-items: center; justify-content: space-between; color: var(--lg2-label-3); }
+.lg2-roomkpi__value { font-size: 1.55rem; font-weight: 720; letter-spacing: -0.02em; color: var(--lg2-label-1); font-variant-numeric: tabular-nums; }
+.lg2-roomkpi__label { font-size: 12px; color: var(--lg2-label-2); font-weight: 600; }
+.lg2-roomkpi__hint { font-size: 11px; color: var(--lg2-label-3); }
+
+/* Temperature chart card. */
+.lg2-roomchart { padding: 15px 17px; display: flex; flex-direction: column; gap: 12px; }
+.lg2-roomchart__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lg2-roomchart__head h3 { margin: 0; font-size: 0.98rem; font-weight: 650; }
+.lg2-roomchart__empty { min-height: 190px; display: grid; place-items: center; color: var(--lg2-label-3); font-size: 0.9rem; }
+
+/* Six status tiles. */
+.lg2-roomstrip { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--lg2-gap); }
+.lg2-stripcell { padding: 13px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.lg2-stripcell__icon { color: var(--lg2-label-3); }
+.lg2-stripcell__value { font-size: 1.02rem; font-weight: 680; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-stripcell__label { font-size: 11px; color: var(--lg2-label-2); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-stripcell__sub { font-size: 10.5px; color: var(--lg2-label-3); display: flex; align-items: center; gap: 5px; }
+
+@media (max-width: 1100px) {
+  .lg2-roomstrip { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 1000px) {
+  .lg2-raeume { height: auto; overflow: visible; }
+  .lg2-raeume__split { grid-template-columns: 1fr; }
+  .lg2-raeume__detail { overflow: visible; }
+  .lg2-roomkpis { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .lg2-roomstrip { grid-template-columns: 1fr 1fr; }
+}
+
+/* ================================================================== *
+ * 18. Header automation lever + expert-view strip
+ * ================================================================== */
+
+.lg2-header__right { display: flex; align-items: center; gap: 14px; }
+
+/* Master automation on/off lever (glass pill, matches the V2 style). */
+.lg2-autolever {
+  appearance: none; cursor: pointer; box-sizing: border-box;
+  display: inline-flex; align-items: center; gap: 10px; padding: 7px 9px 7px 15px; margin: 0;
+  border-radius: var(--lg2-r-pill); color: var(--lg2-label-1);
+  background: var(--lg2-panel); border: 1px solid var(--lg2-hairline);
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat)); backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  box-shadow: var(--lg2-shadow);
+  transition: border-color var(--lg2-fast) var(--lg2-ease), background var(--lg2-fast) var(--lg2-ease), transform var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-autolever:hover { transform: translateY(-1px); border-color: var(--lg2-accent); } }
+.lg2-autolever:focus-visible { outline: none; box-shadow: var(--lg2-focus); }
+.lg2-autolever__track { position: relative; flex: 0 0 auto; width: 40px; height: 24px; border-radius: 999px; background: rgba(120,120,128,0.34); transition: background var(--lg2-fast) var(--lg2-ease); }
+.lg2-autolever__knob { position: absolute; top: 50%; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transform: translateY(-50%); box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: transform var(--lg2-dur) var(--lg2-spring); }
+.lg2-autolever--on .lg2-autolever__track { background: var(--lg2-green); }
+.lg2-autolever--on .lg2-autolever__knob { transform: translate(16px, -50%); }
+.lg2-autolever__text { display: flex; flex-direction: column; line-height: 1.12; text-align: left; }
+.lg2-autolever__lbl { font-size: 11px; color: var(--lg2-label-3); font-weight: 600; }
+.lg2-autolever__state { font-size: 0.9rem; font-weight: 660; }
+.lg2-autolever--on .lg2-autolever__state { color: var(--lg2-green); }
+
+/* Expert-view value strip (revealed by the global Basis/Experte switch). */
+.lg2-expert { flex: 0 0 auto; padding: 12px 16px; }
+.lg2-expert__title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--lg2-label-3); font-weight: 700; }
+.lg2-expert__grid { margin-top: 9px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.lg2-expert__grid span { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--lg2-label-2); min-width: 0; }
+.lg2-expert__grid b { font-size: 1.05rem; font-weight: 680; color: var(--lg2-label-1); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+@media (max-width: 1100px) { .lg2-expert__grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px) { .lg2-header__right { gap: 8px; } .lg2-autolever__text { display: none; } .lg2-expert__grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ================================================================== *
+ * 19. Expert view = scrollable. Basic view stays fixed to one screen.
+ *   (Basic must always fit without scrolling; Expert may grow + scroll.)
+ *
+ *   The scroll happens INSIDE the main content column, NOT on the page/body.
+ *   That keeps `.lg2-demo` a non-scrolling 100vh grid so the left sidebar
+ *   (a peer grid child) stays fixed and never moves while the content scrolls
+ *   — same robust pattern the settings/fallback pages already use.
+ *
+ *   NB: we must NOT use `overflow-x: hidden; overflow-y: visible` on the demo
+ *   here — per the CSS spec a non-`visible` value on one axis forces the other
+ *   axis to compute to `auto`, turning `.lg2-demo` into a (content-sized,
+ *   non-scrolling) scroll container that silently breaks the sidebar's
+ *   `position: sticky` so it scrolls away with the page.
+ * ================================================================== */
+.lg2-demo.lg2-expert-on { height: 100vh; overflow: hidden; }
+.lg2-demo.lg2-expert-on .lg2-main {
+  height: 100vh;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* CRITICAL: `.lg2-main` is a 100vh flex column. In the single-screen Basic view
+   its children flex-shrink to fit; in Expert there is far more content, so the
+   children MUST keep their natural height and let the main element scroll —
+   otherwise they get squeezed/clipped and overlap (the reported bug). */
+.lg2-demo.lg2-expert-on .lg2-main > * { flex: 0 0 auto; }
+.lg2-demo.lg2-expert-on .lg2-two { flex: 0 0 auto; }
+.lg2-demo.lg2-expert-on .lg2-two > .lg2-card { overflow: visible; }
+.lg2-demo.lg2-expert-on .lg2-raeume__split,
+.lg2-demo.lg2-expert-on .lg2-garden__split { flex: 0 0 auto; align-items: start; }
+/* Automatik status tiles: keep natural block height but stretch to equal height. */
+.lg2-demo.lg2-expert-on .lg2-auto__grid3 { flex: 0 0 auto; align-items: stretch; }
+/* Master-detail list: pin it while the detail column scrolls with the page. */
+.lg2-demo.lg2-expert-on .lg2-roomlist { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 24px); }
+.lg2-demo.lg2-expert-on .lg2-raeume__detail { overflow-x: hidden; overflow-y: visible; min-height: 0; }
+/* The sidebar lives in the non-scrolling 100vh grid, so it is always fixed. */
+.lg2-demo.lg2-expert-on .lg2-side { position: sticky; top: 0; height: 100vh; }
+
+/* ================================================================== *
+ * 20. Shared room-detail modal (v1.20) inside the V2 demo: centre the ×
+ *   and use the demo accent instead of the app's amber.
+ * ================================================================== */
+body.lg2-demo-open .room-detail__close { display: grid; place-items: center; padding: 0; box-sizing: border-box; }
+body.lg2-demo-open .room-detail__close:hover { border-color: var(--lg2-accent); color: var(--lg2-accent); }
+
+/* (Legibility is handled via adaptive text colours computed in JS — see
+   `textVars()` — so no text-shadow is needed here.) */
+
+/* ================================================================== *
+ * 22. Vorhersage (Liquid Glass V2 forecast timeline /liquid-glass-vorhersage)
+ * ================================================================== */
+
+.lg2-fc { display: flex; flex-direction: column; gap: var(--lg2-gap); }
+.lg2-fc__controls { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+.lg2-fc__ctl { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--lg2-label-3); font-weight: 600; }
+.lg2-fc__ctl > span { padding-left: 2px; }
+.lg2-fc__ctl .lg2-cfg__select { min-width: 130px; }
+
+/* Risk / status banner */
+.lg2-fc__banner { display: flex; align-items: center; gap: 14px; padding: 14px 18px; flex: 0 0 auto; }
+.lg2-fc__banner--risk { box-shadow: inset 0 0 0 1px rgba(255, 140, 66, 0.35), var(--lg2-shadow); }
+.lg2-fc__banner-icon { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: #ff8c42; background: rgba(255, 140, 66, 0.16); border: 1px solid rgba(255, 140, 66, 0.34); }
+.lg2-fc__banner-icon--ok { color: #30d158; background: rgba(48, 209, 88, 0.14); border-color: rgba(48, 209, 88, 0.3); }
+.lg2-fc__banner-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lg2-fc__banner-body strong { font-size: 1.02rem; font-weight: 660; color: #ff9f5b; }
+.lg2-fc__banner--ok .lg2-fc__banner-body strong { color: var(--lg2-label-1); }
+.lg2-fc__banner-body span { font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-fc__banner-btn { flex: 0 0 auto; }
+
+/* The timeline grid: [row label] [N time columns] per logical row. */
+.lg2-fc__grid { padding: 0; overflow: hidden; display: grid; grid-template-columns: clamp(146px, 15vw, 196px) 1fr; flex: 1 1 auto; min-height: 0; }
+.lg2-fc__rowhead { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--lg2-hairline); min-width: 0; }
+.lg2-fc__rowhead--top { border-top: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--lg2-label-3); font-weight: 700; }
+.lg2-fc__rowicon { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.14); border: 1px solid rgba(var(--lg2-accent-rgb), 0.26); }
+.lg2-fc__rowlabel { display: flex; flex-direction: column; min-width: 0; }
+.lg2-fc__rowlabel b { font-size: 0.9rem; font-weight: 640; white-space: nowrap; }
+.lg2-fc__rowlabel em { font-style: normal; font-size: 10.5px; color: var(--lg2-label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.lg2-fc__days, .lg2-fc__hours, .lg2-fc__cells { display: grid; grid-template-columns: repeat(var(--fc-cols), 1fr); }
+.lg2-fc__hours, .lg2-fc__cells { border-top: 1px solid var(--lg2-hairline); position: relative; }
+.lg2-fc__day { padding: 8px 6px 4px; font-size: 11px; font-weight: 650; color: var(--lg2-label-2); text-align: center; border-left: 1px solid var(--lg2-hairline); }
+.lg2-fc__day:first-child { border-left: 0; }
+.lg2-fc__hour { padding: 6px 4px; text-align: center; font-size: 12px; font-weight: 600; color: var(--lg2-label-1); }
+.lg2-fc__hour--risk { color: #ff8c42; background: rgba(255, 140, 66, 0.14); }
+.lg2-fc__riskflag { display: block; font-size: 8.5px; font-weight: 700; color: #ff8c42; white-space: nowrap; letter-spacing: 0.02em; }
+
+.lg2-fc__cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 9px 4px; text-align: center; font-size: 12px; color: var(--lg2-label-2); border-left: 1px solid var(--lg2-hairline); min-width: 0; position: relative; z-index: 1; }
+.lg2-fc__cell:first-child { border-left: 0; }
+.lg2-fc__cell b { font-size: 0.9rem; font-weight: 660; color: var(--lg2-label-1); font-variant-numeric: tabular-nums; }
+.lg2-fc__cell svg { color: var(--lg2-label-2); }
+.lg2-fc__cell--risk { background: rgba(255, 140, 66, 0.1); }
+.lg2-fc__hot { color: #ff8c42 !important; }
+
+/* Trend curve overlay */
+.lg2-fc__curve { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+/* Ventilation label */
+.lg2-fc__vent { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; font-weight: 600; }
+.lg2-fc__vent em { font-style: normal; }
+
+/* Shutter mini-blind */
+.lg2-fc__shutter { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.lg2-fc__blind { width: 26px; height: 20px; border: 1px solid var(--lg2-hairline-2); border-radius: 3px; overflow: hidden; display: flex; align-items: flex-start; background: rgba(127, 127, 127, 0.1); }
+.lg2-fc__blind-fill { width: 100%; background: repeating-linear-gradient(var(--lg2-label-3) 0 2px, transparent 2px 4px); }
+.lg2-fc__shutter--risk .lg2-fc__blind-fill { background: repeating-linear-gradient(#ff8c42 0 2px, transparent 2px 4px); }
+
+/* Footer + legend */
+.lg2-fc__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 2px 4px; flex: 0 0 auto; }
+.lg2-fc__legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11.5px; color: var(--lg2-label-2); }
+.lg2-fc__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lg2-fc__swatch { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
+.lg2-fc__swatch--risk { background: rgba(255, 140, 66, 0.6); height: 12px; width: 12px; border-radius: 3px; }
+.lg2-fc__updated { font-size: 11.5px; color: var(--lg2-label-3); }
+.lg2-fc__empty { padding: 40px; text-align: center; color: var(--lg2-label-2); }
+
+.lg2-fc__grid--compact .lg2-fc__rowlabel em { display: none; }
+.lg2-fc__grid--compact .lg2-fc__cell { padding: 6px 3px; }
+.lg2-fc__grid--compact .lg2-fc__curve { display: none; }
+
+@media (max-width: 1100px) {
+  .lg2-fc__grid { overflow-x: auto; }
+  .lg2-fc__days, .lg2-fc__hours, .lg2-fc__cells { min-width: 620px; }
+}
+
+/* ================================================================== *
+ * 23. Garten / Bewässerung (Liquid Glass V2  /liquid-glass-garten)
+ * ================================================================== */
+
+.lg2-garden { display: flex; flex-direction: column; gap: var(--lg2-gap); }
+.lg2-garden__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 48px 24px; color: var(--lg2-label-2); text-align: center; }
+.lg2-garden__empty svg { color: var(--lg2-accent); }
+.lg2-garden__empty p { margin: 0; max-width: 42ch; }
+
+.lg2-garden__status { display: flex; align-items: center; gap: 10px; }
+.lg2-garden__chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--lg2-r-pill); font-size: 0.82rem; font-weight: 600; color: var(--lg2-label-1); background: var(--lg2-panel); border: 1px solid var(--lg2-hairline); }
+.lg2-garden__chip--auto { color: var(--lg2-accent); border-color: rgba(var(--lg2-accent-rgb), 0.4); background: rgba(var(--lg2-accent-rgb), 0.14); }
+
+/* KPI row */
+.lg2-garden__kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--lg2-gap); }
+.lg2-garden__kpi { padding: 15px 17px; display: flex; flex-direction: column; gap: 3px; }
+.lg2-garden__kpi--accent { box-shadow: inset 0 0 0 1px rgba(var(--lg2-accent-rgb), 0.3), var(--lg2-shadow); }
+.lg2-garden__kpihead { display: flex; align-items: center; justify-content: space-between; color: var(--lg2-label-3); }
+.lg2-garden__kpival { font-size: 1.5rem; font-weight: 720; letter-spacing: -0.02em; color: var(--lg2-label-1); font-variant-numeric: tabular-nums; }
+.lg2-garden__kpilabel { font-size: 12px; color: var(--lg2-label-2); font-weight: 600; }
+.lg2-garden__kpihint { font-size: 11px; color: var(--lg2-label-3); }
+
+/* Zone cards */
+.lg2-garden__zones { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--lg2-gap); }
+.lg2-zone { padding: 16px; display: flex; flex-direction: column; gap: 13px; }
+.lg2-zone--running { box-shadow: inset 0 0 0 1.5px #35d6e7, var(--lg2-shadow); }
+.lg2-zone__head { display: flex; align-items: center; gap: 11px; }
+.lg2-zone__icon { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: rgba(53, 214, 231, 0.12); border: 1px solid rgba(53, 214, 231, 0.26); }
+.lg2-zone__id { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.lg2-zone__id b { font-size: 1rem; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-zone__id em { font-style: normal; font-size: 11.5px; color: var(--lg2-label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-zone__badge { flex: 0 0 auto; font-size: 11px; font-weight: 650; padding: 3px 9px; border-radius: 999px; color: var(--lg2-label-2); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); }
+.lg2-zone__badge--on { color: #35d6e7; background: rgba(53, 214, 231, 0.16); border-color: rgba(53, 214, 231, 0.34); }
+.lg2-zone__badge--block { color: #ff9f0a; background: rgba(255, 159, 10, 0.14); border-color: rgba(255, 159, 10, 0.3); }
+
+.lg2-zone__moist { display: flex; flex-direction: column; gap: 6px; }
+.lg2-zone__gauge { height: 10px; border-radius: 999px; background: rgba(127, 127, 127, 0.18); overflow: hidden; }
+.lg2-zone__gauge-fill { height: 100%; border-radius: 999px; transition: width var(--lg2-dur) var(--lg2-ease); }
+.lg2-zone__moistrow { display: flex; align-items: baseline; gap: 8px; }
+.lg2-zone__moistval { font-size: 1.3rem; font-weight: 720; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lg2-zone__moistlbl { font-size: 11.5px; color: var(--lg2-label-3); }
+
+.lg2-zone__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lg2-zone__stats span { display: flex; flex-direction: column; gap: 1px; font-size: 10.5px; color: var(--lg2-label-3); }
+.lg2-zone__stats b { font-size: 0.9rem; font-weight: 640; color: var(--lg2-label-1); font-variant-numeric: tabular-nums; }
+
+.lg2-zone__next { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--lg2-label-2); }
+.lg2-zone__next svg { color: var(--lg2-accent); flex: 0 0 auto; }
+
+.lg2-zone__actions { margin-top: auto; display: flex; }
+.lg2-zone__run, .lg2-zone__stop { width: 100%; justify-content: center; }
+.lg2-zone__run { color: #35d6e7; border-color: rgba(53, 214, 231, 0.4); background: rgba(53, 214, 231, 0.14); }
+.lg2-zone__stop { color: #ff5d57; border-color: rgba(255, 93, 87, 0.4); background: rgba(255, 93, 87, 0.14); }
+.lg2-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Plan list */
+.lg2-garden__plan { padding: 15px 17px; }
+.lg2-garden__planlist { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.lg2-garden__planrow { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); font-size: 12.5px; }
+.lg2-garden__planrow--done { opacity: 0.55; }
+.lg2-garden__plantime { font-weight: 660; color: var(--lg2-label-1); font-variant-numeric: tabular-nums; }
+.lg2-garden__planzone { flex: 1 1 auto; color: var(--lg2-label-1); }
+.lg2-garden__planmeta { color: var(--lg2-label-3); font-size: 11px; }
+.lg2-garden__plandone { color: #30d158; font-size: 11px; font-weight: 650; }
+
+@media (max-width: 1100px) { .lg2-garden__kpis { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px) { .lg2-garden__kpis { grid-template-columns: 1fr 1fr; } .lg2-zone__stats { grid-template-columns: 1fr 1fr; } }
+
+/* ================================================================== *
+ * 24. Garten V2 — hero water-balance banner, zone table, 7-day chart
+ * ================================================================== */
+
+/* Hero balance banner */
+.lg2-garden__hero { position: relative; overflow: hidden; display: grid; grid-template-columns: 1fr clamp(150px, 16vw, 210px); gap: 20px; padding: 18px 22px; }
+.lg2-garden__hero::before { content: ''; position: absolute; inset: 0 0 0 auto; width: 46%; background: var(--lg2-hero-img) center / cover no-repeat; -webkit-mask-image: linear-gradient(90deg, transparent, #000 62%); mask-image: linear-gradient(90deg, transparent, #000 62%); opacity: 0.42; z-index: 0; pointer-events: none; }
+.lg2-garden__hero-main, .lg2-garden__hero-side { position: relative; z-index: 1; }
+.lg2-garden__hero-head { display: flex; align-items: center; gap: 14px; }
+.lg2-garden__hero-icon { flex: 0 0 auto; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; }
+.lg2-garden__hero-icon--ok { color: #30d158; background: rgba(48, 209, 88, 0.16); border: 1px solid rgba(48, 209, 88, 0.32); }
+.lg2-garden__hero-icon--due { color: #35d6e7; background: rgba(53, 214, 231, 0.16); border: 1px solid rgba(53, 214, 231, 0.32); }
+.lg2-garden__hero-head h2 { margin: 0; font-size: 1.3rem; font-weight: 680; letter-spacing: -0.01em; }
+.lg2-garden__hero-head p { margin: 3px 0 0; font-size: 13px; color: var(--lg2-label-2); }
+.lg2-garden__hero-stats { display: flex; gap: clamp(16px, 3vw, 40px); flex-wrap: wrap; margin-top: 16px; }
+.lg2-garden__hstat { display: flex; flex-direction: column; gap: 1px; }
+.lg2-garden__hstat-val { font-size: 1.35rem; font-weight: 720; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lg2-garden__hstat-lbl { font-size: 11px; color: var(--lg2-label-3); }
+.lg2-garden__hstat-sub { font-size: 11.5px; font-weight: 600; color: var(--lg2-label-2); }
+.lg2-garden__hero-side { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; text-align: right; gap: 2px; }
+.lg2-garden__hero-rain { color: #35d6e7; }
+.lg2-garden__hero-rainval { font-size: 11px; color: var(--lg2-label-3); margin-top: 4px; }
+.lg2-garden__hero-rainmm { font-size: 1.05rem; font-weight: 680; color: var(--lg2-label-1); }
+.lg2-garden__hero-cover { font-size: 11.5px; font-weight: 600; color: #30d158; }
+
+/* Split: zones | chart+tip */
+.lg2-garden__split { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: var(--lg2-gap); align-items: start; }
+.lg2-garden__rightcol { display: flex; flex-direction: column; gap: var(--lg2-gap); }
+
+/* Zone overview table */
+.lg2-garden__zones2 { padding: 16px 18px; }
+.lg2-garden__zones-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.lg2-garden__zcols { display: grid; grid-template-columns: 92px 62px 92px; gap: 10px; font-size: 10.5px; color: var(--lg2-label-3); text-align: right; }
+.lg2-garden__zonelist { display: flex; flex-direction: column; }
+.lg2-garden__zrow { display: grid; grid-template-columns: 1fr 92px 62px 92px; gap: 10px; align-items: center; padding: 11px 0; border-top: 1px solid var(--lg2-hairline); }
+.lg2-garden__zrow:first-child { border-top: 0; }
+.lg2-garden__zname { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lg2-garden__zicon { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(53, 214, 231, 0.1); border: 1px solid var(--lg2-hairline); }
+.lg2-garden__zname > div { min-width: 0; display: flex; flex-direction: column; }
+.lg2-garden__zname b { font-size: 0.92rem; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-garden__zname em { font-style: normal; font-size: 11px; color: var(--lg2-label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-garden__zmoist { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.lg2-garden__zgauge { width: 100%; height: 7px; border-radius: 999px; background: rgba(127, 127, 127, 0.18); overflow: hidden; }
+.lg2-garden__zgauge-fill { display: block; height: 100%; border-radius: 999px; }
+.lg2-garden__zpct { display: flex; align-items: baseline; gap: 6px; font-size: 0.86rem; font-weight: 640; font-variant-numeric: tabular-nums; }
+.lg2-garden__zpct em { font-style: normal; font-size: 10px; font-weight: 600; }
+.lg2-garden__zstatus { display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 12px; color: var(--lg2-label-2); }
+.lg2-garden__znext { text-align: right; font-size: 11.5px; color: var(--lg2-label-2); font-variant-numeric: tabular-nums; }
+.lg2-garden__manage { appearance: none; cursor: pointer; margin-top: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: var(--lg2-r-sm); border: 1px solid var(--lg2-hairline); background: var(--lg2-inset); color: var(--lg2-accent); font: inherit; font-weight: 620; font-size: 0.85rem; transition: border-color var(--lg2-fast) var(--lg2-ease), background var(--lg2-fast) var(--lg2-ease); }
+@media (hover: hover) { .lg2-garden__manage:hover { border-color: var(--lg2-accent); background: var(--lg2-hover); } }
+
+/* 7-day chart */
+.lg2-garden__chartcard { padding: 15px 17px; }
+.lg2-garden__chart-head { display: flex; align-items: center; justify-content: space-between; }
+.lg2-garden__chart-unit { font-size: 11px; color: var(--lg2-label-3); border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-sm); padding: 3px 9px; }
+.lg2-garden__chart { margin-top: 12px; }
+.lg2-garden__chartsvg { width: 100%; height: 170px; display: block; }
+.lg2-garden__chart-x { display: flex; justify-content: space-around; margin-top: 4px; font-size: 10px; color: var(--lg2-label-3); }
+.lg2-garden__chart-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 11.5px; color: var(--lg2-label-2); }
+.lg2-garden__chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lg2-garden__chart-empty { min-height: 160px; display: grid; place-items: center; text-align: center; color: var(--lg2-label-3); font-size: 0.9rem; padding: 0 16px; }
+
+/* Tip card */
+.lg2-garden__tip { display: flex; align-items: center; gap: 14px; padding: 15px 17px; }
+.lg2-garden__tip-icon { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: #30d158; background: rgba(48, 209, 88, 0.14); border: 1px solid rgba(48, 209, 88, 0.3); }
+.lg2-garden__tip-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lg2-garden__tip-body strong { font-size: 0.95rem; font-weight: 660; }
+.lg2-garden__tip-body span { font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-garden__tip-drop { flex: 0 0 auto; color: #35d6e7; opacity: 0.7; }
+
+@media (max-width: 1000px) {
+  .lg2-garden__split { grid-template-columns: 1fr; }
+  .lg2-garden__hero { grid-template-columns: 1fr; }
+  .lg2-garden__hero::before { width: 100%; opacity: 0.25; }
+  .lg2-garden__hero-side { align-items: flex-start; text-align: left; flex-direction: row; flex-wrap: wrap; gap: 10px; }
+}
+
+/* ================================================================== *
+ * 25. Automatik (Liquid Glass V2  /liquid-glass-automatik)
+ * ================================================================== */
+
+.lg2-auto { display: flex; flex-direction: column; gap: var(--lg2-gap); }
+.lg2-auto__mode { appearance: none; cursor: pointer; display: inline-flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: var(--lg2-r); background: var(--lg2-panel); border: 1px solid var(--lg2-hairline); color: var(--lg2-label-1); box-shadow: var(--lg2-shadow); -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat)); backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat)); }
+.lg2-auto__mode svg:first-child { color: var(--lg2-accent); }
+.lg2-auto__mode span { display: flex; flex-direction: column; text-align: left; line-height: 1.15; }
+.lg2-auto__mode em { font-style: normal; font-size: 10.5px; color: var(--lg2-label-3); }
+.lg2-auto__mode b { font-size: 0.9rem; font-weight: 650; }
+@media (hover: hover) { .lg2-auto__mode:hover { border-color: var(--lg2-accent); } }
+
+.lg2-auto__tabs { display: flex; gap: 4px; padding: 4px; border-radius: var(--lg2-r-pill); background: rgba(0,0,0,0.16); border: 1px solid var(--lg2-hairline); align-self: flex-start; flex-wrap: wrap; }
+.lg2-auto__tab { appearance: none; cursor: pointer; border: 0; background: transparent; color: var(--lg2-label-2); font: inherit; font-size: 0.85rem; font-weight: 600; padding: 7px 16px; border-radius: var(--lg2-r-pill); }
+.lg2-auto__tab--on { background: rgba(var(--lg2-accent-rgb), 0.18); color: var(--lg2-accent); box-shadow: inset 0 0 0 1px rgba(var(--lg2-accent-rgb), 0.4); }
+
+.lg2-auto__grid3 { display: grid; grid-template-columns: 0.9fr 1.25fr 0.95fr; gap: var(--lg2-gap); align-items: stretch; }
+/* The three Status-tab tiles fill the row to equal height. */
+.lg2-auto__grid3 > .lg2-auto__col { height: 100%; }
+.lg2-auto__col { padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; }
+
+.lg2-auto__big { display: flex; flex-direction: column; gap: 2px; }
+.lg2-auto__biglabel { font-size: 11px; color: var(--lg2-label-3); font-weight: 600; }
+.lg2-auto__bigval { font-size: 1.9rem; font-weight: 720; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lg2-auto__big--sm .lg2-auto__bigval { font-size: 1.4rem; }
+.lg2-auto__bigsub { font-size: 12px; color: var(--lg2-label-2); }
+
+.lg2-auto__blocks { display: flex; flex-direction: column; gap: 9px; }
+.lg2-auto__blockhead { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; color: var(--lg2-label-2); }
+.lg2-auto__blockn { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.16); border-radius: 999px; padding: 1px 8px; }
+.lg2-auto__blockrow { display: flex; align-items: center; gap: 10px; }
+.lg2-auto__bicon, .lg2-auto__bok { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: #ff9f0a; background: rgba(255,159,10,0.14); border: 1px solid rgba(255,159,10,0.28); }
+.lg2-auto__bok { color: #30d158; background: rgba(48,209,88,0.14); border-color: rgba(48,209,88,0.28); }
+.lg2-auto__bok--warn { color: #ff5d57; background: rgba(255,93,87,0.14); border-color: rgba(255,93,87,0.3); }
+.lg2-auto__blockrow > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.lg2-auto__blockrow b { font-size: 0.86rem; font-weight: 620; }
+.lg2-auto__blockrow em { font-style: normal; font-size: 11px; color: var(--lg2-label-3); }
+
+/* Decision rationale */
+.lg2-auto__reason { gap: 13px; }
+.lg2-auto__decision { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--lg2-hairline); }
+.lg2-auto__dicon { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.14); border: 1px solid rgba(var(--lg2-accent-rgb), 0.28); }
+.lg2-auto__decision b { font-size: 1rem; font-weight: 660; }
+.lg2-auto__decision em { font-style: normal; display: block; font-size: 11.5px; color: var(--lg2-label-3); margin-top: 2px; }
+.lg2-auto__reasonrow { display: flex; gap: 11px; }
+.lg2-auto__ricon { flex: 0 0 auto; color: var(--lg2-accent); margin-top: 1px; }
+.lg2-auto__reasonrow > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lg2-auto__reasonrow b { font-size: 0.86rem; font-weight: 640; }
+.lg2-auto__reasonrow span { font-size: 12px; color: var(--lg2-label-2); line-height: 1.4; }
+.lg2-auto__stratnote { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 9px 12px; border-radius: var(--lg2-r-sm); background: rgba(48,209,88,0.1); border: 1px solid rgba(48,209,88,0.24); color: #30d158; font-size: 12px; font-weight: 600; }
+.lg2-auto__stratnote svg { flex: 0 0 auto; }
+
+/* Strategy settings list */
+.lg2-auto__settings { display: flex; flex-direction: column; }
+.lg2-auto__setrow { appearance: none; cursor: pointer; display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; padding: 11px 4px; border: 0; border-top: 1px solid var(--lg2-hairline); background: transparent; color: inherit; font: inherit; }
+.lg2-auto__setrow:first-child { border-top: 0; }
+@media (hover: hover) { .lg2-auto__setrow:hover { background: var(--lg2-hover); } }
+.lg2-auto__seticon { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.14); border: 1px solid rgba(var(--lg2-accent-rgb), 0.24); }
+.lg2-auto__setlabel { flex: 1 1 auto; min-width: 0; font-size: 0.88rem; font-weight: 560; }
+.lg2-auto__setval { font-size: 0.84rem; font-weight: 640; color: var(--lg2-label-2); white-space: nowrap; }
+.lg2-auto__setval--accent { color: #30d158; }
+.lg2-auto__setrow > svg:last-child { color: var(--lg2-label-3); flex: 0 0 auto; }
+
+/* Other-tab panels */
+.lg2-auto__panel { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.lg2-auto__panelintro { margin: 0; font-size: 13px; color: var(--lg2-label-2); max-width: 60ch; }
+.lg2-auto__reasonlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.lg2-auto__reasonlist li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-auto__reasonlist svg { color: var(--lg2-accent); flex: 0 0 auto; }
+.lg2-auto__empty { color: var(--lg2-label-2); font-size: 0.92rem; margin: 0; }
+.lg2-auto__sim { align-items: center; text-align: center; }
+.lg2-auto__simicon { width: 54px; height: 54px; border-radius: 15px; display: grid; place-items: center; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.14); border: 1px solid rgba(var(--lg2-accent-rgb), 0.28); }
+.lg2-auto__sim .lg2-auto__panelintro { text-align: center; }
+.lg2-auto__log { display: flex; flex-direction: column; width: 100%; }
+.lg2-auto__logrow { display: grid; grid-template-columns: 64px 1.2fr 64px 2fr; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--lg2-hairline); font-size: 12.5px; }
+.lg2-auto__logrow:first-child { border-top: 0; }
+.lg2-auto__logtime { font-weight: 660; font-variant-numeric: tabular-nums; }
+.lg2-auto__logzone { font-weight: 600; }
+.lg2-auto__logact { color: var(--lg2-accent); font-weight: 640; }
+.lg2-auto__logreason { color: var(--lg2-label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Last actions strip */
+.lg2-auto__last { padding: 15px 18px; }
+.lg2-auto__lasthead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.lg2-auto__lastlink { appearance: none; cursor: pointer; border: 0; background: transparent; color: var(--lg2-accent); font: inherit; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.lg2-auto__lastgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--lg2-gap); }
+.lg2-auto__lastcard { padding: 12px 13px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lg2-auto__lasttime { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 640; font-variant-numeric: tabular-nums; }
+.lg2-auto__lastact { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-auto__lastgrund { font-size: 11px; color: var(--lg2-label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 1100px) { .lg2-auto__grid3 { grid-template-columns: 1fr; } .lg2-auto__lastgrid { grid-template-columns: repeat(2, 1fr); } .lg2-auto__logrow { grid-template-columns: 56px 1fr 56px; } .lg2-auto__logreason { display: none; } }
+
+/* Settings hub UI v1/v2 switcher (production shell) */
+.settings-hub__uiswitch { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 18px; margin-bottom: 18px; border-radius: 14px; background: var(--color-card, #101725); border: 1px solid var(--color-card-border, #232c3b); }
+.settings-hub__uiswitch-title { display: block; font-weight: 700; font-size: 0.98rem; }
+.settings-hub__uiswitch-hint { display: block; font-size: 12.5px; color: var(--color-muted, #9aa6b8); margin-top: 2px; max-width: 60ch; }
+.settings-hub__seg { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(120,120,128,0.16); border: 1px solid var(--color-card-border, #232c3b); flex: 0 0 auto; }
+.settings-hub__seg-btn { appearance: none; cursor: pointer; border: 0; background: transparent; color: var(--color-muted, #9aa6b8); font: inherit; font-size: 0.85rem; font-weight: 600; padding: 8px 16px; border-radius: 999px; }
+.settings-hub__seg-btn--on { background: var(--color-accent, #f59e0b); color: var(--color-accent-contrast, #1a1205); }
+
+/* ================================================================== *
+ * 26. Expert-mode panels (Automatik + Garten)
+ * ================================================================== */
+
+.lg2-auto__expert { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.lg2-auto__expmetrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.lg2-auto__expmetrics > div { display: flex; flex-direction: column; gap: 2px; }
+.lg2-auto__expmetrics span { font-size: 11px; color: var(--lg2-label-3); }
+.lg2-auto__expmetrics b { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.lg2-auto__expreasons { flex-wrap: wrap; }
+.lg2-auto__exprooms { display: flex; flex-wrap: wrap; gap: 8px; }
+.lg2-auto__exprooms span { font-size: 11.5px; color: var(--lg2-label-2); padding: 5px 10px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); }
+.lg2-auto__exprooms b { color: var(--lg2-label-1); font-weight: 640; }
+@media (max-width: 900px) { .lg2-auto__expmetrics { grid-template-columns: repeat(2, 1fr); } }
+
+.lg2-garden__expert { padding: 16px 18px; }
+.lg2-garden__exptable { margin-top: 10px; display: flex; flex-direction: column; }
+.lg2-garden__exphead, .lg2-garden__exprow { display: grid; grid-template-columns: 1.4fr 0.9fr 1.2fr 0.9fr 0.6fr 0.7fr; gap: 10px; align-items: center; }
+.lg2-garden__exphead { font-size: 10.5px; color: var(--lg2-label-3); padding-bottom: 6px; }
+.lg2-garden__exprow { padding: 9px 0; border-top: 1px solid var(--lg2-hairline); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.lg2-garden__exprow > span:not(.lg2-garden__expname) { color: var(--lg2-label-2); }
+.lg2-garden__expname { font-weight: 620; color: var(--lg2-label-1); display: flex; flex-direction: column; }
+.lg2-garden__expfault { font-style: normal; font-size: 10px; color: #ff5d57; }
+@media (max-width: 900px) { .lg2-garden__exphead { display: none; } .lg2-garden__exprow { grid-template-columns: 1fr 1fr; gap: 4px 10px; padding: 10px 0; } }
+
+/* ================================================================== *
+ * ui-v2-release Task 3 — app-wide sidebar chrome + update banner
+ * ================================================================== */
+
+/* Version badge (replaces the plain subtitle; clickable → /updates). */
+.lg2-side__version {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 1px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.1;
+  color: var(--lg2-label-3);
+  cursor: pointer;
+}
+.lg2-side__version:hover { color: var(--lg2-accent); }
+.lg2-side__version-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lg2-accent);
+  box-shadow: 0 0 6px var(--lg2-accent);
+}
+
+/* Chrome cluster (lever + message bell + freshness) above the foot. */
+.lg2-side__chrome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg2-s2);
+  padding: var(--lg2-s2) 0;
+}
+.lg2-side__chrome-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lg2-s2);
+  flex-wrap: wrap;
+}
+/* Compact icon rail: centre the cluster and drop the lever's text label. */
+.lg2-nav-rail .lg2-side__chrome { align-items: center; }
+.lg2-nav-rail .lg2-side__chrome-row { justify-content: center; }
+/* The automation lever lives in the header (not the rail), so its label must
+   stay visible even in icon-rail mode. */
+
+/* Mobile bottom-bar: keep it icon-nav only. */
+@media (max-width: 820px) {
+  .lg2-side__chrome { display: none; }
+}
+
+/* Dismissible update banner — a floating pill near the top of the content. */
+.lg2-updatebar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: var(--lg2-s2);
+  max-width: min(92vw, 520px);
+  padding: 6px 6px 6px 12px;
+  border-radius: 999px;
+  color: var(--lg2-label-1);
+  background: var(--lg2-panel, rgba(16, 24, 36, 0.9));
+  border: 1px solid var(--lg2-hairline);
+  box-shadow: var(--lg2-shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.45));
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  font-size: 12.5px;
+}
+.lg2-updatebar__go {
+  border: 0;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--lg2-on-accent);
+  background: var(--lg2-accent);
+}
+.lg2-updatebar__x {
+  border: 0;
+  background: none;
+  color: var(--lg2-label-2);
+  font-size: 17px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+.lg2-updatebar__x:hover { color: var(--lg2-label-1); }
+
+/* ================================================================== *
+ * ui-v2-release Task 5 — native v2 settings pages
+ * ================================================================== */
+
+.lg2-settings { gap: var(--lg2-gap); }
+.lg2-settings .lg2-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg2-s3);
+  /* The base `.lg2-card` has no padding — settings cards need their own so the
+     content doesn't sit flush against (and get clipped at) the card edge. */
+  padding: clamp(14px, 1.4vw, 20px) clamp(16px, 1.6vw, 22px);
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+.lg2-settings__hint { margin: 0; font-size: 12.5px; color: var(--lg2-label-3); line-height: 1.45; }
+
+/* Label + control row (toggle on the right). */
+.lg2-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lg2-s3);
+  font-size: 13px;
+  color: var(--lg2-label-2);
+}
+.lg2-settings__row > span { flex: 1 1 auto; }
+.lg2-settings__row small { color: var(--lg2-label-3); }
+
+/* Primary button (open appearance, etc.). */
+.lg2-settings__btn {
+  align-self: flex-start;
+  border: 0;
+  border-radius: var(--lg2-r-sm);
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--lg2-on-accent);
+  background: var(--lg2-accent);
+}
+.lg2-settings__btn:hover { filter: brightness(1.08); }
+
+/* Labelled field (text input / select). */
+.lg2-field { display: flex; flex-direction: column; gap: 4px; }
+.lg2-field__label { font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-field__input {
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: var(--lg2-r-sm);
+  border: 1px solid var(--lg2-hairline);
+  background: var(--lg2-inset, rgba(255, 255, 255, 0.06));
+  color: var(--lg2-label-1);
+  font: inherit;
+}
+.lg2-field__input:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--lg2-focus); }
+
+/* Settings hub card grid. */
+.lg2-settings__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--lg2-gap);
+}
+.lg2-settings__card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: var(--lg2-s4);
+  border-radius: var(--lg2-r-lg);
+  border: 1px solid var(--lg2-hairline);
+  background: var(--lg2-panel, rgba(255, 255, 255, calc(var(--lg2-glass-alpha) * 1)));
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  box-shadow: var(--lg2-inner);
+  cursor: pointer;
+  transition: transform 0.14s var(--lg2-ease, ease), border-color 0.14s ease, box-shadow 0.14s ease;
+}
+@media (hover: hover) {
+  .lg2-settings__card:hover {
+    transform: translateY(-2px);
+    border-color: var(--lg2-accent);
+    box-shadow: var(--lg2-inner), var(--lg2-shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.4));
+  }
+}
+.lg2-settings__card-title { font-weight: 640; font-size: 0.98rem; color: var(--lg2-label-1); }
+.lg2-settings__card-desc { font-size: 12.5px; color: var(--lg2-label-3); line-height: 1.45; }
+
+/* ================================================================== *
+ * ui-v2-release Task 5.4 — native-v2 skin for fallback pages
+ * ------------------------------------------------------------------
+ * Pages without a bespoke v2 layout (rooms, sources, wizard, diagnostics,
+ * system, logs-debug, notifications, irrigation-settings, messages, updates,
+ * help) render their full v1 content inside `.lg2-main.lg2-fallback`. Because
+ * the v1 components style exclusively via tokens, remapping the `--color-*` /
+ * `--hs-*` tokens here re-skins ALL of them to the Liquid Glass look at once —
+ * no duplication, guaranteed feature parity. Surfaces stay solid-dark so text
+ * is readable over any wallpaper/scheme; only accent, radii and borders adopt
+ * the active v2 theme.
+ * ================================================================== */
+
+/* Native v2 settings/warnings pages are content pages (not one-screen
+   dashboards) — they always scroll, in Basic and Expert alike. */
+.lg2-main.lg2-settings,
+.lg2-main.lg2-garden,
+.lg2-main.lg2-warn {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+/* Content pages: cards must keep their natural height (never flex-shrink to fit
+   the 100vh column, which — combined with `.lg2-card { overflow:hidden }` —
+   clipped the bottom content). The page scrolls instead. Applies in Basic and
+   Expert alike. */
+.lg2-main.lg2-settings > *,
+.lg2-main.lg2-garden > *,
+.lg2-main.lg2-warn > *,
+.lg2-main.lg2-fallback > * { flex: 0 0 auto; }
+
+.lg2-main.lg2-fallback {
+  /* Long settings pages scroll (the shell content area is otherwise fixed). */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: clamp(12px, 1vw, 22px) clamp(12px, 1vw, 22px) clamp(24px, 3vw, 40px);
+
+  /* Surface + text tokens are NOT hard-coded here — they are inherited from the
+     scheme-aware `.lg2-demo` block so the v1 fallback pages follow Light/Dark
+     exactly like the native v2 pages. Only scheme-independent mappings (radii,
+     shadows) live here. */
+  --hs-radius-sm: var(--lg2-r-sm);
+  --hs-radius-md: var(--lg2-r);
+  --hs-radius-lg: var(--lg2-r-lg);
+  --hs-radius-hero: var(--lg2-r-xl);
+  --hs-shadow-card: var(--lg2-shadow, 0 12px 40px rgb(0 0 0 / 28%));
+  --hs-shadow-elevated: var(--lg2-shadow-lg, 0 20px 70px rgb(0 0 0 / 42%));
+}
+
+/* Accent-coloured focus rings inside the fallback follow the v2 accent. */
+.lg2-main.lg2-fallback :focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--lg2-focus);
+}
+
+/* A touch of glass on the top-level cards for cohesion (kept readable — the
+   FULL Liquid Glass recipe (sheen + scrim + translucent panel + blur + bevel),
+   so the reused v1 settings cards read EXACTLY like the native v2 cards
+   (`.lg2-card`) instead of a flat solid `--color-card` surface. */
+.lg2-main.lg2-fallback .module-panel__card,
+.lg2-main.lg2-fallback .settings-hub__card,
+.lg2-main.lg2-fallback .settings-hub__uiswitch {
+  background: var(--lg2-sheen), var(--lg2-scrim), var(--lg2-panel) !important;
+  border: 1px solid var(--lg2-hairline) !important;
+  border-radius: var(--lg2-r-lg);
+  box-shadow: var(--lg2-inner), var(--lg2-shadow);
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+}
+.lg2-main.lg2-fallback .settings-hub__uiswitch { border-radius: var(--lg2-r); }
+/* Lite mode: no blur, more-opaque fill (matches `.lg2-lite .lg2-card`). */
+.lg2-demo.lg2-lite .lg2-main.lg2-fallback .module-panel__card,
+.lg2-demo.lg2-lite .lg2-main.lg2-fallback .settings-hub__card,
+.lg2-demo.lg2-lite .lg2-main.lg2-fallback .settings-hub__uiswitch {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* Static Glass (preblur): drop the live backdrop-filter and paint the
+   pre-blurred wallpaper — same frosted look, far cheaper. */
+.lg2-demo.lg2-preblur .lg2-main.lg2-fallback .module-panel__card,
+.lg2-demo.lg2-preblur .lg2-main.lg2-fallback .settings-hub__card,
+.lg2-demo.lg2-preblur .lg2-main.lg2-fallback .settings-hub__uiswitch {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background:
+    var(--lg2-sheen),
+    var(--lg2-scrim),
+    var(--lg2-panel),
+    var(--lg2-bg-blurred, transparent) center / cover fixed no-repeat !important;
+}
+/* High FPS Mode #4/#5 apply to the settings cards too. */
+.lg2-fps-cv .lg2-main.lg2-fallback .settings-hub__card,
+.lg2-fps-cv .lg2-main.lg2-fallback .module-panel__card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+}
+.lg2-fps-contain .lg2-main.lg2-fallback .settings-hub__card,
+.lg2-fps-contain .lg2-main.lg2-fallback .module-panel__card {
+  contain: layout style;
+}
+
+/* ================================================================== *
+ * Task 11.11 / 11.20 — reused v1 weather components in native v2
+ * Vorhersage expert panels (radar, wind, "Wettervorhersage · Diagramme").
+ * These components style via the v1 --color-*/--hs-* tokens, so we remap
+ * those tokens (same values as the fallback) on their wrappers to adopt the
+ * active Liquid Glass theme — no rebuild, full parity.
+ * ================================================================== */
+.lg2-expert__radar,
+.lg2-expert__wind,
+.lg2-expert__weathercharts {
+  /* Surface/text tokens inherit from the scheme-aware `.lg2-demo` block so the
+     reused v1 components follow Light/Dark. Only radius mappings are asserted. */
+  --hs-radius-sm: var(--lg2-r-sm);
+  --hs-radius-md: var(--lg2-r);
+  --hs-radius-lg: var(--lg2-r-lg);
+}
+
+/* The reused components bring their own card chrome; drop the extra padding so
+   they sit flush inside the lg2 expert card. */
+.lg2-expert__radar,
+.lg2-expert__wind,
+.lg2-expert__weathercharts {
+  display: block;
+}
+.lg2-expert__radar :focus-visible,
+.lg2-expert__wind :focus-visible,
+.lg2-expert__weathercharts :focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--lg2-focus);
+}
+.lg2-expert__wind {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+@media (max-width: 860px) {
+  .lg2-expert__wind { grid-template-columns: minmax(0, 1fr); }
+}
+.lg2-expert__weathercharts .weather-charts__grid {
+  gap: 14px;
+}
+
+/* Honest coverage note under the forecast controls (Task 11.10). */
+.lg2-fc__coverage {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  color: var(--lg2-label-2);
+}
+
+/* ================================================================== *
+ * ui-v2-release Task 6 — app-wide v2 container frame
+ * ------------------------------------------------------------------
+ * With the unified AppShell the v2 shell lives directly under
+ * `.app.app--uiv2` (there is no `.app__main` in v2). Carry the configurable
+ * outer frame (image/gradient/colour + darken, composed into `--lg2-frame-bg`)
+ * onto that container so the centred ~82vw column on ultrawide screens keeps
+ * its frame. On normal screens the demo is width:100% and covers this fully.
+ * ================================================================== */
+body.ui-v2 .app--uiv2 {
+  padding: 0 !important;
+  min-height: 100vh;
+  background: var(--lg2-frame-bg, var(--lg2-frame-base, #05070d)) !important;
+}
+
+/* ================================================================== *
+ * ui-v2-release Task 9.3 — expert panels (tables + manual control)
+ * ================================================================== */
+
+.lg2-exp-table { display: flex; flex-direction: column; gap: 2px; }
+.lg2-exp-row {
+  display: grid;
+  grid-template-columns: auto minmax(80px, 1fr) auto auto minmax(0, 1.6fr);
+  align-items: center;
+  gap: var(--lg2-s3);
+  padding: 6px 8px;
+  border-radius: var(--lg2-r-sm);
+  font-size: 12.5px;
+  color: var(--lg2-label-2);
+}
+.lg2-exp-row:nth-child(odd) { background: rgba(var(--lg2-scrim-rgb, 8, 11, 17), 0.05); }
+.lg2-exp-row__time { color: var(--lg2-label-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lg2-exp-row__name { color: var(--lg2-label-1); font-weight: 600; }
+.lg2-exp-row__val { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lg2-exp-row__state { color: var(--lg2-label-3); font-size: 11px; }
+.lg2-exp-row__reason { color: var(--lg2-label-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Manual control [control]. */
+.lg2-exp-ctl { display: flex; flex-direction: column; gap: 6px; }
+.lg2-exp-ctl__row { display: flex; align-items: center; justify-content: space-between; gap: var(--lg2-s3); }
+.lg2-exp-ctl__name { display: flex; flex-direction: column; color: var(--lg2-label-1); font-weight: 600; font-size: 13px; }
+.lg2-exp-ctl__name small { color: var(--lg2-label-3); font-weight: 400; font-variant-numeric: tabular-nums; }
+.lg2-exp-ctl__btns { display: inline-flex; gap: 4px; }
+.lg2-exp-ctl__btns button {
+  border: 1px solid var(--lg2-hairline);
+  background: var(--lg2-inset, rgba(255, 255, 255, 0.06));
+  color: var(--lg2-label-1);
+  border-radius: var(--lg2-r-sm);
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.lg2-exp-ctl__btns button:hover {
+  border-color: var(--lg2-accent);
+  background: var(--lg2-hover);
+}
+
+/* ui-v2-release Task 9.3 — Vorhersage expert sun-path container. */
+.lg2-expert__sun { max-width: 420px; margin: 4px auto 0; }
+.lg2-expert__sun svg { width: 100%; height: auto; }
+
+/* ui-v2-release Task 9.3 — Automatik expert risk-weight bars. */
+.lg2-auto__weights { margin-top: var(--lg2-s4); display: flex; flex-direction: column; gap: 6px; }
+.lg2-auto__weights-title { margin: 0 0 4px; font-size: 12.5px; font-weight: 650; color: var(--lg2-label-2); }
+.lg2-auto__weightrow { display: grid; grid-template-columns: minmax(90px, 140px) 1fr auto; align-items: center; gap: var(--lg2-s3); font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-auto__weightbar { height: 8px; border-radius: 999px; background: rgba(var(--lg2-scrim-rgb, 8, 11, 17), 0.12); overflow: hidden; }
+.lg2-auto__weightfill { display: block; height: 100%; border-radius: 999px; background: var(--lg2-accent); }
+.lg2-auto__weightval { font-variant-numeric: tabular-nums; color: var(--lg2-label-1); font-weight: 600; }
+
+/* ================================================================== *
+ * ui-v2-release fix — never allow a horizontal (left-right) scrollbar
+ * ------------------------------------------------------------------
+ * The v2 shell is a full-height grid; content must only ever scroll
+ * vertically. Grid children default to `min-width: auto` which lets wide
+ * content (tables, charts) push the layout past the viewport → a page-level
+ * horizontal scrollbar. Clamp it everywhere and let grid/flex children shrink.
+ * ================================================================== */
+.lg2-demo { overflow-x: hidden; max-width: 100%; }
+.lg2-demo .lg2-main { overflow-x: hidden; }
+.lg2-demo .lg2-main > *,
+.lg2-raeume__split > *,
+.lg2-two > *,
+.lg2-garden__split > *,
+.lg2-auto__grid3 > * { min-width: 0; }
+/* Wide expert tables scroll WITHIN their card, not the whole page. */
+.lg2-exp-table,
+.lg2-fc__grid { max-width: 100%; }
+
+/* ================================================================== *
+ * ui-v2-release chrome/warnings tweaks
+ * ================================================================== */
+
+/* Sidebar messages item: unread badge on the mail glyph. */
+.lg2-nav__iconwrap { position: relative; display: inline-flex; }
+.lg2-nav__badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--lg2-red, #ff5d57);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* Header right cluster (lever + weather/mode) — consistent spacing. */
+.lg2-header__right { display: flex; align-items: center; gap: var(--lg2-s3); }
+/* Automatik mode pill is now a status span (not a button). */
+.lg2-auto__mode { cursor: default; }
+
+/* Native v2 severe-weather cards. */
+.lg2-warn { gap: var(--lg2-gap); }
+.lg2-warncard {
+  border-left: 4px solid var(--lg2-warn-color, var(--lg2-red));
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg2-s3);
+}
+.lg2-warncard__head { display: flex; align-items: flex-start; gap: var(--lg2-s3); }
+.lg2-warncard__icon { flex: 0 0 auto; }
+.lg2-warncard__title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lg2-warncard__title strong { color: var(--lg2-label-1); font-size: 1.02rem; font-weight: 650; }
+.lg2-warncard__meta { font-size: 12.5px; color: var(--lg2-label-3); }
+.lg2-warncard__level { font-weight: 650; }
+.lg2-warncard__desc { margin: 0; color: var(--lg2-label-2); font-size: 13.5px; line-height: 1.5; }
+.lg2-warncard__instr {
+  display: flex;
+  gap: var(--lg2-s2);
+  padding: var(--lg2-s3);
+  border-radius: var(--lg2-r-sm);
+  background: rgba(var(--lg2-scrim-rgb, 8, 11, 17), 0.06);
+}
+.lg2-warncard__instr p { margin: 0; color: var(--lg2-label-2); font-size: 13px; line-height: 1.5; white-space: pre-line; }
+.lg2-warncard__instr-icon { flex: 0 0 auto; color: var(--lg2-accent); }
+
+/* ================================================================== *
+ * ui-v2-release Runde 2 (Task 11) — polish & parity CSS
+ * ================================================================== */
+
+/* --- Task 11.4: theme the reused v1 RoomDetailModal in v2 -------------------
+ * The modal is portaled to <body> (which carries `.ui-v2` while the v2 shell is
+ * mounted), so it renders OUTSIDE the shell tree. Remap the v1 --color-*/--hs-*
+ * tokens on the portaled root so it adopts the Liquid Glass look (dark glass +
+ * accent) instead of the v1 amber/foreign design. Base --lg2-* tokens resolve
+ * from :root, so the accent follows the theme default. */
+body.ui-v2 .room-detail {
+  --color-bg: rgba(5, 10, 18, 0.62);
+  --color-bg-elev: rgba(255, 255, 255, 0.05);
+  --color-card: #12202f;
+  --color-card-hover: #17293b;
+  --color-card-border: var(--lg2-hairline);
+  --color-card-border-strong: rgba(255, 255, 255, 0.22);
+  --color-text: var(--lg2-label-1);
+  --color-muted: var(--lg2-label-2);
+  --color-faint: var(--lg2-label-3);
+  --color-accent: var(--lg2-accent);
+  --color-accent-strong: var(--lg2-orange-2);
+  --color-accent-contrast: var(--lg2-on-accent);
+  --color-accent-soft: var(--lg2-orange-2);
+  --hs-surface-1: #12202f;
+  --hs-surface-2: #17293b;
+  --hs-border: var(--lg2-hairline);
+  --hs-text-1: var(--lg2-label-1);
+  --hs-text-2: var(--lg2-label-2);
+  --hs-text-3: var(--lg2-label-3);
+  --hs-amber: var(--lg2-accent);
+  --hs-amber-soft: var(--lg2-orange-2);
+}
+body.ui-v2 .room-detail__panel {
+  background: var(--lg2-sheen), rgba(16, 26, 40, 0.96);
+  border: 1px solid var(--lg2-hairline-2);
+  border-radius: var(--lg2-r-lg);
+  box-shadow: var(--lg2-inner), var(--lg2-shadow-lg, 0 20px 70px rgb(0 0 0 / 46%));
+}
+body.ui-v2 .room-detail__close:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--lg2-focus); }
+
+/* --- Twin room popover (chips overview) in v2 -------------------------------
+ * The popover is portaled to <body> (`.ui-v2`), so — like the detail modal — it
+ * renders outside `.lg2-demo`. Remap the v1 --color-*/--glass-*/--action-*
+ * tokens to the Liquid Glass tokens (which the shell mirrors onto <body>) so
+ * the popover AND its children (info rows, manual control, quick buttons, icon
+ * button) adopt the V2 look instead of the foreign v1 dark card. */
+body.ui-v2 .twin-popover {
+  --color-text: var(--lg2-label-1);
+  --color-muted: var(--lg2-label-2);
+  --color-faint: var(--lg2-label-3);
+  --color-accent: var(--lg2-accent);
+  --color-accent-strong: var(--lg2-orange-2);
+  --color-accent-contrast: var(--lg2-on-accent);
+  --color-card-border: var(--lg2-hairline);
+  --color-card-border-strong: var(--lg2-hairline-2);
+  --color-bg-elev: var(--lg2-inset);
+  --color-success: var(--lg2-green);
+  --color-danger: var(--lg2-red);
+  --color-warn: var(--lg2-orange);
+  --glass-bg-strong: var(--lg2-panel);
+  --action-vent: var(--lg2-green);
+  --action-warn: var(--lg2-red);
+  --glow-accent: 0 0 14px rgba(var(--lg2-accent-rgb), 0.32);
+  --radius-md: var(--lg2-r);
+  background: var(--lg2-sheen), rgba(16, 26, 40, 0.94);
+  border: 1px solid var(--lg2-hairline-2);
+  border-radius: var(--lg2-r);
+  box-shadow: var(--lg2-inner), var(--lg2-shadow-lg, 0 20px 70px rgb(0 0 0 / 46%));
+  -webkit-backdrop-filter: blur(var(--lg2-blur-lg)) saturate(var(--lg2-sat));
+  backdrop-filter: blur(var(--lg2-blur-lg)) saturate(var(--lg2-sat));
+}
+body.ui-v2 .twin-popover__title { color: var(--lg2-label-1); }
+body.ui-v2 .twin-popover__detail {
+  color: var(--lg2-accent);
+  border: 1px solid rgba(var(--lg2-accent-rgb), 0.4);
+  background: rgba(var(--lg2-accent-rgb), 0.14);
+  border-radius: var(--lg2-r-sm);
+}
+body.ui-v2 .twin-popover__detail:hover {
+  background: rgba(var(--lg2-accent-rgb), 0.24);
+  border-color: var(--lg2-accent);
+}
+body.ui-v2 .twin-control__quick button {
+  background: var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+  color: var(--lg2-label-1);
+  border-radius: var(--lg2-r-sm);
+}
+body.ui-v2 .twin-control__quick button:hover {
+  border-color: var(--lg2-accent);
+  background: var(--lg2-hover);
+}
+body.ui-v2 .twin-iconbtn {
+  background: var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+  border-radius: var(--lg2-r-sm);
+  color: var(--lg2-label-1);
+}
+body.ui-v2 .twin-iconbtn:hover { border-color: var(--lg2-accent); }
+body.ui-v2 .twin-control__row input[type='range'] { accent-color: var(--lg2-accent); }
+/* A few explicit rules so the popover is unmistakably V2 even where the token
+   remap doesn't reach: head divider, close button, section dividers. */
+body.ui-v2 .twin-popover__head { border-bottom: 0; }
+body.ui-v2 .twin-popover__close { color: var(--lg2-label-3); }
+body.ui-v2 .twin-popover__close:hover { color: var(--lg2-label-1); }
+body.ui-v2 .twin-popover__chart,
+body.ui-v2 .twin-popover__risk,
+body.ui-v2 .twin-popover__action,
+body.ui-v2 .twin-control { border-top-color: var(--lg2-hairline); }
+body.ui-v2 .twin-popover__chart-label { color: var(--lg2-label-3); }
+body.ui-v2 .twin-popover__riskbar { background: rgba(255, 255, 255, 0.08); }
+body.ui-v2 .twin-popover__riskfill { background: linear-gradient(90deg, var(--lg2-accent), var(--lg2-orange-2)); }
+body.ui-v2 .room-badge__floor {
+  background: rgba(var(--lg2-accent-rgb), 0.2);
+  color: var(--lg2-accent);
+}
+
+/* --- Hausübersicht chips: match the V2 room rows -----------------------------
+ * The reused twin room badge shipped with a hard-coded dark pill background +
+ * its own blur. In the V2 chips grid, re-skin it to the same glass fill,
+ * hairline and radius as the Räume rows (`.lg2-roomrow`) so both read as one
+ * design; keep the tone-coloured left status bar. */
+body.ui-v2 .twin-chips .room-badge {
+  background: var(--lg2-scrim), var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+  border-left: 4px solid var(--lg2-label-3);
+  border-radius: var(--lg2-r-sm);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+body.ui-v2 .twin-chips .room-badge--scheduled,
+body.ui-v2 .twin-chips .room-badge--recommended { border-left-color: var(--lg2-accent); }
+body.ui-v2 .twin-chips .room-badge--executing { border-left-color: var(--lg2-green); }
+body.ui-v2 .twin-chips .room-badge--blocked { border-left-color: var(--lg2-red); }
+body.ui-v2 .twin-chips .room-badge--manuallyOverridden { border-left-color: var(--lg2-orange-2); }
+@media (hover: hover) {
+  body.ui-v2 .twin-chips .room-badge:hover {
+    background: var(--lg2-hover);
+    border-color: var(--lg2-accent);
+    box-shadow: none;
+  }
+}
+body.ui-v2 .twin-chips .room-badge--selected {
+  border-color: var(--lg2-accent);
+  box-shadow: inset 0 0 0 1.5px var(--lg2-accent);
+}
+
+/* Empty state for the Hausübersicht — centred, muted. */
+.lg2-rooms-empty {
+  margin: 0;
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  min-height: 88px;
+  padding: var(--lg2-s5) var(--lg2-s3);
+  color: var(--lg2-label-2);
+  font-size: 0.95rem;
+}
+
+/* --- Task 11.8: Räume risk badges — readability in Liquid Glass -------------
+ * Stronger fill + a hairline border so the pill reads clearly on frosted glass,
+ * and use the shared lg2 semantic hues so the badges belong to the theme. */
+.lg2-risk,
+.lg2-riskpill { border: 1px solid transparent; }
+.lg2-risk--high { color: #ffb27a; background: rgba(255, 140, 66, 0.24); border-color: rgba(255, 140, 66, 0.42); }
+.lg2-risk--mid { color: #ffe08a; background: rgba(255, 207, 91, 0.22); border-color: rgba(255, 207, 91, 0.4); }
+.lg2-risk--low { color: #8ee493; background: rgba(102, 214, 107, 0.2); border-color: rgba(102, 214, 107, 0.38); }
+.lg2-risk--vlow { color: #7fe4f0; background: rgba(53, 214, 231, 0.2); border-color: rgba(53, 214, 231, 0.38); }
+
+/* --- Task 11.16: Automatik sub-nav → cohesive v2 glass tile -----------------*/
+.lg2-auto__tabs {
+  background: var(--lg2-sheen), var(--lg2-panel);
+  border: 1px solid var(--lg2-hairline);
+  box-shadow: var(--lg2-inner);
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+  backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
+}
+.lg2-auto__tab { transition: color var(--lg2-dur-fast, 0.14s) ease, background var(--lg2-dur-fast, 0.14s) ease; }
+@media (hover: hover) { .lg2-auto__tab:hover { color: var(--lg2-label-1); background: var(--lg2-hover); } }
+.lg2-auto__tab--on {
+  background: linear-gradient(180deg, var(--lg2-orange-2), var(--lg2-accent));
+  color: var(--lg2-on-accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 12px rgba(var(--lg2-accent-rgb), 0.3);
+}
+
+/* --- Tasks 11.12 / 11.13: Garten manual valve control layout ---------------*/
+.lg2-garden__valvectl { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.lg2-garden__valverow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 1.4fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--lg2-r);
+  background: var(--lg2-inset, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--lg2-hairline);
+}
+.lg2-garden__valvename { display: flex; flex-direction: column; min-width: 0; font-weight: 600; }
+.lg2-garden__valvename small { font-weight: 500; color: var(--lg2-label-2); font-size: 11.5px; }
+.lg2-garden__valvedur { display: inline-flex; align-items: center; gap: 6px; }
+.lg2-garden__valvedur-lbl { font-size: 11.5px; color: var(--lg2-label-2); }
+.lg2-garden__valvebtns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.lg2-garden__valvebtns button {
+  appearance: none; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600;
+  padding: 6px 12px; border-radius: var(--lg2-r-sm);
+  border: 1px solid var(--lg2-hairline-2); background: var(--lg2-bg-elev, rgba(255, 255, 255, 0.06));
+  color: var(--lg2-label-1);
+}
+.lg2-garden__valvebtns .lg2-btn { border-color: transparent; }
+@media (max-width: 720px) {
+  .lg2-garden__valverow { grid-template-columns: minmax(0, 1fr); }
+  .lg2-garden__valvebtns { justify-content: flex-start; }
+}
+
+/* --- Task 11.17: strengthen the fallback skin (settings pages) --------------
+ * Some v1 components hardcode a bright-blue accent (rgba(59,130,246,…)) or use
+ * --color-info directly, which clashes with the Liquid Glass amber theme. Pin
+ * those to the active v2 accent inside the fallback container. */
+.lg2-main.lg2-fallback {
+  --color-info: var(--lg2-accent);
+}
+.lg2-main.lg2-fallback .tab-rooms__preset-btn,
+.lg2-main.lg2-fallback .room-card--dragover,
+.lg2-main.lg2-fallback .tab-sources__map-row--active {
+  border-color: var(--lg2-accent) !important;
+  box-shadow: 0 0 0 1px rgba(var(--lg2-accent-rgb), 0.4) !important;
+}
+.lg2-main.lg2-fallback .tab-rooms__preset-btn {
+  background: rgba(var(--lg2-accent-rgb), 0.14) !important;
+  color: var(--lg2-label-1) !important;
+}
+.lg2-main.lg2-fallback .room-card,
+.lg2-main.lg2-fallback .tab-sources__card,
+.lg2-main.lg2-fallback .tab-sources__map-row {
+  /* Scheme-aware surface via the (now scheme-bound) v1 glass token. */
+  background: var(--lg2-sheen), var(--glass-bg);
+  border: 1px solid var(--lg2-hairline);
+  border-radius: var(--lg2-r);
+  box-shadow: var(--lg2-inner);
+}
+
+/* --- Task 11.18: richer Warnungen (summary banner + validity window) -------*/
+.lg2-warnsum {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-left: 4px solid var(--lg2-warn-color, var(--lg2-accent));
+}
+.lg2-warnsum__icon { flex: 0 0 auto; }
+.lg2-warnsum__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px 18px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.lg2-warnsum__grid > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lg2-warnsum__grid span { font-size: 11.5px; color: var(--lg2-label-2); }
+.lg2-warnsum__grid b { font-size: 0.95rem; font-weight: 650; color: var(--lg2-label-1); }
+
+.lg2-warncard__event {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: var(--lg2-r-pill);
+  background: var(--lg2-inset, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--lg2-hairline);
+  font-size: 11px;
+  color: var(--lg2-label-2);
+}
+.lg2-warncard__times {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px 16px;
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  border-radius: var(--lg2-r-sm);
+  background: var(--lg2-inset, rgba(255, 255, 255, 0.05));
+}
+.lg2-warncard__times > div { display: flex; flex-direction: column; gap: 1px; }
+.lg2-warncard__tlabel { font-size: 11px; color: var(--lg2-label-2); }
+.lg2-warncard__times b { font-size: 0.9rem; font-weight: 620; color: var(--lg2-label-1); font-variant-numeric: tabular-nums; }
+.lg2-warncard__instr div { min-width: 0; }
+.lg2-warncard__instr b { display: block; font-size: 12px; color: var(--lg2-label-2); margin-bottom: 2px; }
+
+/* --- Task 11.7: compact manual control + per-device config jump ------------*/
+.lg2-exp-ctl--compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 6px;
+}
+.lg2-exp-ctl--compact .lg2-exp-ctl__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--lg2-r-sm);
+  background: var(--lg2-inset, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--lg2-hairline);
+}
+.lg2-exp-ctl--compact .lg2-exp-ctl__name { font-size: 12.5px; font-weight: 600; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.lg2-exp-ctl--compact .lg2-exp-ctl__name small { color: var(--lg2-label-2); font-weight: 500; }
+.lg2-exp-ctl--compact .lg2-exp-ctl__btns { display: inline-flex; gap: 4px; flex: 0 0 auto; }
+.lg2-exp-ctl--compact .lg2-exp-ctl__btns button {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 600;
+  padding: 4px 9px; border-radius: var(--lg2-r-sm);
+  border: 1px solid var(--lg2-hairline-2); background: var(--lg2-bg-elev, rgba(255, 255, 255, 0.06));
+  color: var(--lg2-label-1);
+}
+.lg2-exp-ctl__cfg { display: inline-flex; align-items: center; justify-content: center; padding: 4px 7px !important; color: var(--lg2-label-2) !important; }
+@media (hover: hover) { .lg2-exp-ctl__cfg:hover { color: var(--lg2-accent) !important; border-color: var(--lg2-accent) !important; } }
+
+/* ================================================================== *
+ * Expert deep-dive primitives (shell/lg2Expert.tsx)
+ * ================================================================== */
+
+/* Freshness dot. */
+.lg2-exp-dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; margin-right: 5px; vertical-align: middle; }
+.lg2-exp-dot--ok { background: var(--lg2-green, #30d158); box-shadow: 0 0 6px rgba(48, 209, 88, 0.6); }
+.lg2-exp-dot--warn { background: var(--lg2-orange, #ff9f0a); }
+.lg2-exp-dot--bad { background: var(--lg2-red, #ff5d57); }
+.lg2-exp-dot--faint { background: var(--lg2-label-3); }
+
+/* Provenance chip. */
+.lg2-exp-prov {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: var(--lg2-r-pill);
+  border: 1px solid var(--lg2-hairline); background: var(--lg2-inset, rgba(255, 255, 255, 0.05));
+  color: var(--lg2-label-2); white-space: nowrap;
+}
+.lg2-exp-prov--measured { color: var(--lg2-green, #30d158); border-color: rgba(48, 209, 88, 0.35); }
+.lg2-exp-prov--forecast { color: var(--lg2-blue, #4a8cff); border-color: rgba(74, 140, 255, 0.35); }
+.lg2-exp-prov--estimated { color: var(--lg2-orange, #ff9f0a); border-color: rgba(255, 159, 10, 0.35); }
+
+/* Signal telemetry table. */
+.lg2-exp-sigtable { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.lg2-exp-sigtable__head,
+.lg2-exp-sigtable__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 0.9fr);
+  gap: 8px; align-items: center; padding: 5px 8px; border-radius: var(--lg2-r-sm);
+}
+.lg2-exp-sigtable__head { font-size: 11px; color: var(--lg2-label-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.lg2-exp-sigtable__row { background: var(--lg2-inset, rgba(255, 255, 255, 0.04)); border: 1px solid var(--lg2-hairline); }
+.lg2-exp-sigtable__name { font-weight: 600; font-size: 12.5px; min-width: 0; }
+.lg2-exp-sigtable__val { font-variant-numeric: tabular-nums; font-weight: 640; }
+.lg2-exp-sigtable__state,
+.lg2-exp-sigtable__age,
+.lg2-exp-sigtable__bound { font-size: 12px; color: var(--lg2-label-2); }
+@media (max-width: 720px) {
+  .lg2-exp-sigtable__head { display: none; }
+  .lg2-exp-sigtable__row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lg2-exp-sigtable__age, .lg2-exp-sigtable__bound { display: none; }
+}
+
+/* Normalised bar (weights / factors). */
+.lg2-exp-bar { display: grid; grid-template-columns: minmax(90px, 0.6fr) 1fr auto; gap: 10px; align-items: center; padding: 3px 0; }
+.lg2-exp-bar__lbl { font-size: 12.5px; color: var(--lg2-label-2); min-width: 0; }
+.lg2-exp-bar__track { height: 8px; border-radius: 999px; background: var(--lg2-inset, rgba(255, 255, 255, 0.08)); overflow: hidden; }
+.lg2-exp-bar__fill { display: block; height: 100%; border-radius: 999px; background: var(--lg2-accent); }
+.lg2-exp-bar__val { font-size: 12px; font-weight: 640; font-variant-numeric: tabular-nums; color: var(--lg2-label-1); min-width: 44px; text-align: right; }
+
+/* Wide expert tables get a horizontal scroll rather than overflowing. */
+.lg2-expert .lg2-exp-table { overflow-x: auto; }
+
+/* Full per-window risk breakdown block. */
+.lg2-exp-risk { padding: 10px; border-radius: var(--lg2-r); background: var(--lg2-inset, rgba(255, 255, 255, 0.04)); border: 1px solid var(--lg2-hairline); margin-top: 8px; }
+.lg2-exp-risk__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 8px; }
+.lg2-exp-risk__name { font-weight: 660; font-size: 13.5px; }
+.lg2-exp-risk__stat { font-size: 12px; color: var(--lg2-label-2); }
+.lg2-exp-risk__stat b { color: var(--lg2-label-1); font-variant-numeric: tabular-nums; }
+.lg2-exp-risk__bars { display: flex; flex-direction: column; gap: 3px; }
+
+/* Environment provenance list. */
+.lg2-exp-provlist { display: flex; flex-direction: column; gap: 4px; }
+.lg2-exp-provrow {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
+  padding: 6px 8px; border-radius: var(--lg2-r-sm);
+  background: var(--lg2-inset, rgba(255, 255, 255, 0.04)); border: 1px solid var(--lg2-hairline);
+}
+.lg2-exp-provrow > span { font-size: 12.5px; color: var(--lg2-label-2); min-width: 0; }
+.lg2-exp-provrow > b { font-variant-numeric: tabular-nums; font-weight: 640; }
+
+/* Advice block (Automatik / Räume expert). */
+.lg2-auto__advice { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset, rgba(255, 255, 255, 0.04)); border: 1px solid var(--lg2-hairline); margin-bottom: 6px; }
+.lg2-auto__advice b { font-size: 13px; }
+.lg2-auto__advice span { font-size: 12px; color: var(--lg2-label-2); }
+.lg2-auto__advice em { font-size: 11.5px; color: var(--lg2-label-3); font-style: normal; }
+.lg2-auto__riskfull { margin-top: 12px; }
+
+/* Planned-action state chips in expert tables. */
+.lg2-exp-state--blocked { color: var(--lg2-red, #ff5d57); }
+.lg2-exp-state--manuallyOverridden { color: var(--lg2-orange, #ff9f0a); }
+.lg2-exp-state--completed { color: var(--lg2-label-3); }
+.lg2-exp-state--executing { color: var(--lg2-green, #30d158); }
+
+/* Garden per-zone telemetry block. */
+.lg2-exp-zone { padding: 10px; border-radius: var(--lg2-r); background: var(--lg2-inset, rgba(255, 255, 255, 0.04)); border: 1px solid var(--lg2-hairline); margin-bottom: 8px; }
+.lg2-exp-zone__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px 14px; margin-top: 8px; }
+.lg2-exp-zone__grid span { display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: var(--lg2-label-2); }
+.lg2-exp-zone__grid b { font-size: 0.95rem; font-weight: 640; color: var(--lg2-label-1); font-variant-numeric: tabular-nums; }
+
+/* Precipitation nowcast mini-bars. */
+.lg2-exp-nowcast { display: flex; align-items: flex-end; gap: 4px; height: 90px; padding-top: 6px; }
+.lg2-exp-nowcast__col { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; min-width: 0; }
+.lg2-exp-nowcast__bar { width: 60%; min-height: 2px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--lg2-blue, #4a8cff), rgba(74, 140, 255, 0.4)); }
+.lg2-exp-nowcast__lbl { font-size: 9.5px; color: var(--lg2-label-3); transform: rotate(-45deg); white-space: nowrap; }
+
+/* Trajectory table: even 5 columns. */
+.lg2-exp-traj__head,
+.lg2-exp-traj__row { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+
+/* ================================================================== *
+ * v1 token systems follow the v2 SCHEME (light AND dark both supported).
+ * ------------------------------------------------------------------
+ * The reused v1 components (rain radar, wind rose, weather charts) and every
+ * fallback settings page render from the v1 `--color-*` / `--glass-*` / `--hs-*`
+ * tokens. The global `styles.css` only switches those by OS `prefers-color-
+ * scheme`, so an EXPLICIT scheme (e.g. Light chosen on a dark-mode OS) left them
+ * mismatched (dark v1 cards on a light v2 surface, or vice-versa).
+ *
+ * Here we bind the v1 tokens to the ACTIVE scheme, mirroring how `--lg2-*` is
+ * themed: dark by default, light when the light scheme is active (explicit
+ * `.lg2-scheme-light` OR Auto on a light-mode OS). Native v2 uses `--lg2-*`
+ * (untouched), so this only re-skins v1 content — one place, every page.
+ * ================================================================== */
+
+/* Dark v1 tokens — the default (covers Dark scheme + Auto on a dark OS, and
+   beats the styles.css OS-light `:root` block via later source order). */
+.lg2-demo {
+  --color-bg: transparent;
+  --color-bg-elev: rgba(255, 255, 255, 0.05);
+  --color-card: #12202f;
+  --color-card-hover: #17293b;
+  --color-card-border: rgba(255, 255, 255, 0.12);
+  --color-card-border-strong: rgba(255, 255, 255, 0.22);
+  --color-text: #f4f7fb;
+  --color-muted: #b4c1d2;
+  --color-faint: #8a99ac;
+  --color-accent: var(--lg2-accent);
+  --color-accent-strong: var(--lg2-orange-2);
+  --color-accent-contrast: var(--lg2-on-accent);
+  --color-accent-soft: var(--lg2-orange-2);
+  --color-info: var(--lg2-accent);
+  --color-success: var(--lg2-green, #30d158);
+  --color-warn: var(--lg2-orange, #ff9f0a);
+  --color-danger: var(--lg2-red, #ff5d57);
+  --glass-bg: rgba(16, 26, 40, 0.72);
+  --glass-bg-strong: rgba(16, 26, 40, 0.86);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-edge: rgba(255, 255, 255, 0.16);
+  --hs-bg-0: transparent;
+  --hs-bg-1: rgba(255, 255, 255, 0.05);
+  --hs-surface-1: #12202f;
+  --hs-surface-2: #17293b;
+  --hs-border: rgba(255, 255, 255, 0.12);
+  --hs-amber: var(--lg2-accent);
+  --hs-amber-soft: var(--lg2-orange-2);
+
+  /* TEXT is bound to the ADAPTIVE label colours (computed by textVars from the
+     effective surface luminance) so every v1 text element auto-contrasts to its
+     background in ANY scheme/wallpaper — same logic as the native v2 text. */
+  --color-text: var(--lg2-label-1);
+  --color-muted: var(--lg2-label-2);
+  --color-faint: var(--lg2-label-3);
+  --hs-text-1: var(--lg2-label-1);
+  --hs-text-2: var(--lg2-label-2);
+  --hs-text-3: var(--lg2-label-3);
+}
+
+/* Light v1 tokens — mirror the light `--lg2-*` surfaces. Applied for the
+   explicit Light scheme and for Auto on a light-mode OS. */
+/* Light scheme: SURFACES only (light cards/glass). Text is inherited from the
+   base block's adaptive `--lg2-label-*` binding, so it auto-flips to dark on
+   these light surfaces. Applies for explicit Light and Auto on a light OS. */
+.lg2-demo.lg2-scheme-light {
+  --color-bg: transparent;
+  --color-bg-elev: rgba(20, 30, 50, 0.05);
+  --color-card: #ffffff;
+  --color-card-hover: #f4f7fb;
+  --color-card-border: rgba(20, 30, 50, 0.12);
+  --color-card-border-strong: rgba(20, 30, 50, 0.22);
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-bg-strong: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(20, 30, 50, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+  --glass-edge: rgba(20, 30, 50, 0.2);
+  --hs-bg-0: transparent;
+  --hs-bg-1: rgba(20, 30, 50, 0.04);
+  --hs-surface-1: #ffffff;
+  --hs-surface-2: #f2f5fa;
+  --hs-border: rgba(20, 30, 50, 0.12);
+}
+@media (prefers-color-scheme: light) {
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light) {
+    --color-bg: transparent;
+    --color-bg-elev: rgba(20, 30, 50, 0.05);
+    --color-card: #ffffff;
+    --color-card-hover: #f4f7fb;
+    --color-card-border: rgba(20, 30, 50, 0.12);
+    --color-card-border-strong: rgba(20, 30, 50, 0.22);
+    --glass-bg: rgba(255, 255, 255, 0.62);
+    --glass-bg-strong: rgba(255, 255, 255, 0.8);
+    --glass-border: rgba(20, 30, 50, 0.12);
+    --glass-highlight: rgba(255, 255, 255, 0.7);
+    --glass-edge: rgba(20, 30, 50, 0.2);
+    --hs-surface-1: #ffffff;
+    --hs-surface-2: #f2f5fa;
+    --hs-border: rgba(20, 30, 50, 0.12);
+  }
+}
+
+/* ================================================================== *
+ * Premium, scheme-aware risk palette (badges + pills).
+ * ------------------------------------------------------------------
+ * Replaces the old neon cyan/green/amber (which read "cheap", especially in
+ * light mode) with refined, desaturated tones: soft tint + hairline + a
+ * medium-weight label in a deeper shade of the same hue. Dark uses luminous
+ * pastels on a low-alpha tint; light uses deep, saturated ink on a faint tint.
+ * ================================================================== */
+.lg2-demo {
+  --risk-high-fg: #ff9b7d; --risk-high-bg: rgba(255, 110, 74, 0.17); --risk-high-bd: rgba(255, 122, 88, 0.34);
+  --risk-mid-fg:  #ffcf8f; --risk-mid-bg:  rgba(255, 176, 84, 0.15); --risk-mid-bd:  rgba(255, 186, 100, 0.32);
+  --risk-low-fg:  #7fe0ad; --risk-low-bg:  rgba(64, 200, 140, 0.15); --risk-low-bd:  rgba(80, 205, 150, 0.30);
+  --risk-vlow-fg: #a9d2de; --risk-vlow-bg: rgba(120, 190, 210, 0.13); --risk-vlow-bd: rgba(140, 195, 214, 0.28);
+}
+.lg2-demo.lg2-scheme-light {
+  --risk-high-fg: #b03a15; --risk-high-bg: rgba(200, 70, 30, 0.09); --risk-high-bd: rgba(200, 70, 30, 0.22);
+  --risk-mid-fg:  #8f5407; --risk-mid-bg:  rgba(180, 110, 20, 0.10); --risk-mid-bd:  rgba(180, 110, 20, 0.24);
+  --risk-low-fg:  #0e7a51; --risk-low-bg:  rgba(16, 140, 90, 0.09);  --risk-low-bd:  rgba(16, 140, 90, 0.22);
+  --risk-vlow-fg: #0c6b83; --risk-vlow-bg: rgba(14, 116, 144, 0.08); --risk-vlow-bd: rgba(14, 116, 144, 0.20);
+}
+@media (prefers-color-scheme: light) {
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light) {
+    --risk-high-fg: #b03a15; --risk-high-bg: rgba(200, 70, 30, 0.09); --risk-high-bd: rgba(200, 70, 30, 0.22);
+    --risk-mid-fg:  #8f5407; --risk-mid-bg:  rgba(180, 110, 20, 0.10); --risk-mid-bd:  rgba(180, 110, 20, 0.24);
+    --risk-low-fg:  #0e7a51; --risk-low-bg:  rgba(16, 140, 90, 0.09);  --risk-low-bd:  rgba(16, 140, 90, 0.22);
+    --risk-vlow-fg: #0c6b83; --risk-vlow-bg: rgba(14, 116, 144, 0.08); --risk-vlow-bd: rgba(14, 116, 144, 0.20);
+  }
+}
+
+.lg2-risk, .lg2-riskpill { border: 1px solid transparent; }
+.lg2-risk--high, .lg2-riskpill--high { color: var(--risk-high-fg); background: var(--risk-high-bg); border-color: var(--risk-high-bd); }
+.lg2-risk--mid,  .lg2-riskpill--mid  { color: var(--risk-mid-fg);  background: var(--risk-mid-bg);  border-color: var(--risk-mid-bd); }
+.lg2-risk--low,  .lg2-riskpill--low  { color: var(--risk-low-fg);  background: var(--risk-low-bg);  border-color: var(--risk-low-bd); }
+.lg2-risk--vlow, .lg2-riskpill--vlow { color: var(--risk-vlow-fg); background: var(--risk-vlow-bg); border-color: var(--risk-vlow-bd); }
+
+/* ================================================================== *
+ * Warnungen — graphical hero + list (DWD level colours + per-kind hero)
+ * `--warn` = DWD level colour; `--warn-img` = hero image url.
+ * ================================================================== */
+.lg2-warn__section { margin: 4px 2px -2px; font-size: 1.05rem; font-weight: 660; color: var(--lg2-label-1); }
+.lg2-warn__list { display: flex; flex-direction: column; gap: 10px; }
+
+/* Hero card (most severe / all-clear). */
+.lg2-warnhero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--lg2-r-lg);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--lg2-hairline));
+  box-shadow: var(--lg2-shadow);
+  min-height: 190px;
+  isolation: isolate;
+}
+.lg2-warnhero__photo {
+  position: absolute; inset: 0; z-index: 0;
+  background: var(--warn-img) center right / cover no-repeat;
+}
+.lg2-warnhero__scrim {
+  position: absolute; inset: 0; z-index: 1;
+  background:
+    linear-gradient(100deg, rgba(6, 9, 14, 0.94) 0%, rgba(6, 9, 14, 0.66) 42%, rgba(6, 9, 14, 0.08) 74%, rgba(6, 9, 14, 0) 100%),
+    linear-gradient(100deg, color-mix(in srgb, var(--warn) 34%, transparent) 0%, transparent 56%);
+}
+/* Light scheme: lighten the scrim so text stays dark-readable on the left. */
+.lg2-demo.lg2-scheme-light .lg2-warnhero__scrim {
+  background:
+    linear-gradient(100deg, rgba(244, 247, 251, 0.94) 0%, rgba(244, 247, 251, 0.7) 42%, rgba(244, 247, 251, 0.1) 74%, rgba(244, 247, 251, 0) 100%),
+    linear-gradient(100deg, color-mix(in srgb, var(--warn) 26%, transparent) 0%, transparent 56%);
+}
+.lg2-warnhero__inner {
+  position: relative; z-index: 2;
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: clamp(16px, 1.8vw, 24px);
+}
+.lg2-warnhero__icon {
+  flex: 0 0 auto; width: 50px; height: 50px; border-radius: 15px;
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--warn) 85%, #fff 12%), var(--warn));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--warn) 45%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.lg2-warnhero__text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.lg2-warnhero__eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warn); }
+.lg2-warnhero__title { margin: 0; font-size: clamp(1.3rem, 2.4vw, 1.85rem); font-weight: 720; letter-spacing: -0.02em; color: var(--lg2-label-1); }
+.lg2-warnhero__desc { margin: 2px 0 0; max-width: 46ch; font-size: 13.5px; line-height: 1.5; color: var(--lg2-label-2); }
+.lg2-warnhero__times { display: flex; flex-wrap: wrap; gap: 6px 28px; margin-top: 10px; }
+.lg2-warnhero__times > div { display: flex; flex-direction: column; gap: 2px; }
+.lg2-warnhero__times span { font-size: 12px; color: var(--lg2-label-3); }
+.lg2-warnhero__times b { display: inline-flex; align-items: center; gap: 6px; font-size: 0.95rem; font-weight: 620; color: var(--lg2-label-1); font-variant-numeric: tabular-nums; }
+.lg2-warnhero__times b svg { color: var(--lg2-label-3); }
+.lg2-warnhero__stufe {
+  flex: 0 0 auto; align-self: center; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  min-width: 92px; padding: 10px 14px; border-radius: 16px;
+  border: 1px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 20%, rgba(6, 9, 14, 0.4));
+  color: var(--warn);
+}
+.lg2-warnhero__stufe span { font-size: 11.5px; color: color-mix(in srgb, var(--warn) 70%, var(--lg2-label-2)); }
+.lg2-warnhero__stufe b { font-size: 1.9rem; font-weight: 760; line-height: 1.1; color: var(--warn); }
+.lg2-warnhero__stufe em { font-size: 12px; font-weight: 640; font-style: normal; color: var(--warn); }
+
+/* All-clear (green) variant keeps the same structure. */
+.lg2-warnhero--clear .lg2-warnhero__title { color: var(--lg2-label-1); }
+
+/* List rows. */
+.lg2-warnrow {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: var(--lg2-r);
+  background: var(--lg2-sheen), var(--glass-bg);
+  border: 1px solid var(--lg2-hairline);
+  box-shadow: var(--lg2-inner);
+}
+.lg2-warnrow__icon {
+  width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 34%, transparent);
+}
+.lg2-warnrow__body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lg2-warnrow__name { font-size: 0.98rem; font-weight: 660; color: var(--lg2-label-1); }
+.lg2-warnrow__desc {
+  font-size: 12.5px; color: var(--lg2-label-2); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.lg2-warnrow__until { font-size: 12.5px; color: var(--lg2-label-2); white-space: nowrap; }
+.lg2-warnrow__pill {
+  flex: 0 0 auto; font-size: 12px; font-weight: 650; padding: 5px 12px; border-radius: var(--lg2-r-pill);
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 38%, transparent);
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .lg2-warnhero__inner { flex-wrap: wrap; }
+  .lg2-warnhero__stufe { align-self: flex-start; }
+  .lg2-warnrow { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .lg2-warnrow__until { display: none; }
+}
+
+/* ================================================================== *
+ * "Liquid Glass" material (opt-in via th.liquid → .lg2-liquid).
+ * ------------------------------------------------------------------
+ * A real transparent glass PLATE: the wallpaper behind the surface is
+ * refracted/lensed (SVG feDisplacementMap `#lg2-liquid` on the backdrop),
+ * saturated and slightly brightened, with pronounced specular glass edges
+ * (bright top-left rim, soft inner shadow at the bottom). Keep the tint low
+ * (opacity slider) to let the refraction read. Degrades to plain frosted glass
+ * where `backdrop-filter: url()` is unsupported.
+ * ================================================================== */
+.lg2-demo.lg2-liquid .lg2-card,
+.lg2-demo.lg2-liquid .lg2-nav,
+.lg2-demo.lg2-liquid .lg2-weather,
+.lg2-demo.lg2-liquid .lg2-warnrow {
+  -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(calc(var(--lg2-sat) * 1.15)) brightness(1.05);
+  backdrop-filter: blur(var(--lg2-blur)) saturate(calc(var(--lg2-sat) * 1.15)) brightness(1.05) url("#lg2-liquid");
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
+    inset 1px 0 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 -14px 28px -16px rgba(0, 0, 0, 0.5),
+    0 14px 40px rgba(0, 0, 0, 0.34);
+}
+/* A brighter, refractive specular sweep along the glass edge. */
+.lg2-demo.lg2-liquid .lg2-card::before {
+  opacity: 1;
+  padding: 1.5px;
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(255, 255, 255, 0.06) 26%,
+    rgba(255, 255, 255, 0) 52%,
+    rgba(255, 255, 255, 0.05) 74%,
+    rgba(255, 255, 255, 0.3) 100%);
+}
+/* Light scheme: soften the specular so it doesn't blow out on light surfaces. */
+.lg2-demo.lg2-liquid.lg2-scheme-light .lg2-card,
+.lg2-demo.lg2-liquid.lg2-scheme-light .lg2-nav,
+.lg2-demo.lg2-liquid.lg2-scheme-light .lg2-weather,
+.lg2-demo.lg2-liquid.lg2-scheme-light .lg2-warnrow {
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.8),
+    inset 0 0 0 1px rgba(20, 30, 50, 0.06),
+    inset 0 -14px 26px -18px rgba(20, 30, 50, 0.28),
+    0 12px 34px rgba(20, 30, 50, 0.16);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lg2-demo.lg2-liquid .lg2-card,
+  .lg2-demo.lg2-liquid .lg2-nav,
+  .lg2-demo.lg2-liquid .lg2-weather,
+  .lg2-demo.lg2-liquid .lg2-warnrow { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* ================================================================== *
+ * Garten — automatic-irrigation toggle + watering-plan editor
+ * ================================================================== */
+.lg2-garden__autobar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 16px;
+}
+.lg2-garden__autoicon {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
+}
+.lg2-garden__autoicon--on { color: var(--lg2-green, #30d158); background: color-mix(in srgb, var(--lg2-green, #30d158) 16%, transparent); border: 1px solid color-mix(in srgb, var(--lg2-green, #30d158) 34%, transparent); }
+.lg2-garden__autoicon--off { color: var(--lg2-label-3); background: var(--lg2-inset, rgba(255,255,255,0.05)); border: 1px solid var(--lg2-hairline); }
+.lg2-garden__autotext { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lg2-garden__autotext b { font-size: 0.98rem; font-weight: 660; color: var(--lg2-label-1); }
+.lg2-garden__autotext span { font-size: 12.5px; color: var(--lg2-label-2); }
+
+.lg2-garden__planeditor { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; }
+.lg2-garden__plan-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.lg2-garden__planempty { margin: 2px 0; color: var(--lg2-label-2); font-size: 13px; }
+.lg2-garden__planlist { display: flex; flex-direction: column; gap: 6px; }
+.lg2-garden__planrow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
+  align-items: center; gap: 12px;
+  padding: 8px 12px; border-radius: var(--lg2-r-sm);
+  background: var(--lg2-inset, rgba(255,255,255,0.05)); border: 1px solid var(--lg2-hairline);
+}
+.lg2-garden__planrow--off { opacity: 0.55; }
+.lg2-garden__plantime { font-variant-numeric: tabular-nums; font-weight: 650; color: var(--lg2-label-1); }
+.lg2-garden__planzone { min-width: 0; font-weight: 600; color: var(--lg2-label-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg2-garden__plandur { font-variant-numeric: tabular-nums; color: var(--lg2-label-2); }
+.lg2-garden__plansrc { font-size: 11.5px; color: var(--lg2-label-3); }
+.lg2-garden__plandel {
+  appearance: none; cursor: pointer; border: 1px solid var(--lg2-hairline); background: transparent;
+  color: var(--lg2-label-2); width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  font-size: 16px; line-height: 1;
+}
+@media (hover: hover) { .lg2-garden__plandel:hover { color: var(--lg2-red, #ff5d57); border-color: var(--lg2-red, #ff5d57); } }
+.lg2-garden__planadd { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 4px; }
+.lg2-garden__planfield { display: flex; flex-direction: column; gap: 3px; }
+.lg2-garden__planfield > span { font-size: 11.5px; color: var(--lg2-label-2); }
+.lg2-garden__planadd .lg2-btn { align-self: flex-end; }
+@media (max-width: 720px) {
+  .lg2-garden__planrow { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  .lg2-garden__plansrc { display: none; }
+}
+
+/* ================================================================== *
+ * ui-v2-release — DEEP fallback-consistency pass (v88)
+ * ------------------------------------------------------------------
+ * The v1 components render inside `.lg2-main.lg2-fallback`. Token-based
+ * styling already follows the scheme-aware `.lg2-demo` remap, but a number of
+ * v1 rules hardcode raw colours (dark code blocks, white/black overlays,
+ * light-theme leftovers like #fee2e2 / #e0ecff, and the v1 green/red action
+ * buttons). Those do NOT adapt to Light/Dark and clash with Liquid Glass.
+ * This block re-skins every remaining offender to the active `--lg2-*` tokens
+ * so all settings/detail pages are visually consistent in both schemes.
+ * Scoped to the fallback container so v1 standalone (uiVersion='v1') is intact.
+ * ================================================================== */
+
+/* --- Code / log / mono blocks: scheme-aware inset instead of near-black ---- */
+.lg2-main.lg2-fallback .logs-pre {
+  background: var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+  color: var(--lg2-label-1);
+}
+.lg2-main.lg2-fallback .logs-toolbar__field select,
+.lg2-main.lg2-fallback .tab-rules__field input,
+.lg2-main.lg2-fallback .tab-rules__field select,
+.lg2-main.lg2-fallback .tab-rules__field textarea,
+.lg2-main.lg2-fallback .tab-sources__field input,
+.lg2-main.lg2-fallback .tab-sources__field select,
+.lg2-main.lg2-fallback .irr-zone-edit .tab-rules__field input,
+.lg2-main.lg2-fallback .irr-zone-edit .tab-rules__field select,
+.lg2-main.lg2-fallback .tab-irrigation-settings .tab-rules__field input,
+.lg2-main.lg2-fallback .tab-irrigation-settings .tab-rules__field select,
+.lg2-main.lg2-fallback input[type='text'],
+.lg2-main.lg2-fallback input[type='password'],
+.lg2-main.lg2-fallback input[type='number'],
+.lg2-main.lg2-fallback input[type='time'],
+.lg2-main.lg2-fallback select,
+.lg2-main.lg2-fallback textarea {
+  background: var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+  color: var(--lg2-label-1);
+}
+.lg2-main.lg2-fallback .discovery-status__hist code,
+.lg2-main.lg2-fallback code {
+  background: var(--lg2-inset);
+  color: var(--lg2-label-1);
+}
+
+/* --- Segmented control (Sprache etc.): scheme-aware track --------------- */
+.lg2-demo .seg {
+  background: var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+}
+.lg2-demo .seg__btn { color: var(--lg2-label-2); }
+.lg2-demo .seg__btn:hover:not(:disabled) { color: var(--lg2-label-1); }
+.lg2-demo .seg__btn--active {
+  background: linear-gradient(180deg, var(--lg2-orange-2, var(--lg2-accent)), var(--lg2-accent));
+  color: var(--lg2-on-accent);
+}
+
+/* --- Irrigation action buttons: keep green=start / red=stop semantics but
+   render as themed glass instead of the flat v1 green/red fills. --------- */
+.lg2-main.lg2-fallback .irr-btn,
+.lg2-main.lg2-fallback .irr-plan__add .irr-btn,
+.lg2-main.lg2-fallback .gardena-valve__btn {
+  background: rgba(var(--lg2-green-rgb, 102, 214, 107), 0.16);
+  border: 1px solid rgba(var(--lg2-green-rgb, 102, 214, 107), 0.42);
+  color: var(--lg2-green, #66d66b);
+}
+.lg2-main.lg2-fallback .irr-btn:hover:not(:disabled),
+.lg2-main.lg2-fallback .gardena-valve__btn:hover:not(:disabled) {
+  background: rgba(var(--lg2-green-rgb, 102, 214, 107), 0.26);
+}
+.lg2-main.lg2-fallback .irr-btn--stop {
+  background: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.16);
+  border-color: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.42);
+  color: var(--lg2-red, #ff5d57);
+}
+.lg2-main.lg2-fallback .irr-btn--stop:hover:not(:disabled) {
+  background: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.26);
+}
+.lg2-main.lg2-fallback .irr-btn--ghost {
+  background: var(--lg2-inset);
+  border-color: var(--lg2-hairline);
+  color: var(--lg2-label-2);
+}
+
+/* --- Updates banner: amber theme accent (not hardcoded #fbbf24) --------- */
+.lg2-main.lg2-fallback .updates-banner--new {
+  border-color: rgba(var(--lg2-accent-rgb), 0.5);
+  background: linear-gradient(180deg, rgba(var(--lg2-accent-rgb), 0.12), var(--lg2-inset));
+}
+.lg2-main.lg2-fallback .updates-banner--new h3 { color: var(--lg2-accent); }
+
+/* --- Status banners (discovery): themed semantic tints + readable text --- */
+.lg2-main.lg2-fallback .discovery-status--ok {
+  background: rgba(var(--lg2-green-rgb, 102, 214, 107), 0.14);
+  border-color: rgba(var(--lg2-green-rgb, 102, 214, 107), 0.4);
+  color: var(--lg2-label-1);
+}
+.lg2-main.lg2-fallback .discovery-status--warn {
+  background: rgba(var(--lg2-orange-rgb, 255, 159, 10), 0.14);
+  border-color: rgba(var(--lg2-orange-rgb, 255, 159, 10), 0.4);
+  color: var(--lg2-label-1);
+}
+.lg2-main.lg2-fallback .discovery-status--error {
+  background: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.14);
+  border-color: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.4);
+  color: var(--lg2-label-1);
+}
+.lg2-main.lg2-fallback .discovery-status__feature {
+  background: rgba(var(--lg2-blue-rgb, 74, 140, 255), 0.16);
+  border: 1px solid rgba(var(--lg2-blue-rgb, 74, 140, 255), 0.4);
+  color: var(--lg2-blue, #4a8cff);
+}
+.lg2-main.lg2-fallback .discovery-status__fval { color: var(--lg2-blue, #4a8cff); }
+.lg2-main.lg2-fallback .discovery-status__raw--drop { color: var(--lg2-red, #ff5d57); }
+
+/* --- Room-card + window chips: kill light-theme leftovers --------------- */
+.lg2-main.lg2-fallback .room-card__floor {
+  background: var(--lg2-inset);
+  color: var(--lg2-label-1);
+}
+.lg2-main.lg2-fallback .window-card__badge {
+  background: rgba(var(--lg2-accent-rgb), 0.2);
+  color: var(--lg2-accent);
+}
+.lg2-main.lg2-fallback .window-card__mode { background: var(--lg2-inset); color: var(--lg2-label-2); }
+.lg2-main.lg2-fallback .room-card__window--issue { color: var(--lg2-red, #ff5d57); }
+.lg2-main.lg2-fallback .room-card__name:hover,
+.lg2-main.lg2-fallback .room-card__name:focus { background: var(--lg2-hover); }
+.lg2-main.lg2-fallback .room-card__delete:hover {
+  background: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.18);
+  border-color: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.4);
+  color: var(--lg2-red, #ff5d57);
+}
+.lg2-main.lg2-fallback .room-card__contact-clear { color: var(--lg2-label-3); }
+.lg2-main.lg2-fallback .room-card__contact-clear:hover {
+  background: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.18);
+  color: var(--lg2-red, #ff5d57);
+}
+.lg2-main.lg2-fallback .tab-rooms__preset-btn:hover {
+  background: rgba(var(--lg2-accent-rgb), 0.2) !important;
+  box-shadow: none;
+}
+.lg2-main.lg2-fallback .tab-rooms__unassigned--over,
+.lg2-main.lg2-fallback .tab-rooms__drop-hint { color: var(--lg2-accent); }
+
+/* --- Validation strips: themed success/fail ---------------------------- */
+.lg2-main.lg2-fallback .tab-rules__ok,
+.lg2-main.lg2-fallback .tab-wizard__validation--ok {
+  background: rgba(var(--lg2-green-rgb, 102, 214, 107), 0.16);
+  border: 1px solid rgba(var(--lg2-green-rgb, 102, 214, 107), 0.4);
+  color: var(--lg2-label-1);
+}
+.lg2-main.lg2-fallback .tab-rules__error,
+.lg2-main.lg2-fallback .tab-wizard__validation--fail,
+.lg2-main.lg2-fallback .error-boundary {
+  background: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.16);
+  border: 1px solid rgba(var(--lg2-red-rgb, 255, 93, 87), 0.4);
+  color: var(--lg2-label-1);
+}
+
+/* --- Messages: unread accent + surface via tokens ---------------------- */
+.lg2-main.lg2-fallback .message-item {
+  background: var(--lg2-sheen), var(--glass-bg);
+  border: 1px solid var(--lg2-hairline);
+}
+.lg2-main.lg2-fallback .message-item--unread {
+  border-left: 4px solid var(--lg2-accent);
+  background: rgba(var(--lg2-accent-rgb), 0.08);
+}
+
+/* --- Wizard / profile active steps → accent (not hardcoded #fff blue) --- */
+.lg2-main.lg2-fallback .tab-wizard__step--active,
+.lg2-main.lg2-fallback .tab-rules__profile-btn--active {
+  background: var(--lg2-accent);
+  border-color: var(--lg2-accent);
+  color: var(--lg2-on-accent);
+}
+
+/* --- Generic white-overlay fills used across cards → scheme-aware inset -- */
+.lg2-main.lg2-fallback .settings-hub__intro,
+.lg2-main.lg2-fallback .discovery-status__raw {
+  background: var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+}
+
+/* ================================================================== *
+ * Setup wizard (native v2) — liquidGlass2Wizard.tsx
+ * ================================================================== */
+
+.lg2-btn--primary {
+  background: linear-gradient(180deg, var(--lg2-orange-2, var(--lg2-accent)), var(--lg2-accent));
+  color: var(--lg2-on-accent);
+  border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 6px 16px rgba(var(--lg2-accent-rgb), 0.3);
+}
+@media (hover: hover) { .lg2-btn--primary:hover { border-color: transparent; filter: brightness(1.05); } }
+
+.lg2-main.lg2-wiz {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: clamp(14px, 2vw, 34px);
+}
+.lg2-wiz__shell { width: 100%; max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--lg2-s4); }
+
+/* Progress rail */
+.lg2-wiz__progress {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; align-items: flex-start; gap: 4px; flex-wrap: wrap;
+}
+.lg2-wiz__pstep { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1 1 0; min-width: 64px; }
+.lg2-wiz__pdot {
+  appearance: none; cursor: pointer; width: 30px; height: 30px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--lg2-hairline); background: var(--lg2-inset); color: var(--lg2-label-2);
+  transition: background var(--lg2-fast) var(--lg2-ease), color var(--lg2-fast) var(--lg2-ease), border-color var(--lg2-fast) var(--lg2-ease);
+}
+.lg2-wiz__pdot:disabled { cursor: default; }
+.lg2-wiz__pstep--active .lg2-wiz__pdot {
+  background: linear-gradient(180deg, var(--lg2-orange-2, var(--lg2-accent)), var(--lg2-accent));
+  color: var(--lg2-on-accent); border-color: transparent;
+  box-shadow: 0 4px 12px rgba(var(--lg2-accent-rgb), 0.3);
+}
+.lg2-wiz__pstep--done .lg2-wiz__pdot { background: rgba(var(--lg2-green-rgb, 48, 209, 88), 0.2); color: var(--lg2-green); border-color: rgba(var(--lg2-green-rgb, 48, 209, 88), 0.4); }
+.lg2-wiz__plabel { font-size: 11px; color: var(--lg2-label-3); text-align: center; line-height: 1.2; }
+.lg2-wiz__pstep--active .lg2-wiz__plabel { color: var(--lg2-label-1); font-weight: 600; }
+@media (max-width: 640px) { .lg2-wiz__plabel { display: none; } }
+
+/* Card */
+.lg2-wiz__card { padding: clamp(16px, 2.2vw, 28px); display: flex; flex-direction: column; gap: var(--lg2-s4); }
+.lg2-wiz__head { display: flex; align-items: center; gap: var(--lg2-s3); }
+.lg2-wiz__badge {
+  flex: 0 0 auto; width: 46px; height: 46px; border-radius: var(--lg2-r);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(var(--lg2-accent-rgb), 0.16); color: var(--lg2-accent);
+  border: 1px solid rgba(var(--lg2-accent-rgb), 0.32);
+}
+.lg2-wiz__head > div { flex: 1 1 auto; min-width: 0; }
+.lg2-wiz__title { margin: 0; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+.lg2-wiz__sub { margin: 2px 0 0; font-size: 13.5px; color: var(--lg2-label-2); }
+.lg2-wiz__count { flex: 0 0 auto; font-size: 12px; color: var(--lg2-label-3); font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .lg2-wiz__count { display: none; } }
+
+.lg2-wiz__body { min-height: 120px; }
+.lg2-wiz__form { display: flex; flex-direction: column; gap: var(--lg2-s3); }
+.lg2-wiz__row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--lg2-s3); }
+@media (max-width: 560px) { .lg2-wiz__row2 { grid-template-columns: 1fr; } }
+
+/* Fields */
+.lg2-wiz__field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--lg2-label-2); min-width: 0; }
+.lg2-wiz__field > span { font-weight: 600; }
+.lg2-wiz__field input,
+.lg2-wiz__field select,
+.lg2-wiz__inline select {
+  min-width: 0; width: 100%; min-height: 38px;
+  background: var(--lg2-inset); color: var(--lg2-label-1);
+  border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-sm);
+  padding: 7px 10px; font: inherit; font-size: 14px;
+}
+.lg2-wiz__field input:focus-visible,
+.lg2-wiz__field select:focus-visible,
+.lg2-wiz__inline select:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--lg2-focus); border-color: var(--lg2-accent); }
+
+.lg2-wiz__hint { margin: 0; font-size: 12px; color: var(--lg2-label-3); line-height: 1.45; }
+.lg2-wiz__hint--warn { color: var(--lg2-orange, #ff9f0a); }
+.lg2-wiz__error {
+  margin: 0; padding: 8px 12px; border-radius: var(--lg2-r-sm);
+  background: rgba(var(--lg2-red-rgb, 255, 69, 58), 0.16); border: 1px solid rgba(var(--lg2-red-rgb, 255, 69, 58), 0.4);
+  color: var(--lg2-label-1); font-size: 13px;
+}
+.lg2-wiz__sectionlabel { font-size: 12px; font-weight: 650; color: var(--lg2-label-2); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Nav footer */
+.lg2-wiz__nav { display: flex; align-items: center; gap: 10px; }
+.lg2-wiz__spacer { flex: 1 1 auto; }
+
+/* Big choice cards */
+.lg2-wiz__choices { display: grid; grid-template-columns: 1fr 1fr; gap: var(--lg2-s3); }
+@media (max-width: 560px) { .lg2-wiz__choices { grid-template-columns: 1fr; } }
+.lg2-wiz__choice {
+  appearance: none; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: var(--lg2-s3);
+  padding: 14px 16px; border-radius: var(--lg2-r);
+  background: var(--lg2-inset); border: 1.5px solid var(--lg2-hairline); color: inherit;
+  transition: border-color var(--lg2-fast) var(--lg2-ease), background var(--lg2-fast) var(--lg2-ease), transform var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-wiz__choice:hover { transform: translateY(-1px); border-color: var(--lg2-hairline-2); } }
+.lg2-wiz__choice--on { border-color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.12); }
+.lg2-wiz__choice-icon { flex: 0 0 auto; color: var(--lg2-accent); }
+.lg2-wiz__choice-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.lg2-wiz__choice-title { font-weight: 650; font-size: 14.5px; color: var(--lg2-label-1); }
+.lg2-wiz__choice-desc { font-size: 12px; color: var(--lg2-label-2); }
+.lg2-wiz__choice-check { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: var(--lg2-on-accent); background: var(--lg2-accent); opacity: 0; transition: opacity var(--lg2-fast) var(--lg2-ease); }
+.lg2-wiz__choice--on .lg2-wiz__choice-check { opacity: 1; }
+
+/* Welcome */
+.lg2-wiz__lead { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--lg2-label-1); }
+.lg2-wiz__checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.lg2-wiz__checklist li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--lg2-label-2); }
+.lg2-wiz__checkicon { flex: 0 0 auto; display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; border-radius: 999px; background: rgba(var(--lg2-accent-rgb), 0.14); color: var(--lg2-accent); }
+
+/* Room presets + list */
+.lg2-wiz__presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lg2-wiz__presets-label { font-size: 12.5px; color: var(--lg2-label-2); font-weight: 600; margin-right: 2px; }
+.lg2-wiz__preset {
+  appearance: none; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600;
+  padding: 6px 12px; border-radius: var(--lg2-r-pill);
+  background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); color: var(--lg2-label-1);
+}
+.lg2-wiz__preset small { color: var(--lg2-label-3); font-weight: 500; }
+@media (hover: hover) { .lg2-wiz__preset:hover { border-color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.14); } }
+.lg2-wiz__empty { margin: 0; padding: 14px; border-radius: var(--lg2-r); background: var(--lg2-inset); border: 1px dashed var(--lg2-hairline-2); color: var(--lg2-label-2); font-size: 13px; }
+
+.lg2-wiz__roomlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.lg2-wiz__roomrow { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); }
+.lg2-wiz__roomname { flex: 1 1 auto; min-width: 0; min-height: 34px; background: var(--lg2-bg-elev, rgba(255,255,255,0.04)); color: var(--lg2-label-1); border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-sm); padding: 5px 9px; font: inherit; font-size: 14px; }
+.lg2-wiz__roomfloor { flex: 0 0 auto; font-size: 11px; font-weight: 600; color: var(--lg2-label-2); padding: 2px 8px; border-radius: var(--lg2-r-pill); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); }
+.lg2-wiz__roomprio { flex: 0 0 auto; min-height: 34px; background: var(--lg2-inset); color: var(--lg2-label-1); border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-sm); padding: 4px 8px; font: inherit; font-size: 12.5px; }
+.lg2-wiz__roomdel { flex: 0 0 auto; appearance: none; cursor: pointer; width: 28px; height: 28px; border-radius: 999px; border: 1px solid transparent; background: transparent; color: var(--lg2-label-3); font-size: 13px; }
+@media (hover: hover) { .lg2-wiz__roomdel:hover { background: rgba(var(--lg2-red-rgb, 255,69,58), 0.18); color: var(--lg2-red); } }
+.lg2-wiz__addroom { align-self: flex-start; }
+
+/* Shutter assignment */
+.lg2-wiz__discoverbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lg2-wiz__discovercount { font-size: 12.5px; color: var(--lg2-label-2); font-variant-numeric: tabular-nums; }
+.lg2-wiz__shutterlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.lg2-wiz__shutterrow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 9px 11px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); }
+.lg2-wiz__shutterrow--on { border-color: rgba(var(--lg2-accent-rgb), 0.4); }
+.lg2-wiz__shuttername { flex: 1 1 160px; min-width: 0; font-weight: 620; font-size: 13.5px; color: var(--lg2-label-1); }
+.lg2-wiz__inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--lg2-label-2); }
+.lg2-wiz__inline > span { white-space: nowrap; }
+.lg2-wiz__inline select { min-height: 32px; width: auto; }
+
+/* Finish: profiles + summary */
+.lg2-wiz__profiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--lg2-s3); }
+@media (max-width: 640px) { .lg2-wiz__profiles { grid-template-columns: 1fr; } }
+.lg2-wiz__profile {
+  appearance: none; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 3px; padding: 12px 14px;
+  border-radius: var(--lg2-r); background: var(--lg2-inset); border: 1.5px solid var(--lg2-hairline); color: inherit;
+  transition: border-color var(--lg2-fast) var(--lg2-ease), background var(--lg2-fast) var(--lg2-ease);
+}
+.lg2-wiz__profile--on { border-color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.12); }
+.lg2-wiz__profile-title { font-weight: 650; font-size: 14px; color: var(--lg2-label-1); }
+.lg2-wiz__profile-desc { font-size: 11.5px; color: var(--lg2-label-2); }
+
+.lg2-wiz__summary { display: flex; flex-wrap: wrap; gap: 8px; }
+.lg2-wiz__chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: var(--lg2-r-pill); border: 1px solid var(--lg2-hairline); color: var(--lg2-label-1); background: var(--lg2-inset); }
+.lg2-wiz__chip-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--lg2-label-3); }
+.lg2-wiz__chip--ok .lg2-wiz__chip-dot { background: var(--lg2-green); }
+.lg2-wiz__chip--bad .lg2-wiz__chip-dot { background: var(--lg2-red); }
+.lg2-wiz__chip--ok { border-color: rgba(var(--lg2-green-rgb, 48,209,88), 0.4); }
+.lg2-wiz__chip--bad { border-color: rgba(var(--lg2-red-rgb, 255,69,58), 0.4); }
+
+.lg2-wiz__activate { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--lg2-r); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); cursor: pointer; }
+.lg2-wiz__activate input { margin-top: 2px; width: 18px; height: 18px; accent-color: var(--lg2-accent); }
+.lg2-wiz__activate span { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; font-weight: 600; color: var(--lg2-label-1); }
+.lg2-wiz__activate small { font-weight: 400; font-size: 11.5px; color: var(--lg2-label-2); }
+
+.lg2-wiz__geo { align-self: flex-start; }
+
+/* ================================================================== *
+ * Dropdown readability — native <select> popups follow the theme
+ * ------------------------------------------------------------------
+ * The OS draws the open <option> list. Without a matching color-scheme it
+ * renders a light popup while our inherited text stays white → unreadable.
+ * Bind color-scheme to the active scheme AND set explicit option colours as a
+ * cross-browser guarantee (applies to every dropdown inside the v2 UI).
+ * ================================================================== */
+.lg2-demo.lg2-scheme-dark { color-scheme: dark; }
+.lg2-demo.lg2-scheme-light { color-scheme: light; }
+.lg2-demo option,
+.lg2-demo optgroup {
+  background-color: #12202f;
+  color: #f4f7fb;
+}
+.lg2-demo.lg2-scheme-light option,
+.lg2-demo.lg2-scheme-light optgroup {
+  background-color: #ffffff;
+  color: #1b232f;
+}
+@media (prefers-color-scheme: light) {
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light) { color-scheme: light; }
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light) option,
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light) optgroup {
+    background-color: #ffffff;
+    color: #1b232f;
+  }
+}
+
+/* ================================================================== *
+ * Scroll performance — skip painting off-screen list rows
+ * (High FPS Mode #4: gated behind the `lg2-fps-cv` toggle).
+ * ================================================================== */
+.lg2-fps-cv .lg2-roomlist__scroll .lg2-roomrow {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 84px;
+}
+.lg2-fps-cv .lg2-wiz__roomlist .lg2-wiz__roomrow,
+.lg2-fps-cv .lg2-wiz__shutterlist .lg2-wiz__shutterrow {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 54px;
+}
+
+/* ================================================================== *
+ * Wizard additions (HMIP power source, floor selector, priority help)
+ * ================================================================== */
+.lg2-wiz__choices--3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 720px) { .lg2-wiz__choices--3 { grid-template-columns: 1fr; } }
+
+.lg2-wiz__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--lg2-r);
+  background: rgba(var(--lg2-orange-rgb, 255, 159, 10), 0.12);
+  border: 1px solid rgba(var(--lg2-orange-rgb, 255, 159, 10), 0.3);
+  color: var(--lg2-label-1);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.lg2-wiz__note svg { flex: 0 0 auto; color: var(--lg2-orange); margin-top: 1px; }
+
+.lg2-wiz__roomfloorsel {
+  flex: 0 0 auto;
+  min-height: 34px;
+  max-width: 140px;
+  background: var(--lg2-inset);
+  color: var(--lg2-label-1);
+  border: 1px solid var(--lg2-hairline);
+  border-radius: var(--lg2-r-sm);
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.lg2-wiz__priohelp {
+  margin-top: 2px;
+  padding: 12px 14px;
+  border-radius: var(--lg2-r);
+  background: var(--lg2-inset);
+  border: 1px solid var(--lg2-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lg2-wiz__priohelp-title { font-size: 12.5px; font-weight: 650; color: var(--lg2-label-1); }
+.lg2-wiz__priohelp ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.lg2-wiz__priohelp li { font-size: 12px; color: var(--lg2-label-2); }
+.lg2-wiz__priohelp li b { color: var(--lg2-label-1); font-weight: 640; }
+.lg2-wiz__priohelp-foot { font-size: 11.5px; color: var(--lg2-label-3); }
+
+/* ================================================================== *
+ * Performance A — pre-blurred wallpaper ("Statisches Glas")
+ * ------------------------------------------------------------------
+ * When enabled, `--lg2-bg-blurred` holds a pre-blurred data-URL of the
+ * wallpaper (generated once on the client). Glass surfaces then drop the
+ * per-frame `backdrop-filter` and instead paint that pre-blurred image with
+ * `background-attachment: fixed` UNDER the same translucent glass tint — so
+ * each card still reveals the (blurred) wallpaper behind it, at a fraction of
+ * the GPU cost. Only applied once the image is ready (class added by the shell).
+ * ================================================================== */
+/* Every top-level glass surface (cards AND the standalone bars/rows/pills) gets
+   the pre-blurred wallpaper so it stays frosted-transparent, not opaque. */
+.lg2-demo.lg2-preblur .lg2-card,
+.lg2-demo.lg2-preblur .lg2-weather,
+.lg2-demo.lg2-preblur .lg2-nav,
+.lg2-demo.lg2-preblur .lg2-auto__tabs,
+.lg2-demo.lg2-preblur .lg2-auto__mode,
+.lg2-demo.lg2-preblur .lg2-warnrow,
+.lg2-demo.lg2-preblur .lg2-room-chip {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background:
+    var(--lg2-sheen),
+    var(--lg2-scrim),
+    var(--lg2-panel),
+    var(--lg2-bg-blurred, transparent) center / cover fixed no-repeat;
+}
+/* Buttons only drop the (few, cheap) live blurs — their own fill stays intact. */
+.lg2-demo.lg2-preblur .lg2-btn {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* The sidebar keeps a frosted feel via the pre-blurred wallpaper too. */
+.lg2-demo.lg2-preblur .lg2-side {
+  background:
+    var(--lg2-scrim),
+    var(--lg2-sidebar),
+    var(--lg2-bg-blurred, transparent) center / cover fixed no-repeat;
+}
+
+/* ================================================================== *
+ * High FPS Mode — granular, individually-toggled micro-optimizations.
+ * Each rule is gated behind its own root class (emitted by themeStyle only
+ * when the master `fps` flag AND the individual flag are on).
+ * ================================================================== */
+
+/* #4 content-visibility — skip painting off-screen list rows/cards. */
+.lg2-fps-cv .lg2-actions .lg2-action { content-visibility: auto; contain-intrinsic-size: auto 60px; }
+.lg2-fps-cv .lg2-warn .lg2-warnrow { content-visibility: auto; contain-intrinsic-size: auto 76px; }
+.lg2-fps-cv .lg2-warn .lg2-warncard { content-visibility: auto; contain-intrinsic-size: auto 160px; }
+.lg2-fps-cv .lg2-exp-table .lg2-exp-row { content-visibility: auto; contain-intrinsic-size: auto 34px; }
+.lg2-fps-cv .lg2-exp-sigtable .lg2-exp-sigtable__row { content-visibility: auto; contain-intrinsic-size: auto 34px; }
+
+/* #5 contain — isolate a card's layout/style recalc from its siblings on live
+   updates (no `paint` → shadows/popovers are never clipped, zero visual change). */
+.lg2-fps-contain .lg2-card { contain: layout style; }
+
+/* #1 no nested blur — chips/buttons that sit on an already-frosted card don't
+   need their own backdrop-filter (redundant double-blur). */
+.lg2-fps-nonest .lg2-btn,
+.lg2-fps-nonest .lg2-room-chip {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* #8 no specular rim — drop the ::before mask-composite light edge on cards. */
+.lg2-fps-nospec .lg2-card::before { display: none; }
+
+/* #6 pause CSS animations while the tab is hidden (body class toggled by the
+   shell via `visibilitychange`, only when the toggle is on). */
+body.lg2-anim-paused .lg2-demo *,
+body.lg2-anim-paused .lg2-demo *::before,
+body.lg2-anim-paused .lg2-demo *::after {
+  animation-play-state: paused !important;
+}
+
+/* High FPS sub-toggle rows in the config panel. */
+.lg2-cfg__fpsgroup { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 8px; border-left: 2px solid var(--lg2-hairline); }
+.lg2-cfg__fpshint { margin: 2px 0 0; font-size: 11px; line-height: 1.35; color: var(--lg2-label-3); }
+
+/* ================================================================== *
+ * Room icon tile — neutral black/white gradient (scheme-aware, style test)
+ * ================================================================== */
+/* Dark (default): black graphite gradient, light glyph. */
+.lg2-demo {
+  --lg2-icontile-bg: linear-gradient(180deg, #363c47 0%, #0b0e14 100%);
+  --lg2-icontile-fg: #f4f7fb;
+  --lg2-icontile-edge: rgba(255, 255, 255, 0.16);
+  --lg2-icontile-inner: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --lg2-icontile-glow: 0 3px 8px rgba(0, 0, 0, 0.45);
+  --lg2-icontile-glyph-shadow: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.22));
+}
+/* Light: white gradient, dark glyph. */
+.lg2-demo.lg2-scheme-light {
+  --lg2-icontile-bg: linear-gradient(180deg, #ffffff 0%, #dbe1ea 100%);
+  --lg2-icontile-fg: #1b232f;
+  --lg2-icontile-edge: rgba(20, 30, 50, 0.14);
+  --lg2-icontile-inner: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --lg2-icontile-glow: 0 3px 8px rgba(20, 30, 50, 0.16);
+}
+@media (prefers-color-scheme: light) {
+  .lg2-demo:not(.lg2-scheme-dark):not(.lg2-scheme-light) {
+    --lg2-icontile-bg: linear-gradient(180deg, #ffffff 0%, #dbe1ea 100%);
+    --lg2-icontile-fg: #1b232f;
+    --lg2-icontile-edge: rgba(20, 30, 50, 0.14);
+    --lg2-icontile-inner: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    --lg2-icontile-glow: 0 3px 8px rgba(20, 30, 50, 0.16);
+  }
+}
+
+/* ================================================================== *
+ * Unified "icon tile" style (configurable: `iconTiles` → .lg2-icons-tile).
+ * ------------------------------------------------------------------
+ * When enabled, every category glyph across the pages sits on the same neutral
+ * gradient tile (black gradient in dark, white in light) with a configurable
+ * glyph shadow — the "app icon" look. When disabled, each page keeps its normal
+ * (accent-/semantic-tinted) symbols. Uses `!important` to override the per-tile
+ * accent/semantic modifiers (e.g. --ok / --due / --warn).
+ * ================================================================== */
+.lg2-demo.lg2-icons-tile .lg2-roomrow__icon,
+.lg2-demo.lg2-icons-tile .lg2-roomhead__icon,
+.lg2-demo.lg2-icons-tile .lg2-hero__badge,
+.lg2-demo.lg2-icons-tile .lg2-action__icon,
+.lg2-demo.lg2-icons-tile .lg2-fc__banner-icon,
+.lg2-demo.lg2-icons-tile .lg2-fc__rowicon,
+.lg2-demo.lg2-icons-tile .lg2-zone__icon,
+.lg2-demo.lg2-icons-tile .lg2-garden__hero-icon,
+.lg2-demo.lg2-icons-tile .lg2-garden__zicon,
+.lg2-demo.lg2-icons-tile .lg2-garden__tip-icon,
+.lg2-demo.lg2-icons-tile .lg2-auto__bicon,
+.lg2-demo.lg2-icons-tile .lg2-auto__bok,
+.lg2-demo.lg2-icons-tile .lg2-auto__dicon,
+.lg2-demo.lg2-icons-tile .lg2-auto__seticon,
+.lg2-demo.lg2-icons-tile .lg2-auto__simicon {
+  color: var(--lg2-icontile-fg) !important;
+  background: var(--lg2-icontile-bg) !important;
+  border: 1px solid var(--lg2-icontile-edge) !important;
+  box-shadow: var(--lg2-icontile-inner), var(--lg2-icontile-glow) !important;
+}
+.lg2-demo.lg2-icons-tile .lg2-roomrow__icon svg,
+.lg2-demo.lg2-icons-tile .lg2-roomhead__icon svg,
+.lg2-demo.lg2-icons-tile .lg2-hero__badge svg,
+.lg2-demo.lg2-icons-tile .lg2-action__icon svg,
+.lg2-demo.lg2-icons-tile .lg2-fc__banner-icon svg,
+.lg2-demo.lg2-icons-tile .lg2-fc__rowicon svg,
+.lg2-demo.lg2-icons-tile .lg2-zone__icon svg,
+.lg2-demo.lg2-icons-tile .lg2-garden__hero-icon svg,
+.lg2-demo.lg2-icons-tile .lg2-garden__zicon svg,
+.lg2-demo.lg2-icons-tile .lg2-garden__tip-icon svg,
+.lg2-demo.lg2-icons-tile .lg2-auto__bicon svg,
+.lg2-demo.lg2-icons-tile .lg2-auto__bok svg,
+.lg2-demo.lg2-icons-tile .lg2-auto__dicon svg,
+.lg2-demo.lg2-icons-tile .lg2-auto__seticon svg,
+.lg2-demo.lg2-icons-tile .lg2-auto__simicon svg {
+  color: var(--lg2-icontile-fg);
+  filter: var(--lg2-icontile-glyph-shadow, none);
+}
+
+/* Appearance panel — section headers that group the settings. */
+.lg2-cfg__section {
+  margin: 14px 0 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lg2-hairline);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--lg2-label-2);
+}
+.lg2-cfg__section:first-of-type { margin-top: 2px; padding-top: 0; border-top: 0; }

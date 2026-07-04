@@ -97,6 +97,20 @@ function buildGroups(): HelpGroup[] {
       { name: t('Updates', 'Updates'), desc: t('Version, Build, Changelog und GitHub-Update-Hinweis.', 'Version, build, changelog and GitHub update notice.') },
     ],
   },
+  {
+    title: t('Darstellung & Design', 'Appearance & design'),
+    items: [
+      { name: t('Darstellung öffnen', 'Open Appearance'), desc: t('In der linken Leiste unten auf „Darstellung" (Pinsel-Symbol) tippen — das Panel gilt sofort für die ganze App, pro Gerät gespeichert.', 'Tap "Appearance" (paintbrush icon) at the bottom of the left sidebar — the panel applies to the whole app instantly and is saved per device.') },
+      { name: t('Vorlagen (Presets)', 'Presets'), desc: t('Fertige Looks wie Glass (Standard), White, Mono, Natur, Modern, Ocean … Ein Klick übernimmt alle Optionen. Eigene Presets lassen sich benennen und speichern.', 'Ready-made looks like Glass (default), White, Mono, Nature, Modern, Ocean … One click applies all options. You can name and save your own presets.') },
+      { name: t('Farbe & Schema', 'Colour & scheme'), desc: t('Akzentfarbe (oder „Auto" nach Wetter) und Hell/Dunkel/Auto einstellen.', 'Set the accent colour (or "Auto" by weather) and light/dark/auto.') },
+      { name: t('Hintergrund', 'Background'), desc: t('Wallpaper als Bild, Farbe oder Verlauf; Deckkraft und Weichzeichnung regelbar.', 'Wallpaper as image, colour or gradient; opacity and soft-focus adjustable.') },
+      { name: t('Glas, Form & Abstände', 'Glass, shape & spacing'), desc: t('Blur-Stärke, Sättigung, Glas-Deckkraft, Ecken-Radius, Schatten und Kachel-Abstand.', 'Blur strength, saturation, glass opacity, corner radius, shadows and tile spacing.') },
+      { name: t('Symbole', 'Icons'), desc: t('„Symbol-Kacheln" für den App-Icon-Look (mit optionalem Akzent-Verlauf und Symbol-Schatten) — oder aus für normale Symbole.', '"Icon tiles" for the app-icon look (with optional accent gradient and icon shadow) — or off for normal symbols.') },
+      { name: t('Navigation & Rahmen', 'Navigation & frame'), desc: t('Navigation als Kachel, kompakte Icon-Leiste, äußerer Rahmen und Hover-Farbe.', 'Nav as tile, compact icon rail, outer frame and hover colour.') },
+      { name: t('Performance', 'Performance'), desc: t('„Statisches Glas" und „High FPS Mode" (einzeln schaltbare Optimierungen) für flüssigeres Scrollen bei nahezu gleicher Optik; „Lite" schaltet den Blur ganz ab.', '"Static glass" and "High FPS mode" (individually switchable optimizations) for smoother scrolling at nearly identical looks; "Lite" turns blur off entirely.') },
+      { name: t('Klassische Oberfläche (v1)', 'Classic interface (v1)'), desc: t('Unter Einstellungen lässt sich zwischen dem neuen Liquid-Glass-Design (Standard) und der stabilen 1.20-Oberfläche umschalten.', 'Under Settings you can switch between the new Liquid Glass design (default) and the stable 1.20 interface.') },
+    ],
+  },
   ];
 }
 

@@ -127,14 +127,14 @@ export function RoomDetailModal(props: {
       .map((s) => ({ t: Date.parse(s.ts), v: s.value }))
       .filter((p) => Number.isFinite(p.t) && p.t >= past12);
     if (roomPts.length > 0) {
-      out.push({ label: room.name, color: '#22c55e', points: roomPts });
+      out.push({ label: room.name, color: '#66d66b', points: roomPts });
     }
     const outdoor = all
       .filter((s) => s.key === 'outdoor')
       .map((s) => ({ t: Date.parse(s.ts), v: s.value }))
       .filter((p) => Number.isFinite(p.t) && p.t >= past12);
     if (outdoor.length > 0) {
-      out.push({ label: t('Außen', 'Outdoor'), color: '#f59e0b', points: outdoor });
+      out.push({ label: t('Außen', 'Outdoor'), color: '#ff9d2e', points: outdoor });
     }
     return out;
   }, [samples, room.id, room.name, past12]);
@@ -144,7 +144,7 @@ export function RoomDetailModal(props: {
     const pts = fc
       .map((p) => ({ t: Date.parse(p.ts), v: clampPct(p.percent) }))
       .filter((p) => Number.isFinite(p.t));
-    return pts.length >= 2 ? [{ label: t('Rollo', 'Shutter'), color: '#38bdf8', points: pts }] : [];
+    return pts.length >= 2 ? [{ label: t('Rollo', 'Shutter'), color: '#35d6e7', points: pts }] : [];
   }, [room.shutterForecast]);
 
   // Weighted risk factors, descending.

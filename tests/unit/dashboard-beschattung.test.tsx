@@ -119,24 +119,31 @@ afterEach(() => {
   setRiskBreakdowns([]);
 });
 
-describe('App module nav + 3-column grid (Task 13.1)', () => {
-  it('renders the 6-module nav with Beschattung active and a badge', () => {
+describe('App module nav + overview decision surface (uebersicht-rework)', () => {
+  it('renders the primary nav with Übersicht active and a badge', () => {
     snapshot.value = v2Snapshot();
-    const { container } = render(<App initialUrl="/beschattung" />);
+    const { container } = render(<App initialUrl="/uebersicht" />);
     const modules = container.querySelectorAll('[data-testid^="nav-module-"]');
-    expect(modules.length).toBe(7);
-    const beschattung = container.querySelector('[data-testid="nav-module-beschattung"]');
-    expect(beschattung?.className).toContain('app__module--active');
+    expect(modules.length).toBe(6);
+    const uebersicht = container.querySelector('[data-testid="nav-module-uebersicht"]');
+    expect(uebersicht?.className).toContain('app__module--active');
     expect(container.querySelector('[data-testid="nav-badge"]')).not.toBeNull();
   });
 
-  it('renders three columns', () => {
+  it('renders the new overview blocks instead of the legacy 3-column grid', () => {
     snapshot.value = v2Snapshot();
-    const { container } = render(<App initialUrl="/beschattung" />);
-    expect(container.querySelector('[data-testid="dashboard-grid"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="grid-col-left"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="grid-col-center"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="grid-col-right"]')).not.toBeNull();
+    const { container } = render(<App initialUrl="/uebersicht" />);
+    expect(container.querySelector('[data-testid="uebersicht-view"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="status-banner"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="lagekarte"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="next-action-strip"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="house-twin-compact"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="kpi-row"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="outlook-strip"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="room-status-grid"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="overview-deeplinks"]')).not.toBeNull();
+    // The legacy three-column grid is gone from the overview.
+    expect(container.querySelector('[data-testid="dashboard-grid"]')).toBeNull();
   });
 });
 

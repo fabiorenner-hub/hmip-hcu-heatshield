@@ -113,6 +113,13 @@ import type { HmipDeviceMeta } from '../sources/hcu.js';
 import type { IrrigationSnapshot } from '../irrigation/controller.js';
 import type { RuntimeState } from '../../shared/state-schema.js';
 import type { Message } from '../../shared/message-schema.js';
+import type { BuildingModel } from '../../shared/building-model.js';
+import { safeParseBuildingModel, validateBuildingModel } from '../../shared/building-model.js';
+import { canonicalJson, contentHash } from '../../shared/building-model-canonical.js';
+import { modelToGlb } from '../../shared/building-gltf.js';
+import type { UnderlayKind, UnderlayMeta } from '../../shared/building-underlay.js';
+import type { ProjectIndex } from '../persistence/projectStore.js';
+import type { ThermalSnapshotSummary } from '../persistence/thermalStore.js';
 import { maskToken } from '../notifications/telegram.js';
 
 // ---------------------------------------------------------------------------
@@ -806,6 +813,67 @@ export interface DashboardServerDeps {
   getHouseImage?: () => { contentType: string; bytes: Buffer } | null;
   saveHouseImage?: (dataUrl: string) => Promise<void>;
   logger?: ConnectLogger;
+  /**
+   * Optional Building Model Studio accessors (building-model-editor spec,
+   * Phase 1). `getBuildingModel` loads the persisted canonical model, seeding
+   * a default from the HeatShield site when none exists yet.
+   * `saveBuildingModel` performs an optimistic-concurrency save (revision
+   * check) and returns the committed model or a stale conflict. When
+   * undefined, `GET/PUT /api/building` return `503 building_unavailable`.
+   */
+  getBuildingModel?: () => Promise<BuildingModel>;
+  saveBuildingModel?: (
+    draft: BuildingModel,
+    expectedRevision: number,
+  ) => Promise<
+    | { ok: true; model: BuildingModel; changed: boolean }
+    | { ok: false; reason: 'stale'; expected: number; actual: number }
+  >;
+  /**
+   * Optional Building Studio underlay accessors (BME-03/04/12). Reference
+   * rasters traced over in the 2D editor. Binaries live in a separate store
+   * with retention state; these deps front it. When undefined, the
+   * `/api/building/underlays*` routes return `503 building_unavailable`.
+   */
+  listUnderlays?: () => Promise<UnderlayMeta[]>;
+  addUnderlay?: (
+    dataUrl: string,
+    input: { storeyId: string; name?: string; kind?: UnderlayKind },
+  ) => Promise<{ ok: true; meta: UnderlayMeta } | { ok: false; error: string }>;
+  updateUnderlay?: (id: string, patch: Partial<UnderlayMeta>) => Promise<UnderlayMeta | null>;
+  deleteUnderlay?: (id: string) => Promise<boolean>;
+  getUnderlayBinary?: (id: string) => Promise<{ mediaType: string; bytes: Buffer } | null>;
+  /**
+   * Optional building revision history (BME-18). `listRevisions` returns the
+   * snapshotted revisions (newest first); `restoreRevision` re-commits a past
+   * revision as a NEW revision. 503 when unwired.
+   */
+  listRevisions?: () => Promise<Array<{ revision: number; contentHash: string; savedAt: string }>>;
+  restoreRevision?: (
+    revision: number,
+  ) => Promise<
+    | { ok: true; model: BuildingModel; changed: boolean }
+    | { ok: false; reason: 'stale'; expected: number; actual: number }
+  >;
+  /**
+   * Optional multi-project management (shared-building-model 2.2). All
+   * `/api/building*` routes operate on the ACTIVE project; these deps manage
+   * the project set. 503 when unwired.
+   */
+  listProjects?: () => Promise<ProjectIndex>;
+  createProject?: (name: string) => Promise<ProjectIndex>;
+  renameProject?: (id: string, name: string) => Promise<ProjectIndex>;
+  deleteProject?: (id: string) => Promise<ProjectIndex>;
+  activateProject?: (id: string) => Promise<ProjectIndex>;
+  /**
+   * Optional thermal calculation-snapshot persistence (thermal-load-engine).
+   * `saveThermalSnapshot` stores a computed (non-normative) estimate for the
+   * active project; `listThermalSnapshots` returns summaries newest-first;
+   * `readThermalSnapshot` returns one full payload. 503 when unwired.
+   */
+  saveThermalSnapshot?: (estimate: unknown) => Promise<ThermalSnapshotSummary>;
+  listThermalSnapshots?: () => Promise<ThermalSnapshotSummary[]>;
+  readThermalSnapshot?: (id: string) => Promise<unknown | null>;
 }
 
 /**
@@ -972,6 +1040,8 @@ type ApiErrorCode =
   | 'gardena_unavailable'
   | 'irrigation_unavailable'
   | 'dwd_unavailable'
+  | 'building_unavailable'
+  | 'building_stale'
   | 'internal_error';
 
 interface ApiErrorBody {
@@ -1242,6 +1312,7 @@ export class DashboardServer {
     this.registerLearningRoutes();
     this.registerMessagesRoutes();
     this.registerWeatherRoutes();
+    this.registerBuildingRoutes();
     registerForecastRoutes(this.app, this.deps);
   }
 
@@ -1383,6 +1454,362 @@ export class DashboardServer {
         cooling: snap.cooling?.level ?? null,
         stormHoldUntil: snap.storm.holdUntil,
       };
+    });
+  }
+
+  private registerBuildingRoutes(): void {
+    const deps = this.deps;
+
+    // GET /api/building → load (or seed) the canonical building model.
+    this.app.get('/api/building', async (_req, reply) => {
+      if (deps.getBuildingModel === undefined) {
+        const body: ApiErrorBody = {
+          error: { code: 'building_unavailable', message: 'building model unavailable (boot not wired)' },
+        };
+        return reply.code(503).send(body);
+      }
+      try {
+        return await deps.getBuildingModel();
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // PUT /api/building → optimistic-concurrency save. Body: the full model;
+    // `?expectedRevision=` (or body.revision) guards against stale writes.
+    this.app.put('/api/building', async (req, reply) => {
+      if (deps.saveBuildingModel === undefined) {
+        const body: ApiErrorBody = {
+          error: { code: 'building_unavailable', message: 'building model unavailable (boot not wired)' },
+        };
+        return reply.code(503).send(body);
+      }
+      const body = req.body;
+      if (body === undefined || body === null || typeof body !== 'object') {
+        return this.sendInvalidSchema(reply, 'Request body must be a JSON object');
+      }
+      const parsed = safeParseBuildingModel(body);
+      if (!parsed.success) {
+        return this.sendInvalidSchema(reply, 'Building model failed schema validation', parsed.error);
+      }
+      const draft = parsed.data;
+      const query = (req.query ?? {}) as Record<string, unknown>;
+      const rawExpected = query['expectedRevision'];
+      const expectedRevision =
+        typeof rawExpected === 'string' && Number.isInteger(Number(rawExpected))
+          ? Number(rawExpected)
+          : draft.revision;
+      try {
+        const result = await deps.saveBuildingModel(draft, expectedRevision);
+        if (!result.ok) {
+          const errBody: ApiErrorBody = {
+            error: {
+              code: 'building_stale',
+              message: `stale write: expected revision ${result.expected}, current is ${result.actual}`,
+            },
+          };
+          return reply.code(409).send(errBody);
+        }
+        return { ok: true, model: result.model, changed: result.changed };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // GET /api/building/validate → referential-integrity issues (BME-17).
+    this.app.get('/api/building/validate', async (_req, reply) => {
+      if (deps.getBuildingModel === undefined) {
+        const body: ApiErrorBody = {
+          error: { code: 'building_unavailable', message: 'building model unavailable (boot not wired)' },
+        };
+        return reply.code(503).send(body);
+      }
+      try {
+        const model = await deps.getBuildingModel();
+        return validateBuildingModel(model);
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // GET /api/building/export → canonical JSON + content hash (BME-20).
+    this.app.get('/api/building/export', async (_req, reply) => {
+      if (deps.getBuildingModel === undefined) {
+        const body: ApiErrorBody = {
+          error: { code: 'building_unavailable', message: 'building model unavailable (boot not wired)' },
+        };
+        return reply.code(503).send(body);
+      }
+      try {
+        const model = await deps.getBuildingModel();
+        return {
+          kind: 'heatshield-building-model',
+          schemaVersion: model.schemaVersion,
+          revision: model.revision,
+          contentHash: contentHash(model),
+          exportedAt: new Date().toISOString(),
+          canonicalJson: canonicalJson(model),
+          model,
+        };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // GET /api/building/export/glb → binary glTF (GLB) of the current model.
+    this.app.get('/api/building/export/glb', async (_req, reply) => {
+      if (deps.getBuildingModel === undefined) {
+        const body: ApiErrorBody = {
+          error: { code: 'building_unavailable', message: 'building model unavailable (boot not wired)' },
+        };
+        return reply.code(503).send(body);
+      }
+      try {
+        const model = await deps.getBuildingModel();
+        const glb = modelToGlb(model);
+        reply.type('model/gltf-binary');
+        return reply.send(Buffer.from(glb.buffer, glb.byteOffset, glb.byteLength));
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // GET /api/building/history → snapshotted revisions (newest first). BME-18.
+    this.app.get('/api/building/history', async (_req, reply) => {
+      if (deps.listRevisions === undefined) {
+        const body: ApiErrorBody = { error: { code: 'building_unavailable', message: 'building history unavailable (boot not wired)' } };
+        return reply.code(503).send(body);
+      }
+      try {
+        return { revisions: await deps.listRevisions() };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // POST /api/building/restore/:rev → re-commit a past revision as a new one.
+    this.app.post('/api/building/restore/:rev', async (req, reply) => {
+      if (deps.restoreRevision === undefined) {
+        const body: ApiErrorBody = { error: { code: 'building_unavailable', message: 'building history unavailable (boot not wired)' } };
+        return reply.code(503).send(body);
+      }
+      const raw = (req.params as { rev?: string }).rev ?? '';
+      const revision = Number(raw);
+      if (!Number.isInteger(revision) || revision < 1) {
+        return this.sendInvalidSchema(reply, 'revision must be a positive integer');
+      }
+      try {
+        const result = await deps.restoreRevision(revision);
+        if (!result.ok) {
+          const errBody: ApiErrorBody = { error: { code: 'invalid_param', message: `revision ${revision} not found` } };
+          return reply.code(404).send(errBody);
+        }
+        return { ok: true, model: result.model };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // ---- Projects (shared-building-model 2.2) -----------------------------
+    const projectsUnavailable = (reply: FastifyReply): FastifyReply => {
+      const body: ApiErrorBody = {
+        error: { code: 'building_unavailable', message: 'building projects unavailable (boot not wired)' },
+      };
+      return reply.code(503).send(body);
+    };
+
+    // GET /api/building/projects → { activeId, projects }.
+    this.app.get('/api/building/projects', async (_req, reply) => {
+      if (deps.listProjects === undefined) return projectsUnavailable(reply);
+      try {
+        return await deps.listProjects();
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // POST /api/building/projects → create + activate. Body: { name }.
+    this.app.post('/api/building/projects', async (req, reply) => {
+      if (deps.createProject === undefined) return projectsUnavailable(reply);
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const name = typeof b['name'] === 'string' ? b['name'] : '';
+      try {
+        return await deps.createProject(name);
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // PUT /api/building/projects/:id → rename. Body: { name }.
+    this.app.put('/api/building/projects/:id', async (req, reply) => {
+      if (deps.renameProject === undefined) return projectsUnavailable(reply);
+      const id = (req.params as { id?: string }).id ?? '';
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const name = typeof b['name'] === 'string' ? b['name'] : '';
+      if (name.trim().length === 0) return this.sendInvalidSchema(reply, 'name is required');
+      try {
+        return await deps.renameProject(id, name);
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // DELETE /api/building/projects/:id → delete (never the default/last).
+    this.app.delete('/api/building/projects/:id', async (req, reply) => {
+      if (deps.deleteProject === undefined) return projectsUnavailable(reply);
+      const id = (req.params as { id?: string }).id ?? '';
+      try {
+        return await deps.deleteProject(id);
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // POST /api/building/projects/:id/activate → switch the active project.
+    this.app.post('/api/building/projects/:id/activate', async (req, reply) => {
+      if (deps.activateProject === undefined) return projectsUnavailable(reply);
+      const id = (req.params as { id?: string }).id ?? '';
+      try {
+        return await deps.activateProject(id);
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // ---- Thermal snapshots (thermal-load-engine) --------------------------
+    const thermalUnavailable = (reply: FastifyReply): FastifyReply => {
+      const body: ApiErrorBody = {
+        error: { code: 'building_unavailable', message: 'thermal snapshots unavailable (boot not wired)' },
+      };
+      return reply.code(503).send(body);
+    };
+
+    // GET /api/building/thermal/snapshots → summaries (newest first).
+    this.app.get('/api/building/thermal/snapshots', async (_req, reply) => {
+      if (deps.listThermalSnapshots === undefined) return thermalUnavailable(reply);
+      try {
+        return { snapshots: await deps.listThermalSnapshots() };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // POST /api/building/thermal/snapshots → persist a computed estimate.
+    this.app.post('/api/building/thermal/snapshots', { bodyLimit: 4 * 1024 * 1024 }, async (req, reply) => {
+      if (deps.saveThermalSnapshot === undefined) return thermalUnavailable(reply);
+      const body = req.body;
+      if (body === null || typeof body !== 'object') {
+        return this.sendInvalidSchema(reply, 'estimate object required');
+      }
+      try {
+        return await deps.saveThermalSnapshot(body);
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    // GET /api/building/thermal/snapshots/:id → one full estimate payload.
+    this.app.get('/api/building/thermal/snapshots/:id', async (req, reply) => {
+      if (deps.readThermalSnapshot === undefined) return thermalUnavailable(reply);
+      const id = (req.params as { id?: string }).id ?? '';
+      try {
+        const est = await deps.readThermalSnapshot(id);
+        if (est === null) {
+          const errBody: ApiErrorBody = { error: { code: 'invalid_param', message: `unknown snapshot ${id}` } };
+          return reply.code(404).send(errBody);
+        }
+        return { estimate: est };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+    const underlayUnavailable = (reply: FastifyReply): FastifyReply => {
+      const body: ApiErrorBody = {
+        error: { code: 'building_unavailable', message: 'building underlays unavailable (boot not wired)' },
+      };
+      return reply.code(503).send(body);
+    };
+
+    this.app.get('/api/building/underlays', async (_req, reply) => {
+      if (deps.listUnderlays === undefined) return underlayUnavailable(reply);
+      try {
+        return { underlays: await deps.listUnderlays() };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    this.app.post('/api/building/underlays', { bodyLimit: 20 * 1024 * 1024 }, async (req, reply) => {
+      if (deps.addUnderlay === undefined) return underlayUnavailable(reply);
+      const body = req.body;
+      if (body === undefined || body === null || typeof body !== 'object') {
+        return this.sendInvalidSchema(reply, 'Request body must be a JSON object');
+      }
+      const b = body as Record<string, unknown>;
+      const dataUrl = typeof b['dataUrl'] === 'string' ? b['dataUrl'] : '';
+      const storeyId = typeof b['storeyId'] === 'string' ? b['storeyId'] : '';
+      if (dataUrl.length === 0 || storeyId.length === 0) {
+        return this.sendInvalidSchema(reply, 'dataUrl and storeyId are required');
+      }
+      const input: { storeyId: string; name?: string; kind?: UnderlayKind } = { storeyId };
+      if (typeof b['name'] === 'string') input.name = b['name'];
+      if (typeof b['kind'] === 'string') input.kind = b['kind'] as UnderlayKind;
+      try {
+        const result = await deps.addUnderlay(dataUrl, input);
+        if (!result.ok) {
+          const errBody: ApiErrorBody = { error: { code: 'invalid_body', message: result.error } };
+          return reply.code(400).send(errBody);
+        }
+        return { ok: true, meta: result.meta };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    this.app.put('/api/building/underlays/:id', async (req, reply) => {
+      if (deps.updateUnderlay === undefined) return underlayUnavailable(reply);
+      const id = (req.params as { id?: string }).id ?? '';
+      const body = req.body;
+      if (body === undefined || body === null || typeof body !== 'object') {
+        return this.sendInvalidSchema(reply, 'Request body must be a JSON object');
+      }
+      try {
+        const updated = await deps.updateUnderlay(id, body as Partial<UnderlayMeta>);
+        if (updated === null) {
+          const errBody: ApiErrorBody = { error: { code: 'invalid_param', message: `unknown underlay ${id}` } };
+          return reply.code(404).send(errBody);
+        }
+        return { ok: true, meta: updated };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    this.app.delete('/api/building/underlays/:id', async (req, reply) => {
+      if (deps.deleteUnderlay === undefined) return underlayUnavailable(reply);
+      const id = (req.params as { id?: string }).id ?? '';
+      try {
+        const ok = await deps.deleteUnderlay(id);
+        return { ok };
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
+    });
+
+    this.app.get('/api/building/underlays/:id/image', async (req, reply) => {
+      if (deps.getUnderlayBinary === undefined) return underlayUnavailable(reply);
+      const id = (req.params as { id?: string }).id ?? '';
+      try {
+        const bin = await deps.getUnderlayBinary(id);
+        if (bin === null) {
+          const errBody: ApiErrorBody = { error: { code: 'invalid_param', message: `unknown underlay ${id}` } };
+          return reply.code(404).send(errBody);
+        }
+        reply.type(bin.mediaType);
+        return reply.send(bin.bytes);
+      } catch (err) {
+        return this.sendInternalError(reply, err);
+      }
     });
   }
 

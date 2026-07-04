@@ -1,6 +1,8 @@
 node_modules
 dist
 .tmp-assets/
+# Standalone AWS Bedrock / Stability image-gen scratch project (unrelated to the plugin)
+bedrock-stability/
 /data
 *.log
 coverage
@@ -13,3 +15,9 @@ coverage
 # Built SPA bundle (rebuilt via `npm run build:spa`); index.html and styles.css stay checked in.
 src/plugin/dashboard/public/app.js
 src/plugin/dashboard/public/app.js.map
+# Local working/scratch package (planning material, own .kiro) — not part of the plugin.
+HeatShield_Unified_Programme_Package/
+# Release artefacts + tokens (belt-and-suspenders; .tmp-assets already covers these).
+*.tar.gz
+TOKEN
+authtoken.txt

@@ -624,8 +624,8 @@ function Step4(props: Step4Props): JSX.Element {
       {props.shutters.length === 0 && (
         <p>
           {t(
-            'Keine Rollladen-Geräte erkannt (Geräte mit shutterLevel-Feature). Gerätesuche in Schritt 2 ausführen.',
-            'No shutter devices detected (devices with a shutterLevel feature). Run device discovery in step 2.',
+            'Keine Rollladen-/Beschattungsgeräte erkannt (Rollläden oder Module wie HmIP-HDM1). Gerätesuche in Schritt 2 ausführen.',
+            'No shutter/shading devices detected (shutters or modules such as HmIP-HDM1). Run device discovery in step 2.',
           )}
         </p>
       )}

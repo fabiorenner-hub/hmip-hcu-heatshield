@@ -151,6 +151,46 @@ function shutterEventEnvelope(
   };
 }
 
+/**
+ * Build an `HMIP_SYSTEM_EVENT` envelope for an HmIP-HDM1 shading
+ * module: a `SHADING_CHANNEL` that reports `primaryShadingLevel`
+ * instead of the classic `shutterLevel`.
+ */
+function shadingEventEnvelope(
+  deviceId: string,
+  primaryShadingLevel: number,
+): ConnectEnvelope {
+  return {
+    id: 'evt-' + deviceId,
+    pluginId: PLUGIN_ID,
+    type: PluginMessageType.HMIP_SYSTEM_EVENT,
+    body: {
+      eventTransaction: {
+        accessPointId: 'AP',
+        events: {
+          '0': {
+            pushEventType: 'DEVICE_CHANGED',
+            device: {
+              id: deviceId,
+              type: 'HDM',
+              functionalChannels: {
+                '1': {
+                  functionalChannelType: 'SHADING_CHANNEL',
+                  index: 1,
+                  groupIndex: 1,
+                  deviceId,
+                  primaryShadingLevel,
+                },
+              },
+            },
+          },
+        },
+        origin: { type: 'DEVICE' },
+      },
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // setShutterLevel.
 // ---------------------------------------------------------------------------
@@ -188,6 +228,67 @@ describe('HmipSystemAdapter — setShutterLevel', () => {
     client.emit('message', responseEnvelope(env.id, 200));
 
     await expect(promise).resolves.toBeUndefined();
+  });
+
+  it('routes an HmIP-HDM1 shading device to setPrimaryShadingLevel', async () => {
+    const { client, cache, adapter } = makeHarness();
+
+    // The device announces itself as a SHADING_CHANNEL (HmIP-HDM1) via
+    // an event → the cache now knows it is driven by
+    // `primaryShadingLevel`, not `shutterLevel`.
+    client.emit('message', shadingEventEnvelope('hdm1-plissee', 0.2));
+    expect(cache.getShutterDriveType('hdm1-plissee')).toBe('shading');
+
+    const promise = adapter.setShutterLevel('hdm1-plissee', 1, 0.8);
+
+    const env = client.sent[0];
+    if (!env) throw new Error('expected envelope');
+    expect(env.body).toEqual({
+      path: '/hmip/device/control/setPrimaryShadingLevel',
+      body: {
+        primaryShadingLevel: 0.8,
+        channelIndex: 1,
+        deviceId: 'hdm1-plissee',
+      },
+    });
+
+    client.emit('message', responseEnvelope(env.id, 200));
+    await expect(promise).resolves.toBeUndefined();
+  });
+
+  it('emits manualOverride when an HmIP-HDM1 reports a divergent primaryShadingLevel', async () => {
+    const T0 = new Date('2026-06-21T10:00:00.000Z');
+    const { client, cache, adapter, nowRef } = makeHarness(T0);
+    const overrides: unknown[] = [];
+    adapter.on('manualOverride', (d) => overrides.push(d));
+
+    // Register the device as shading directly in the cache (no event
+    // dispatch → no never-commanded emit) + command it to 0.0.
+    cache.applySystemState({
+      devices: {
+        'hdm1-plissee': {
+          id: 'hdm1-plissee',
+          type: 'HDM',
+          functionalChannels: {
+            '1': {
+              primaryShadingLevel: 0.0,
+              functionalChannelType: 'SHADING_CHANNEL',
+            },
+          },
+        },
+      },
+    });
+    const cmd = adapter.setShutterLevel('hdm1-plissee', 1, 0.0);
+    const sent = client.sent[0];
+    if (!sent) throw new Error('expected envelope');
+    client.emit('message', responseEnvelope(sent.id, 200));
+    await cmd;
+
+    // T0 + 50 s: primaryShadingLevel 0.6 → outside grace + tolerance
+    // → manual override.
+    nowRef.current = new Date(T0.getTime() + 50_000);
+    client.emit('message', shadingEventEnvelope('hdm1-plissee', 0.6));
+    expect(overrides).toHaveLength(1);
   });
 
   it('rejects when the response carries a non-200 code', async () => {

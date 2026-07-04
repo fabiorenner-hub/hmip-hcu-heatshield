@@ -29,10 +29,10 @@ function num(v: number | null | undefined): string {
   return v === null || v === undefined || !Number.isFinite(v) ? DASH : String(v);
 }
 
-/** Sparkline colours per metric (matches the mock). */
-const PV_COLOR = '#f59e0b'; // gelb
-const INDOOR_COLOR = '#3b82f6'; // blau
-const OUTDOOR_COLOR = '#f97316'; // orange
+/** Sparkline colours per metric (v2 palette). */
+const PV_COLOR = '#ff9d2e'; // amber (accent)
+const INDOOR_COLOR = '#4a8cff'; // blue (info)
+const OUTDOOR_COLOR = '#ffc45b'; // amber-soft
 
 interface TrendSparklines {
   pv: number[];
@@ -462,9 +462,9 @@ export function HeatIndexCard(props: { value0to10: number | null }): JSX.Element
 
 /** Blue→green→yellow→orange→red ramp for a fraction in [0,1]. */
 function heatColor(frac: number): string {
-  const stops = ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#ef4444'];
+  const stops = ['#4a8cff', '#66d66b', '#ffd45a', '#ff9d2e', '#ff5d57'];
   const idx = Math.min(stops.length - 1, Math.floor(frac * (stops.length - 1)));
-  return stops[idx] ?? '#ef4444';
+  return stops[idx] ?? '#ff5d57';
 }
 
 /** The assembled left rail. */

@@ -140,6 +140,36 @@ import {
   writePvOrientation,
 } from './persistence/pvOrientationStore.js';
 import {
+  readBuildingModel,
+  writeBuildingModel,
+  saveBuildingModel,
+  listRevisions,
+  restoreRevision,
+} from './persistence/buildingStore.js';
+import { contentHash } from '../shared/building-model-canonical.js';
+import {
+  readProjectIndex,
+  createProject,
+  renameProject,
+  deleteProject,
+  setActiveProject,
+  getActiveProjectId,
+} from './persistence/projectStore.js';
+import {
+  saveThermalSnapshot,
+  listThermalSnapshots,
+  readThermalSnapshot,
+} from './persistence/thermalStore.js';
+import {
+  listUnderlays,
+  addUnderlay,
+  updateUnderlay,
+  deleteUnderlay,
+  readUnderlayBinary,
+} from './persistence/underlayStore.js';
+import { newBuildingModel, defaultEditorContext } from '../shared/building-editor.js';
+import type { BuildingModel } from '../shared/building-model.js';
+import {
   emptyRuntimeState,
   readState,
   writeState,
@@ -1783,7 +1813,7 @@ class HeatShieldBoot {
       if (now.getTime() - new Date(commandedAt).getTime() < FIVE_MIN_MS) {
         continue;
       }
-      const lvl = this.cache.getFeature(cfg.shutterDeviceId, 'shutterLevel');
+      const lvl = this.cache.getShutterLevel(cfg.shutterDeviceId);
       const cur =
         lvl !== undefined && typeof lvl.value === 'number' ? lvl.value : null;
       if (cur === null) {
@@ -2254,7 +2284,7 @@ class HeatShieldBoot {
         ];
         const dec = this.runtime.lastDecision;
         for (const w of this.config.windows) {
-          const lvl = this.cache.getFeature(w.shutterDeviceId, 'shutterLevel');
+          const lvl = this.cache.getShutterLevel(w.shutterDeviceId);
           const cur = lvl !== undefined && typeof lvl.value === 'number' ? lvl.value : null;
           const target =
             dec?.windowDecisions.find((d) => d.windowId === w.id)?.finalTarget ?? null;
@@ -2718,7 +2748,7 @@ class HeatShieldBoot {
       // Current shutter level straight from the device's cached
       // `shutterLevel` feature (0..1, 1 = closed). null when the
       // device has not reported yet.
-      const lvl = this.cache.getFeature(w.shutterDeviceId, 'shutterLevel');
+      const lvl = this.cache.getShutterLevel(w.shutterDeviceId);
       const currentLevel01 =
         lvl !== undefined && typeof lvl.value === 'number' ? lvl.value : null;
       // Window contact: map the assigned contact device's
@@ -2919,8 +2949,82 @@ class HeatShieldBoot {
       discoverSources: () => this.discoverSources(),
       getHouseImage: () => this.readHouseImage(),
       saveHouseImage: (dataUrl) => this.saveHouseImage(dataUrl),
+      getBuildingModel: () => this.getBuildingModel(),
+      saveBuildingModel: async (draft, expectedRevision) => {
+        const res = await saveBuildingModel(draft, expectedRevision, await this.activeBuildingOpts());
+        if (res.ok && res.changed) {
+          this.events.emit('event', {
+            type: 'building.revision',
+            payload: { revision: res.model.revision, contentHash: contentHash(res.model), source: 'save' },
+          } satisfies DashboardStreamEvent);
+        }
+        return res;
+      },
+      listUnderlays: () => listUnderlays({ dataDir: this.env.dataDir }),
+      addUnderlay: (dataUrl, input) => addUnderlay(dataUrl, input, { dataDir: this.env.dataDir }),
+      updateUnderlay: (id, patch) => updateUnderlay(id, patch, { dataDir: this.env.dataDir }),
+      deleteUnderlay: (id) => deleteUnderlay(id, { dataDir: this.env.dataDir }),
+      getUnderlayBinary: (id) => readUnderlayBinary(id, { dataDir: this.env.dataDir }),
+      listRevisions: async () => listRevisions(await this.activeBuildingOpts()),
+      restoreRevision: async (revision) => {
+        const res = await restoreRevision(revision, await this.activeBuildingOpts());
+        if (res.ok) {
+          this.events.emit('event', {
+            type: 'building.revision',
+            payload: { revision: res.model.revision, contentHash: contentHash(res.model), source: 'restore' },
+          } satisfies DashboardStreamEvent);
+        }
+        return res;
+      },
+      listProjects: () => readProjectIndex({ dataDir: this.env.dataDir }),
+      createProject: (name) => createProject(name, { dataDir: this.env.dataDir }),
+      renameProject: (id, name) => renameProject(id, name, { dataDir: this.env.dataDir }),
+      deleteProject: (id) => deleteProject(id, { dataDir: this.env.dataDir }),
+      activateProject: async (id) => {
+        const index = await setActiveProject(id, { dataDir: this.env.dataDir });
+        // Notify open sessions so they can reload the now-active project.
+        const model = await this.getBuildingModel();
+        this.events.emit('event', {
+          type: 'building.revision',
+          payload: { revision: model.revision, contentHash: contentHash(model), source: 'project' },
+        } satisfies DashboardStreamEvent);
+        return index;
+      },
+      saveThermalSnapshot: async (estimate) => saveThermalSnapshot(estimate, await this.activeBuildingOpts()),
+      listThermalSnapshots: async () => listThermalSnapshots(await this.activeBuildingOpts()),
+      readThermalSnapshot: async (id) => readThermalSnapshot(id, await this.activeBuildingOpts()),
       logger: this.logBuffer.asLogger,
     };
+  }
+
+  /** Store options bound to the currently active building project. */
+  private async activeBuildingOpts(): Promise<{ dataDir: string; projectId: string }> {
+    const projectId = await getActiveProjectId({ dataDir: this.env.dataDir });
+    return { dataDir: this.env.dataDir, projectId };
+  }
+
+  /**
+   * Load the ACTIVE project's canonical building model, seeding a default (one
+   * empty ground storey) from the configured HeatShield site when none exists
+   * yet. The seed is persisted so subsequent reads are stable.
+   */
+  private async getBuildingModel(): Promise<BuildingModel> {
+    const opts = await this.activeBuildingOpts();
+    const existing = await readBuildingModel(opts);
+    if (existing !== null) return existing;
+    const seed = newBuildingModel(defaultEditorContext(), {
+      latitude: this.config.location.latitude,
+      longitude: this.config.location.longitude,
+      timezone: this.config.location.timezone,
+    });
+    try {
+      await writeBuildingModel(seed, opts);
+    } catch (err) {
+      this.logBuffer.append('warn', 'building model seed write failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return seed;
   }
 
   /**
@@ -3003,7 +3107,9 @@ class HeatShieldBoot {
     const temperatureSources = this.cache.findDevicesWithFeature(
       'actualTemperature',
     );
-    const shutterSources = this.cache.findDevicesWithFeature('shutterLevel');
+    // Shutter-like devices = classic `shutterLevel` actuators PLUS
+    // HmIP-HDM1 shading modules that report `primaryShadingLevel`.
+    const shutterSources = this.cache.findShutterLikeDevices();
     const contactSources = this.cache.findDevicesWithFeature('windowState');
     const inventory = this.cache.listInventory();
     // Raw histogram off the last getSystemState body, BEFORE the
@@ -3291,7 +3397,7 @@ class HeatShieldBoot {
       })),
       windows: this.config.windows.map((w) => {
         const rs = this.runtime.state.windows.find((s) => s.windowId === w.id);
-        const lvl = this.cache.getFeature(w.shutterDeviceId, 'shutterLevel');
+        const lvl = this.cache.getShutterLevel(w.shutterDeviceId);
         const currentLevel01 =
           lvl !== undefined && typeof lvl.value === 'number' ? lvl.value : null;
         const label = this.windowLabel(w.id);
@@ -3581,7 +3687,7 @@ class HeatShieldBoot {
         win !== undefined ? facadeKeyFor(win.orientationDeg) : 'S';
       let shutterPercent = 0;
       if (win !== undefined) {
-        const lvl = this.cache.getFeature(win.shutterDeviceId, 'shutterLevel');
+        const lvl = this.cache.getShutterLevel(win.shutterDeviceId);
         if (lvl !== undefined && typeof lvl.value === 'number') {
           shutterPercent = Math.round(level01ToPercent(lvl.value));
         }

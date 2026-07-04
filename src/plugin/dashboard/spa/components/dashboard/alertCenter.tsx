@@ -29,15 +29,15 @@ import { PrecipOutlook } from './precipOutlook.js';
  *  fixed yellow. */
 function levelMeta(level: number): { color: string; label: () => string } {
   if (level >= 4) {
-    return { color: '#7d0a46', label: (): string => t('Extremes Unwetter (Stufe 4)', 'Extreme severe weather (level 4)') };
+    return { color: 'var(--color-violet)', label: (): string => t('Extremes Unwetter (Stufe 4)', 'Extreme severe weather (level 4)') };
   }
   if (level >= 3) {
-    return { color: '#e3382b', label: (): string => t('Unwetterwarnung (Stufe 3)', 'Severe-weather warning (level 3)') };
+    return { color: 'var(--color-danger)', label: (): string => t('Unwetterwarnung (Stufe 3)', 'Severe-weather warning (level 3)') };
   }
   if (level === 2) {
-    return { color: '#f7900a', label: (): string => t('Markantes Wetter (Stufe 2)', 'Marked weather (level 2)') };
+    return { color: 'var(--color-accent)', label: (): string => t('Markantes Wetter (Stufe 2)', 'Marked weather (level 2)') };
   }
-  return { color: '#fcdf00', label: (): string => t('Wetterwarnung (Stufe 1)', 'Weather warning (level 1)') };
+  return { color: 'var(--color-yellow)', label: (): string => t('Wetterwarnung (Stufe 1)', 'Weather warning (level 1)') };
 }
 
 function isThunder(w: WeatherWarning): boolean {

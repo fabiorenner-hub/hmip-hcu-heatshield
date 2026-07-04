@@ -37,38 +37,42 @@ Ziel: Ein neues Plugin fühlt sich an wie aus derselben Produktfamilie – gleic
 
 ## 3. Design-System / Optik (MUSS)
 
-Der visuelle Kern ist ein **dunkles, geschichtetes „Dark-Glass"-Theme** mit Amber-Akzent. Neue Plugins **MÜSSEN** dieselben Tokens verwenden. Kopiervorlage für `:root` (verbindliche Werte):
+Der visuelle Kern ist ein **dunkles, geschichtetes „Dark-Glass"-Theme** mit Amber-Akzent. Neue Plugins **MÜSSEN** dieselben Tokens verwenden. Kopiervorlage für `:root` (verbindliche Werte — **HeatShield-Programme v2-Palette, DEC-003 Option a**):
 
 ```css
 :root {
-  /* Flächen – tiefes, geschichtetes Dunkel */
-  --color-bg: #05070d;
-  --color-bg-elev: #090d16;
-  --color-card: #101725;
-  --color-card-hover: #16202f;
-  --color-card-border: #232c3b;
-  --color-card-border-strong: #36404f;
-  --color-text: #e8edf6;
-  --color-muted: #9aa6b8;
+  /* Flächen – v2 semantische Palette (blueprint §6.1 / design-tokens.json v2.0.0) */
+  --color-bg: #07111d;        /* v2 bg0 */
+  --color-bg-elev: #0b1725;   /* v2 bg1 */
+  --color-card: #102031;      /* v2 surface1 */
+  --color-card-hover: #16283a;/* v2 surface2 */
+  --color-card-border: #233346;
+  --color-card-border-strong: #36465a;
+  --color-text: #f4f7fb;      /* v2 text */
+  --color-muted: #9eb0c0;     /* v2 muted */
   --color-faint: #6b7686;
 
   /* Akzent (Amber) + semantische Status */
-  --color-accent: #f59e0b;
-  --color-accent-strong: #fbbf24;
+  --color-accent: #ff9d2e;        /* v2 amber */
+  --color-accent-strong: #ffb259; /* hellerer v2-Amber-Ton */
   --color-accent-contrast: #1a1205;
-  --color-info: #3b82f6;
-  --color-success: #22c55e;
+  --color-info: #4a8cff;          /* v2 blue */
+  --color-success: #66d66b;       /* v2 green */
   --color-warn: #f0b300;
-  --color-danger: #ef4444;
+  --color-danger: #ff5d57;        /* v2 red */
+  /* Neue v2-Tokens: cyan = Lüftung/Kühlung/Wasser, violet = Simulation/Modell/KI-Kandidat */
+  --color-cyan: #35d6e7;          /* v2 cyan */
+  --color-violet: #9b7cff;        /* v2 violet */
 
   /* Tastatur-Fokus (a11y) */
-  --focus-ring: 0 0 0 3px rgba(245, 158, 11, 0.45);
+  --focus-ring: 0 0 0 3px rgba(255, 157, 46, 0.45);
 
-  /* Abstands-Skala (4px-Basis) */
+  /* Abstands-Skala (4px-Basis). HINWEIS: v2-Spacing-Remap (Schritte 20/40/48)
+     ist layout-relevant und folgt im Gate-2-Shell-Slice mit Visual-Check. */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
 
-  /* Radius + Elevation */
-  --radius-sm: 6px; --radius: 10px; --radius-lg: 14px; --radius-pill: 999px;
+  /* Radius (v2: sm 8 / md 12 / lg 18 / xl 24) + Elevation */
+  --radius-sm: 8px; --radius: 12px; --radius-lg: 18px; --radius-xl: 24px; --radius-pill: 999px;
   --shadow-1: 0 1px 2px rgba(0,0,0,0.3);
   --shadow-2: 0 4px 12px rgba(0,0,0,0.35);
   --shadow-3: 0 10px 30px rgba(0,0,0,0.45);

@@ -158,33 +158,33 @@ export function WeatherCharts(props: {
 
   const tempSeries: ChartSeries[] = useMemo(() => {
     const out: ChartSeries[] = [];
-    out.push(...lineSeries(t('Temperatur', 'Temperature'), '#f59e0b', (r) => r.temp));
-    out.push(...lineSeries(t('Gefühlt', 'Apparent'), '#fb7185', (r) => r.apparent));
+    out.push(...lineSeries(t('Temperatur', 'Temperature'), '#ff9d2e', (r) => r.temp));
+    out.push(...lineSeries(t('Gefühlt', 'Apparent'), '#ff5d57', (r) => r.apparent));
     return out;
   }, [window]);
 
   const windSeries: ChartSeries[] = useMemo(() => {
     const out: ChartSeries[] = [];
-    out.push(...lineSeries(t('Wind', 'Wind'), '#38bdf8', (r) => r.wind));
-    out.push(...lineSeries(t('Böen', 'Gusts'), '#818cf8', (r) => r.gust));
+    out.push(...lineSeries(t('Wind', 'Wind'), '#35d6e7', (r) => r.wind));
+    out.push(...lineSeries(t('Böen', 'Gusts'), '#9b7cff', (r) => r.gust));
     return out;
   }, [window]);
 
-  const precipSeries = useMemo(() => lineSeries(t('Niederschlag', 'Precipitation'), '#0ea5e9', (r) => r.precip), [window]);
-  const probSeries = useMemo(() => lineSeries(t('Wahrscheinlichkeit', 'Probability'), '#6366f1', (r) => r.prob), [window]);
-  const cloudSeries = useMemo(() => lineSeries(t('Bewölkung', 'Cloud cover'), '#94a3b8', (r) => r.cloud), [window]);
+  const precipSeries = useMemo(() => lineSeries(t('Niederschlag', 'Precipitation'), '#4a8cff', (r) => r.precip), [window]);
+  const probSeries = useMemo(() => lineSeries(t('Wahrscheinlichkeit', 'Probability'), '#9b7cff', (r) => r.prob), [window]);
+  const cloudSeries = useMemo(() => lineSeries(t('Bewölkung', 'Cloud cover'), '#9eb0c0', (r) => r.cloud), [window]);
   const pressureSeries = useMemo(() => lineSeries(t('Luftdruck', 'Air pressure'), '#a78bfa', (r) => r.pressure), [window]);
-  const humiditySeries = useMemo(() => lineSeries(t('Luftfeuchte', 'Humidity'), '#22d3ee', (r) => r.humidity), [window]);
-  const uvSeries = useMemo(() => lineSeries(t('UV-Index', 'UV index'), '#f97316', (r) => r.uv), [window]);
-  const radiationSeries = useMemo(() => lineSeries(t('Globalstrahlung', 'Global radiation'), '#facc15', (r) => r.radiation), [window]);
+  const humiditySeries = useMemo(() => lineSeries(t('Luftfeuchte', 'Humidity'), '#35d6e7', (r) => r.humidity), [window]);
+  const uvSeries = useMemo(() => lineSeries(t('UV-Index', 'UV index'), '#ff9d2e', (r) => r.uv), [window]);
+  const radiationSeries = useMemo(() => lineSeries(t('Globalstrahlung', 'Global radiation'), '#ffd45a', (r) => r.radiation), [window]);
 
   const dailyTempSeries: ChartSeries[] = useMemo(() => {
     const days = data?.daily ?? [];
     const max = days.filter((d) => d.tMax !== null).map((d) => ({ t: d.t, v: d.tMax as number }));
     const min = days.filter((d) => d.tMin !== null).map((d) => ({ t: d.t, v: d.tMin as number }));
     const out: ChartSeries[] = [];
-    if (max.length >= 2) out.push({ label: t('Max', 'Max'), color: '#f59e0b', points: max });
-    if (min.length >= 2) out.push({ label: t('Min', 'Min'), color: '#38bdf8', points: min });
+    if (max.length >= 2) out.push({ label: t('Max', 'Max'), color: '#ff9d2e', points: max });
+    if (min.length >= 2) out.push({ label: t('Min', 'Min'), color: '#35d6e7', points: min });
     return out;
   }, [data]);
 

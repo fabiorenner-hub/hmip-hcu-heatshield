@@ -146,12 +146,12 @@ export function DiscoveryStatus({ discovery }: Props): JSX.Element | null {
         <strong>{t('Steuerbare Rollläden:', 'Controllable shutters:')}</strong>{' '}
         {shutterSources.length > 0
           ? t(
-              `${shutterSources.length} gefunden (Geräte mit shutterLevel-Feature).`,
-              `${shutterSources.length} found (devices with a shutterLevel feature).`,
+              `${shutterSources.length} gefunden (Rollläden mit shutterLevel- bzw. Beschattungsmodule wie HmIP-HDM1 mit primaryShadingLevel-Feature).`,
+              `${shutterSources.length} found (shutters with a shutterLevel or shading modules such as HmIP-HDM1 with a primaryShadingLevel feature).`,
             )
           : t(
-              'keine gefunden. Das Plugin sieht in der HMIP-Systemansicht kein Gerät mit shutterLevel-Feature — ohne ein solches kann es keine Rollläden steuern.',
-              'none found. The plugin sees no device with a shutterLevel feature in the HMIP system view — without one it cannot control any shutters.',
+              'keine gefunden. Das Plugin sieht in der HMIP-Systemansicht kein Gerät mit shutterLevel- oder primaryShadingLevel-Feature — ohne ein solches kann es keine Rollläden steuern.',
+              'none found. The plugin sees no device with a shutterLevel or primaryShadingLevel feature in the HMIP system view — without one it cannot control any shutters.',
             )}
       </div>
       {shutterSources.length > 0 && (

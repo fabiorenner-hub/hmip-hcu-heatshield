@@ -59,27 +59,27 @@ afterEach(() => {
 });
 
 describe('App tab nav (Task 11.1)', () => {
-  it('renders the six product modules with Beschattung active on /', () => {
+  it('renders the primary modules with Übersicht active on /', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
     const { container } = render(<App initialUrl="/" />);
     const modules = container.querySelectorAll('[data-testid^="nav-module-"]');
-    expect(modules.length).toBe(7);
-    const beschattung = container.querySelector('[data-testid="nav-module-beschattung"]');
-    expect(beschattung?.className).toContain('app__module--active');
-    const lueftung = container.querySelector('[data-testid="nav-module-lueftung"]');
-    expect(lueftung?.className).not.toContain('app__module--active');
+    // 6 primary; Warnungen only appears when an alert is active.
+    expect(modules.length).toBe(6);
+    const uebersicht = container.querySelector('[data-testid="nav-module-uebersicht"]');
+    expect(uebersicht?.className).toContain('app__module--active');
+    const raeume = container.querySelector('[data-testid="nav-module-raeume"]');
+    expect(raeume?.className).not.toContain('app__module--active');
   });
 
   it('declares every top-level module', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
     const { container } = render(<App initialUrl="/" />);
     const expectedModules = [
-      'nav-module-beschattung',
-      'nav-module-lueftung',
-      'nav-module-klima',
-      'nav-module-bewaesserung',
-      'nav-module-forecast',
-      'nav-module-automation',
+      'nav-module-uebersicht',
+      'nav-module-raeume',
+      'nav-module-vorhersage',
+      'nav-module-garten',
+      'nav-module-automatik',
       'nav-module-einstellungen',
     ];
     for (const id of expectedModules) {
@@ -89,29 +89,30 @@ describe('App tab nav (Task 11.1)', () => {
 });
 
 describe('App module routing (real content, no dead placeholders)', () => {
-  it('keeps the six modules with their icons', () => {
+  it('keeps the primary modules with their icons', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
-    const { container } = render(<App initialUrl="/beschattung" />);
+    const { container } = render(<App initialUrl="/uebersicht" />);
     const modules = container.querySelectorAll('[data-testid^="nav-module-"]');
-    expect(modules.length).toBe(7);
-    expect(container.querySelectorAll('.app__module-icon').length).toBe(7);
+    expect(modules.length).toBe(6);
+    expect(container.querySelectorAll('.app__module-icon').length).toBe(6);
   });
 
-  it('routes /forecast to the Verlauf/History view and highlights Forecast', () => {
+  it('routes /vorhersage to the Verlauf/History view and highlights Vorhersage', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
-    const { container } = render(<App initialUrl="/forecast" />);
+    const { container } = render(<App initialUrl="/vorhersage" />);
     expect(container.querySelector('[data-testid="tab-history"]')).not.toBeNull();
     expect(
-      container.querySelector('[data-testid="nav-module-forecast"]')?.className,
+      container.querySelector('[data-testid="nav-module-vorhersage"]')?.className,
     ).toContain('app__module--active');
   });
 
-  it('routes /automation to the Regeln view and highlights Automation', () => {
+  it('routes /automatik to the Automatik view (Status default) and highlights Automatik', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
-    const { container } = render(<App initialUrl="/automation" />);
-    expect(container.querySelector('[data-testid="tab-rules"]')).not.toBeNull();
+    const { container } = render(<App initialUrl="/automatik" />);
+    expect(container.querySelector('[data-testid="module-automatik"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="automatik-subnav"]')).not.toBeNull();
     expect(
-      container.querySelector('[data-testid="nav-module-automation"]')?.className,
+      container.querySelector('[data-testid="nav-module-automatik"]')?.className,
     ).toContain('app__module--active');
   });
 
@@ -142,18 +143,28 @@ describe('App module routing (real content, no dead placeholders)', () => {
     ).toContain('app__module--active');
   });
 
-  it('renders informative Lüftung and Klima panels rather than empty stubs', () => {
+  it('consolidates rooms, ventilation and climate under Räume', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
-    const { container: l } = render(<App initialUrl="/lueftung" />);
-    expect(l.querySelector('[data-testid="module-lueftung"]')).not.toBeNull();
-    expect(l.querySelector('[data-testid="lueftung-windows"]')).not.toBeNull();
-    expect(l.querySelector('[data-testid="lueftung-delta"]')).not.toBeNull();
-    cleanup();
+    const { container } = render(<App initialUrl="/raeume" />);
+    expect(container.querySelector('[data-testid="module-raeume"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="raeume-ventilation"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="raeume-climate"]')).not.toBeNull();
+    // Former Lüftung/Klima content is preserved inside Räume.
+    expect(container.querySelector('[data-testid="lueftung-windows"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="klima-mode"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="nav-module-raeume"]')?.className,
+    ).toContain('app__module--active');
+  });
+
+  it('keeps legacy routes redirect-compatible (Übersicht active for /beschattung)', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
-    const { container: k } = render(<App initialUrl="/klima" />);
-    expect(k.querySelector('[data-testid="module-klima"]')).not.toBeNull();
-    expect(k.querySelector('[data-testid="klima-mode"]')).not.toBeNull();
-    expect(k.querySelector('[data-testid="klima-indoor"]')).not.toBeNull();
+    const { container } = render(<App initialUrl="/beschattung" />);
+    // MODULE_ROUTE_MAP keeps Übersicht highlighted for the legacy path while the
+    // <Redirect> navigates to /uebersicht.
+    expect(
+      container.querySelector('[data-testid="nav-module-uebersicht"]')?.className,
+    ).toContain('app__module--active');
   });
 });
 

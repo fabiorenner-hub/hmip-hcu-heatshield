@@ -318,6 +318,66 @@ export class HcuSourceCache {
   }
 
   /**
+   * Latest cached shutter-position value for `deviceId`, abstracting
+   * over the two native HMIP shading actuator families:
+   *
+   *   - `BRAND_SHUTTER` / `BRAND_BLIND` roller/venetian actuators
+   *     expose a `shutterLevel` feature (Connect API §6.7.29).
+   *   - `HmIP-HDM1` (Hunter Douglas / erfal pleated- and roller-blind
+   *     module) reports its position via `primaryShadingLevel`
+   *     instead — the SHADING_CHANNEL never carries `shutterLevel`.
+   *
+   * Both use the same 0..1 convention (1 = fully closed), so callers
+   * can treat the returned value identically. Prefers `shutterLevel`
+   * when both are present (defensive — a device should never carry
+   * both, but if it does the classic feature wins).
+   */
+  public getShutterLevel(deviceId: string): HmipFeatureValue | undefined {
+    const values = this.valuesByDevice.get(deviceId);
+    if (values === undefined) return undefined;
+    return values.get('shutterLevel') ?? values.get('primaryShadingLevel');
+  }
+
+  /**
+   * Whether `deviceId` is controlled through the shading command path
+   * (`setPrimaryShadingLevel`, e.g. HmIP-HDM1) rather than the classic
+   * `setShutterLevel` path. A device counts as `'shading'` only when
+   * it exposes `primaryShadingLevel` and does NOT expose the classic
+   * `shutterLevel` feature; everything else (including unknown
+   * devices) defaults to `'shutter'` so behaviour is unchanged for
+   * existing installations.
+   */
+  public getShutterDriveType(deviceId: string): 'shutter' | 'shading' {
+    const values = this.valuesByDevice.get(deviceId);
+    if (values === undefined) return 'shutter';
+    if (values.has('shutterLevel')) return 'shutter';
+    if (values.has('primaryShadingLevel')) return 'shading';
+    return 'shutter';
+  }
+
+  /**
+   * Every device that can be driven as a shutter — the union of
+   * devices carrying `shutterLevel` (classic roller/venetian
+   * actuators, Velux) and devices carrying `primaryShadingLevel`
+   * (HmIP-HDM1 shading modules). De-duplicated by `deviceId` and
+   * sorted (inherited from {@link findDevicesWithFeature}). This is
+   * the feature-based classifier the wizard/rooms UI and discovery
+   * should use instead of a `deviceType` filter.
+   */
+  public findShutterLikeDevices(): readonly HmipDeviceMeta[] {
+    const byId = new Map<string, HmipDeviceMeta>();
+    for (const d of this.findDevicesWithFeature('shutterLevel')) {
+      byId.set(d.deviceId, d);
+    }
+    for (const d of this.findDevicesWithFeature('primaryShadingLevel')) {
+      if (!byId.has(d.deviceId)) byId.set(d.deviceId, d);
+    }
+    return Array.from(byId.values()).sort((a, b) =>
+      a.deviceId.localeCompare(b.deviceId),
+    );
+  }
+
+  /**
    * Full device inventory for the discovery diagnostic: every cached
    * device plus the list of feature names it exposes. This is the
    * ground-truth view the wizard/diagnostics surface so a user can

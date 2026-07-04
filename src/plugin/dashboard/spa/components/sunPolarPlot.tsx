@@ -99,24 +99,24 @@ export function SunPolarPlot(props: SunPolarPlotProps): JSX.Element {
         cx={CENTER}
         cy={CENTER}
         r={RADIUS}
-        fill="#0d1b2a"
-        stroke="#9aa6b2"
+        fill="var(--color-bg-elev)"
+        stroke="var(--color-muted)"
         stroke-width={1}
       />
-      <circle cx={CENTER} cy={CENTER} r={RADIUS * (2 / 3)} fill="none" stroke="#3a4a5c" stroke-width={0.5} />
-      <circle cx={CENTER} cy={CENTER} r={RADIUS * (1 / 3)} fill="none" stroke="#3a4a5c" stroke-width={0.5} />
+      <circle cx={CENTER} cy={CENTER} r={RADIUS * (2 / 3)} fill="none" stroke="var(--color-card-border)" stroke-width={0.5} />
+      <circle cx={CENTER} cy={CENTER} r={RADIUS * (1 / 3)} fill="none" stroke="var(--color-card-border)" stroke-width={0.5} />
 
       {/* Cardinal labels. */}
-      <text x={CENTER} y={16} text-anchor="middle" fill="#cbd5e1" font-size="10">{t('N', 'N')}</text>
-      <text x={SIZE - 6} y={CENTER + 4} text-anchor="end" fill="#cbd5e1" font-size="10">{t('O', 'E')}</text>
-      <text x={CENTER} y={SIZE - 4} text-anchor="middle" fill="#cbd5e1" font-size="10">{t('S', 'S')}</text>
-      <text x={6} y={CENTER + 4} text-anchor="start" fill="#cbd5e1" font-size="10">{t('W', 'W')}</text>
+      <text x={CENTER} y={16} text-anchor="middle" fill="var(--color-muted)" font-size="10">{t('N', 'N')}</text>
+      <text x={SIZE - 6} y={CENTER + 4} text-anchor="end" fill="var(--color-muted)" font-size="10">{t('O', 'E')}</text>
+      <text x={CENTER} y={SIZE - 4} text-anchor="middle" fill="var(--color-muted)" font-size="10">{t('S', 'S')}</text>
+      <text x={6} y={CENTER + 4} text-anchor="start" fill="var(--color-muted)" font-size="10">{t('W', 'W')}</text>
 
       {/* Shadow wedge (cast opposite the sun; longer when the sun is low). */}
       {shadow !== null && (
         <polygon
           points={shadow}
-          fill="#0b1220"
+          fill="var(--color-bg)"
           opacity={0.45}
           data-testid="sun-shadow"
         />
@@ -127,7 +127,7 @@ export function SunPolarPlot(props: SunPolarPlotProps): JSX.Element {
         <path
           d={nightPath}
           fill="none"
-          stroke="#5b6a7d"
+          stroke="var(--color-muted)"
           stroke-width={1}
           stroke-dasharray="4 3"
           data-testid="sun-trajectory-night"
@@ -139,7 +139,7 @@ export function SunPolarPlot(props: SunPolarPlotProps): JSX.Element {
         <path
           d={dayPath}
           fill="none"
-          stroke="#fbc02d"
+          stroke="var(--color-accent)"
           stroke-width={1.5}
           data-testid="sun-trajectory-day"
         />
@@ -159,7 +159,7 @@ export function SunPolarPlot(props: SunPolarPlotProps): JSX.Element {
             cy={xy.y}
             r={4}
             fill={m.color}
-            stroke="#0d1b2a"
+            stroke="var(--color-bg-elev)"
             stroke-width={1}
             data-testid={`sun-marker-${m.windowId}`}
           >
@@ -173,11 +173,12 @@ export function SunPolarPlot(props: SunPolarPlotProps): JSX.Element {
         <g
           transform={`translate(${sunNowXY.x.toFixed(2)} ${sunNowXY.y.toFixed(2)})`}
           data-testid="sun-dot"
+          style={{ filter: 'drop-shadow(0 0 4px var(--color-accent))' }}
         >
-          <circle r={5.5} fill="#fde68a" stroke="#fff7e0" stroke-width={1} />
+          <circle r={5.5} fill="var(--color-accent-soft)" stroke="var(--color-accent-strong)" stroke-width={1} />
           <path
             d="M0 -10V-7M0 7V10M10 0H7M-10 0H-7M7.1 -7.1 5 -5M-7.1 7.1 -5 5M7.1 7.1 5 5M-7.1 -7.1 -5 -5"
-            stroke="#fbbf24"
+            stroke="var(--color-accent)"
             stroke-width={1.3}
             stroke-linecap="round"
           />
