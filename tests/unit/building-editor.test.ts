@@ -8,10 +8,18 @@ import fc from 'fast-check';
 
 import {
   addStorey,
+  duplicateStorey,
   addWall,
   addSpace,
   addOpening,
+  updateOpening,
+  updateSpace,
+  deleteWallVertex,
+  moveSpaceVertex,
+  deleteSpaceVertex,
+  nearestVertex,
   addRoof,
+  addRoofWindow,
   updateRoof,
   removeRoof,
   roofSectionProfile,
@@ -43,7 +51,7 @@ import {
   type EditorContext,
   type EditorState,
 } from '../../src/shared/building-editor.js';
-import { parseBuildingModel } from '../../src/shared/building-model.js';
+import { parseBuildingModel, validateBuildingModel } from '../../src/shared/building-model.js';
 
 // Deterministic id generator producing valid uuids.
 function testContext(): EditorContext {
@@ -91,6 +99,16 @@ describe('geometry helpers', () => {
     expect(headingDeg({ x: 0, y: 0 }, { x: 1, y: 0 })).toBeCloseTo(0, 6);
     expect(headingDeg({ x: 0, y: 0 }, { x: 0, y: 1 })).toBeCloseTo(90, 6);
   });
+
+  it('nearestVertex snaps to the closest candidate within tolerance', () => {
+    const verts = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 3 }];
+    // Within tolerance → snaps to (5,3).
+    expect(nearestVertex(verts, { x: 4.9, y: 3.1 }, 0.3)).toEqual({ x: 5, y: 3 });
+    // Outside tolerance → null (no snap).
+    expect(nearestVertex(verts, { x: 2.5, y: 1.5 }, 0.3)).toBeNull();
+    // Empty candidate set → null.
+    expect(nearestVertex([], { x: 0, y: 0 }, 1)).toBeNull();
+  });
 });
 
 describe('command reducer', () => {
@@ -123,6 +141,138 @@ describe('command reducer', () => {
     const s3 = deleteWall(s2, wallId);
     expect(s3.model.storeys[0]?.walls).toHaveLength(0);
     expect(s3.model.storeys[0]?.openings).toHaveLength(0);
+  });
+
+  it('updateOpening edits width/height/offset/sill (clamped) and is a no-op for unknown ids', () => {
+    const { ctx, state } = freshState();
+    const s1 = addWall(ctx, state, { axis: [{ x: 0, y: 0 }, { x: 4, y: 0 }] });
+    const wallId = s1.model.storeys[0]!.walls[0]!.id;
+    const s2 = addOpening(ctx, s1, { type: 'window', hostWallId: wallId, offsetM: 1, widthM: 1, heightM: 1.2 });
+    const openingId = s2.model.storeys[0]!.openings[0]!.id;
+    const s3 = updateOpening(s2, openingId, { widthM: 1.4, heightM: 1.6, offsetM: 0.5, sillM: 0.8 });
+    const o = s3.model.storeys[0]!.openings[0]!;
+    expect([o.widthM, o.heightM, o.offsetM, o.sillM]).toEqual([1.4, 1.6, 0.5, 0.8]);
+    // Clamp: width/height floor at 0.1, offset/sill floor at 0.
+    const s4 = updateOpening(s3, openingId, { widthM: -5, heightM: 0, offsetM: -1, sillM: -2 });
+    const o2 = s4.model.storeys[0]!.openings[0]!;
+    expect([o2.widthM, o2.heightM, o2.offsetM, o2.sillM]).toEqual([0.1, 0.1, 0, 0]);
+    // Unknown id → unchanged model reference for openings.
+    expect(updateOpening(s4, 'nope', { widthM: 2 }).model.storeys[0]?.openings[0]?.widthM).toBe(0.1);
+  });
+
+  it('windows default to double glazing; glazing + roofWindow are editable', () => {
+    const { ctx, state } = freshState();
+    const s1 = addWall(ctx, state, { axis: [{ x: 0, y: 0 }, { x: 4, y: 0 }] });
+    const wallId = s1.model.storeys[0]!.walls[0]!.id;
+    const s2 = addOpening(ctx, s1, { type: 'window', hostWallId: wallId, offsetM: 1, widthM: 1, heightM: 1.2 });
+    const win = s2.model.storeys[0]!.openings[0]!;
+    expect(win.glazing).toBe('double');
+    expect(win.roofWindow).toBeUndefined();
+    const s3 = updateOpening(s2, win.id, { glazing: 'triple', roofWindow: true });
+    const win2 = s3.model.storeys[0]!.openings[0]!;
+    expect(win2.glazing).toBe('triple');
+    expect(win2.roofWindow).toBe(true);
+    // Doors carry no glazing.
+    const s4 = addOpening(ctx, s3, { type: 'door', hostWallId: wallId, offsetM: 2, widthM: 1, heightM: 2 });
+    expect(s4.model.storeys[0]!.openings.find((o) => o.type === 'door')!.glazing).toBeUndefined();
+  });
+
+  it('passage (Durchgang) is a door-height opening without glazing, sill on the floor', () => {
+    const { ctx, state } = freshState();
+    const s1 = addWall(ctx, state, { axis: [{ x: 0, y: 0 }, { x: 4, y: 0 }] });
+    const wallId = s1.model.storeys[0]!.walls[0]!.id;
+    const s2 = addOpening(ctx, s1, { type: 'passage', hostWallId: wallId, offsetM: 1, widthM: 1, heightM: 2 });
+    const p = s2.model.storeys[0]!.openings[0]!;
+    expect(p.type).toBe('passage');
+    expect(p.glazing).toBeUndefined();
+    expect(p.sillM).toBe(0);
+  });
+
+  it('deleteWallVertex removes a point, and collapses to deleteWall below 2', () => {
+    const { ctx, state } = freshState();
+    const s1 = addWall(ctx, state, { axis: [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 2 }] });
+    const id = s1.model.storeys[0]!.walls[0]!.id;
+    const s2 = deleteWallVertex(s1, id, 1);
+    expect(s2.model.storeys[0]!.walls[0]!.axis).toHaveLength(2);
+    // Removing another vertex would drop below 2 → the whole wall is deleted.
+    const s3 = deleteWallVertex(s2, id, 0);
+    expect(s3.model.storeys[0]!.walls).toHaveLength(0);
+  });
+
+  it('moveSpaceVertex + deleteSpaceVertex reshape/shrink a room polygon', () => {
+    const { ctx, state } = freshState();
+    const s1 = addSpace(ctx, state, { name: 'A', polygon: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }, { x: 0, y: 3 }] });
+    const id = s1.model.storeys[0]!.spaces[0]!.id;
+    const s2 = moveSpaceVertex(s1, id, 2, { x: 5, y: 4 });
+    expect(s2.model.storeys[0]!.spaces[0]!.polygon[2]).toEqual({ x: 5, y: 4 });
+    const s3 = deleteSpaceVertex(s2, id, 2);
+    expect(s3.model.storeys[0]!.spaces[0]!.polygon).toHaveLength(3);
+    // Below 3 points → the room is deleted.
+    const s4 = deleteSpaceVertex(s3, id, 0);
+    expect(s4.model.storeys[0]!.spaces).toHaveLength(0);
+  });
+
+  it('duplicateStorey copies walls/openings/spaces upward with fresh, remapped ids', () => {
+    const { ctx, state } = freshState();
+    const s1 = addWall(ctx, state, { axis: [{ x: 0, y: 0 }, { x: 4, y: 0 }] });
+    const wallId = s1.model.storeys[0]!.walls[0]!.id;
+    const s2 = addOpening(ctx, s1, { type: 'window', hostWallId: wallId, offsetM: 1, widthM: 1, heightM: 1.2 });
+    const s3 = addSpace(ctx, s2, { name: 'Wohnen', polygon: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }] });
+    const src = s3.model.storeys[0]!;
+    const dup = duplicateStorey(ctx, s3, src.id);
+    expect(dup.model.storeys).toHaveLength(2);
+    const copy = dup.model.storeys.find((s) => s.id !== src.id)!;
+    // Stacked directly above.
+    expect(copy.elevationM).toBeCloseTo(src.elevationM + src.heightM, 6);
+    // Same geometry, new ids.
+    expect(copy.walls).toHaveLength(1);
+    expect(copy.walls[0]!.id).not.toBe(wallId);
+    expect(copy.walls[0]!.axis).toEqual(src.walls[0]!.axis);
+    // Opening re-homed onto the COPIED wall (referential integrity).
+    expect(copy.openings).toHaveLength(1);
+    expect(copy.openings[0]!.hostWallId).toBe(copy.walls[0]!.id);
+    expect(copy.spaces).toHaveLength(1);
+    expect(copy.spaces[0]!.id).not.toBe(src.spaces[0]!.id);
+    // The copy becomes active and the model stays referentially valid.
+    expect(dup.activeStoreyId).toBe(copy.id);
+    expect(parseBuildingModel(dup.model)).toBeTruthy();
+    // Duplicating downward stacks the copy below (toward the basement).
+    const down = duplicateStorey(ctx, s3, src.id, 'down');
+    const below = down.model.storeys.find((s) => s.id !== src.id)!;
+    expect(below.elevationM).toBeCloseTo(src.elevationM - src.heightM, 6);
+  });
+
+  it('links a space to a config room and clears it with null (schema-valid)', () => {
+    const { ctx, state } = freshState();
+    const s1 = addSpace(ctx, state, { name: 'Wohnen', polygon: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }] });
+    const id = s1.model.storeys[0]!.spaces[0]!.id;
+    const s2 = updateSpace(s1, id, { linkedRoomId: 'room-wohnzimmer' });
+    expect(s2.model.storeys[0]!.spaces[0]!.linkedRoomId).toBe('room-wohnzimmer');
+    expect(() => parseBuildingModel(s2.model)).not.toThrow();
+    const s3 = updateSpace(s2, id, { linkedRoomId: null });
+    expect(s3.model.storeys[0]!.spaces[0]!.linkedRoomId).toBeUndefined();
+    expect(() => parseBuildingModel(s3.model)).not.toThrow();
+  });
+
+  it('links an opening to a config window and clears it with null (schema-valid)', () => {
+    const { ctx, state } = freshState();
+    const s1 = addWall(ctx, state, { axis: [{ x: 0, y: 0 }, { x: 4, y: 0 }] });
+    const wallId = s1.model.storeys[0]!.walls[0]!.id;
+    const s2 = addOpening(ctx, s1, { type: 'window', hostWallId: wallId, offsetM: 1, widthM: 1, heightM: 1.2 });
+    const openingId = s2.model.storeys[0]!.openings[0]!.id;
+    const s3 = updateOpening(s2, openingId, { linkedWindowId: 'win-so-schlafzimmer' });
+    expect(s3.model.storeys[0]!.openings[0]!.linkedWindowId).toBe('win-so-schlafzimmer');
+    expect(() => parseBuildingModel(s3.model)).not.toThrow();
+    const s4 = updateOpening(s3, openingId, { linkedWindowId: null });
+    expect(s4.model.storeys[0]!.openings[0]!.linkedWindowId).toBeUndefined();
+  });
+
+  it('updateSpace renames a room', () => {
+    const { ctx, state } = freshState();
+    const s1 = addSpace(ctx, state, { name: 'Alt', polygon: [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 2 }] });
+    const id = s1.model.storeys[0]!.spaces[0]!.id;
+    const s2 = updateSpace(s1, id, { name: 'Wohnzimmer' });
+    expect(s2.model.storeys[0]!.spaces[0]!.name).toBe('Wohnzimmer');
   });
 
   it('addOpening on a non-existent wall is a no-op', () => {
@@ -386,6 +536,49 @@ describe('roof commands (BME-13/14)', () => {
     // A bare pitch patch keeps the (now-absent) ridge absent.
     const s3 = updateRoof(s2, id, { pitchDeg: 25 });
     expect(s3.model.roofs[0]?.ridgeAzimuthDeg).toBeUndefined();
+  });
+
+  it('addRoof/updateRoof carry the knee wall (Kniestock); null clears it, section reflects it', () => {
+    const { ctx, state, storeyId } = storeyWithFootprint();
+    const s1 = addRoof(ctx, state, { storeyId, type: 'gable', pitchDeg: 30, kneeHeightM: 0.9 });
+    const id = s1.model.roofs[0]!.id;
+    expect(s1.model.roofs[0]?.kneeHeightM).toBe(0.9);
+    expect(() => parseBuildingModel(s1.model)).not.toThrow();
+    // Section eaves rise by the knee above the storey wall top.
+    const sec = roofSectionProfile(s1, id);
+    expect(sec!.kneeHeightM).toBe(0.9);
+    expect(sec!.profile[0]!.y).toBeCloseTo(sec!.wallHeightM + 0.9, 6);
+    // Explicit null clears it back to a flush eaves.
+    const s2 = updateRoof(s1, id, { kneeHeightM: null });
+    expect(s2.model.roofs[0]?.kneeHeightM).toBeUndefined();
+  });
+
+  it('addRoofWindow hosts the window on the ROOF (hostRoofId, no wall) and validates', () => {
+    const { ctx, state, storeyId } = storeyWithFootprint();
+    const s1 = addRoof(ctx, state, { storeyId, type: 'gable', pitchDeg: 35 });
+    const roofId = s1.model.roofs[0]!.id;
+    const s2 = addRoofWindow(ctx, s1, { roofId });
+    const win = s2.model.storeys[0]!.openings.find((o) => o.roofWindow === true)!;
+    expect(win.hostRoofId).toBe(roofId);
+    expect(win.hostWallId).toBeUndefined();
+    expect(() => parseBuildingModel(s2.model)).not.toThrow();
+    expect(validateBuildingModel(s2.model).valid).toBe(true);
+  });
+
+  it('addRoofWindow is a no-op without a roof on the active storey', () => {
+    const { ctx, state } = storeyWithFootprint();
+    expect(addRoofWindow(ctx, state, { roofId: 'nope' })).toBe(state);
+  });
+
+  it('a roof window pointing at a missing roof flags OPENING_HOST_ROOF_MISSING', () => {
+    const { ctx, state, storeyId } = storeyWithFootprint();
+    const s1 = addRoof(ctx, state, { storeyId, type: 'gable', pitchDeg: 35 });
+    const roofId = s1.model.roofs[0]!.id;
+    const s2 = addRoofWindow(ctx, s1, { roofId });
+    // Remove the roof but keep the roof window → dangling host.
+    const orphaned = { ...s2.model, roofs: [] };
+    const issues = validateBuildingModel(orphaned).issues;
+    expect(issues.some((i) => i.code === 'OPENING_HOST_ROOF_MISSING')).toBe(true);
   });
 
   it('removeRoof drops the roof (and any PV arrays hosted by its faces)', () => {

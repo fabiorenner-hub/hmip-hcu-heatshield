@@ -23,6 +23,7 @@ import {
 } from './imageUtils.js';
 import {
   clampUnderlayDisplay,
+  normalizeCropPolygon,
   UNDERLAY_KINDS,
   type UnderlayKind,
   type UnderlayMeta,
@@ -93,6 +94,7 @@ function coerceMeta(x: unknown): UnderlayMeta | null {
     visible: o['visible'] !== false,
     locked: o['locked'] === true,
     northAssumed: o['northAssumed'] !== false,
+    crop: normalizeCropPolygon(o['crop']),
     createdAt: typeof o['createdAt'] === 'string' ? o['createdAt'] : new Date(0).toISOString(),
   };
 }
@@ -155,6 +157,7 @@ export async function addUnderlay(
     visible: true,
     locked: false,
     northAssumed: true,
+    crop: [],
     createdAt: new Date().toISOString(),
   };
 
@@ -177,6 +180,7 @@ const PATCHABLE: ReadonlyArray<keyof UnderlayMeta> = [
   'visible',
   'locked',
   'northAssumed',
+  'crop',
 ];
 
 export async function updateUnderlay(

@@ -80,7 +80,12 @@ export const WallBoundarySchema = z.enum([
   'adiabatic',
 ]);
 
-export const OpeningTypeSchema = z.enum(['door', 'window']);
+// 'passage' = a doorway-style opening in the wall WITHOUT a door leaf
+// (Durchgang): full-height hole, no glazing, treated geometrically like a door.
+export const OpeningTypeSchema = z.enum(['door', 'window', 'passage']);
+
+/** Glazing build-up for a window (single / double / triple pane). */
+export const GlazingTypeSchema = z.enum(['single', 'double', 'triple']);
 
 export const RoofTypeSchema = z.enum(['flat', 'gable', 'hip', 'half_hip', 'shed']);
 
@@ -110,11 +115,25 @@ export const OpeningSchema = z
   .object({
     id: uuid(),
     type: OpeningTypeSchema,
-    hostWallId: uuid(),
+    // Host reference: a façade opening sits on a wall (`hostWallId`); a roof
+    // window (Dachfenster) sits in a roof plane (`hostRoofId`). Exactly one is
+    // set. `hostWallId` is OPTIONAL (not required) so roof windows need no
+    // synthetic wall; validation enforces that one valid host is present.
+    hostWallId: uuid().optional(),
+    hostRoofId: uuid().optional(),
     offsetM: z.number().min(0),
     widthM: z.number().positive(),
     heightM: z.number().positive(),
     sillM: z.number().min(0).default(0),
+    // Glazing build-up (windows only). Optional so existing models stay valid.
+    glazing: GlazingTypeSchema.optional(),
+    // A roof window (Dachfenster) sits in the roof plane rather than a façade.
+    // Windows only; optional/absent = a normal façade window.
+    roofWindow: z.boolean().optional(),
+    // Link to a HeatShield configuration window (`config.windows[].id`), so the
+    // drawn opening maps onto the real shutter-controlled window. Optional; not
+    // a uuid (config ids are arbitrary). Best-effort link, not core-validated.
+    linkedWindowId: z.string().min(1).optional(),
   })
   .strict();
 
@@ -125,6 +144,11 @@ export const SpaceSchema = z
     polygon: z.array(PointSchema).min(3),
     useProfileId: z.string().min(1).nullable().default(null),
     thermalZoneId: uuid().nullable().default(null),
+    // Link to a HeatShield configuration room (`config.rooms[].id`), so the
+    // drawn geometry maps onto the real automated room. Optional; not a uuid
+    // (config ids are arbitrary strings). Referential check is best-effort at
+    // the edge (config is separate), so it is NOT validated in the core.
+    linkedRoomId: z.string().min(1).optional(),
   })
   .strict();
 
@@ -148,6 +172,10 @@ export const RoofSchema = z
     pitchDeg: z.number().min(0).max(80),
     ridgeAzimuthDeg: z.number().min(0).lt(360).optional(),
     overhangM: z.number().min(0).optional(),
+    // Knee-wall / Kniestock height (m): the roof mounts on a low vertical wall
+    // above the storey top before it starts to slope, turning the roof space
+    // into a usable half-storey. Optional; absent/0 = roof starts at wall top.
+    kneeHeightM: z.number().min(0).optional(),
   })
   .strict();
 
@@ -215,6 +243,7 @@ export const BuildingModelSchema = z
 export type Point = z.infer<typeof PointSchema>;
 export type WallBoundary = z.infer<typeof WallBoundarySchema>;
 export type OpeningType = z.infer<typeof OpeningTypeSchema>;
+export type GlazingType = z.infer<typeof GlazingTypeSchema>;
 export type RoofType = z.infer<typeof RoofTypeSchema>;
 export type Wall = z.infer<typeof WallSchema>;
 export type Opening = z.infer<typeof OpeningSchema>;

@@ -157,7 +157,7 @@ export function RoomGrid(props: { rooms: RoomDetail[]; onSelect: (id: string) =>
   return (
     <div class="lg2-rooms" data-testid="lg2-rooms">
       {props.rooms.map((r) => {
-        const tone = r.indoorTempState === 'unbound' ? 'unknown' : tempTone(r.indoorTempC);
+        const tone = tempTone(r.indoorTempC);
         const trend: 'up' | 'down' | 'flat' =
           r.trend === 'up' || r.trend === 'down' ? r.trend : 'flat';
         return (

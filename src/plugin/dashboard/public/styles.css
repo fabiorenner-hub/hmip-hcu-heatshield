@@ -2746,6 +2746,16 @@ input::placeholder {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 9999px rgba(239, 68, 68, 0.16);
   border-left-color: var(--color-danger);
 }
+/* Indoor-temperature tone on the LEFT EDGE of each room card (legend colours:
+   green < 24 °C, blue 24–26 °C, red > 26 °C). Placed after the status/heat
+   rules so the temperature tone is the default left-edge colour. */
+.room-badge--tone-ok { border-left-color: var(--color-success); }
+.room-badge--tone-mid { border-left-color: var(--color-info); }
+.room-badge--tone-hot { border-left-color: var(--color-danger); }
+.room-badge--tone-unknown { border-left-color: var(--color-card-border); }
+/* In the overview chips make the temperature tone a clearly visible coloured
+   band on the left edge (the floor-plan badges stay a thin 3px accent). */
+.room-badge--static { border-left-width: 7px; }
 .room-badge__glyph {
   flex: 0 0 auto;
   display: block;
@@ -2814,7 +2824,8 @@ input::placeholder {
   font-size: 9px;
 }
 .room-badge__window {
-  color: var(--color-cyan);
+  /* Match the room-name text colour (was cyan) — window icon inherits the name tone. */
+  color: var(--color-text);
   flex: 0 0 auto;
 }
 .room-badge__fresh {
@@ -7734,26 +7745,29 @@ textarea {
 
 /* ===== Building Model Studio (building-model-editor Phase 1) ============== */
 .building-studio .module-panel__badge { font-variant-numeric: tabular-nums; }
+/* Compact top chrome so the canvas gets the space. */
+.building-studio .module-panel__head { margin-bottom: var(--sp-2); }
+.building-studio .module-panel__head h1 { font-size: 1.1rem; }
 
 .bs-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  margin-bottom: var(--sp-3);
+  gap: var(--sp-1) var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  margin-bottom: var(--sp-2);
   background: var(--color-card);
   border: 1px solid var(--color-card-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-1);
 }
-.bs-toolbar__group { display: flex; gap: var(--sp-2); align-items: center; }
+.bs-toolbar__group { display: flex; gap: var(--sp-1); align-items: center; }
 .bs-toolbar__group--end { margin-left: auto; }
-.bs-toolbar__field { display: flex; flex-direction: column; font-size: 11px; color: var(--color-muted); gap: 2px; }
-.bs-toolbar__field select { min-height: 30px; }
+.bs-toolbar__field { display: flex; flex-direction: column; font-size: 10px; color: var(--color-muted); gap: 1px; }
+.bs-toolbar__field select { min-height: 28px; }
 .bs-toolbar button {
-  min-height: 32px;
-  padding: var(--sp-1) var(--sp-3);
+  min-height: 28px;
+  padding: 2px var(--sp-2);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-card-border-strong);
   background: var(--color-bg-elev);
@@ -7764,14 +7778,57 @@ textarea {
 .bs-toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
 .bs-danger { color: var(--color-danger); border-color: var(--color-danger) !important; }
 
+/* Project controls moved into the header (saves a whole row). */
+.bs-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); }
+.bs-head__projects { display: inline-flex; align-items: center; gap: var(--sp-1); margin-left: auto; }
+.bs-head__projects select, .bs-projects__rename {
+  min-height: 28px; max-width: 220px; padding: 2px var(--sp-2);
+  border-radius: var(--radius-sm); border: 1px solid var(--color-card-border-strong);
+  background: var(--color-bg-elev); color: var(--color-text); font: inherit; font-size: 13px;
+}
+.bs-projects__rename { border-color: var(--color-accent); }
+.bs-head__projects button {
+  min-height: 28px; min-width: 30px; padding: 0 var(--sp-2); border-radius: var(--radius-sm);
+  border: 1px solid var(--color-card-border-strong); background: var(--color-bg-elev);
+  color: var(--color-text); cursor: pointer;
+}
+.bs-head__projects .bs-danger { min-width: 30px; }
+.bs-head__projects button:disabled { opacity: 0.5; cursor: default; }
+
+/* "Mehr" dropdown (secondary/export/panel actions). */
+.bs-more { position: relative; }
+.bs-more__menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 40;
+  display: flex; flex-direction: column; gap: 2px; min-width: 210px;
+  padding: var(--sp-1); border-radius: var(--radius);
+  border: 1px solid var(--color-card-border-strong); background: var(--color-card);
+  box-shadow: var(--shadow-3);
+}
+.bs-more__menu button { width: 100%; text-align: left; min-height: 32px; }
+.bs-more__menu button[aria-pressed='true'] { border-color: var(--color-accent); }
+.bs-more__sep { height: 1px; background: var(--color-card-border); margin: 2px 0; }
+
 .bs-layout {
   display: grid;
-  grid-template-columns: 220px 1fr 320px;
+  grid-template-columns: 220px 1fr 340px;
   gap: var(--sp-3);
-  align-items: start;
+  align-items: stretch;
+}
+/* Desktop: fit the whole editor in the viewport — columns scroll internally,
+   never the page (the canvas fills the middle column). */
+@media (min-width: 1101px) {
+  /* Fill the viewport: the studio is a flex column pinned to the screen height;
+     the 3-column layout flex-grows so the canvas reaches the bottom, whatever
+     the toolbar height. Tree/inspector scroll internally, the page never does. */
+  .building-studio { display: flex; flex-direction: column; height: calc(100vh - 20px); min-height: 560px; }
+  .building-studio > .bs-layout { flex: 1 1 auto; height: auto; min-height: 0; }
+  .bs-tree, .bs-inspector { overflow: auto; }
+  .bs-canvas-wrap { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+  .bs-canvas-wrap .bs-canvas { flex: 1 1 auto; height: auto; min-height: 0; }
+  .bs-canvas-wrap .bs-canvas--3d { flex: 1 1 auto; min-height: 0; }
 }
 @media (max-width: 1100px) {
-  .bs-layout { grid-template-columns: 1fr; }
+  .bs-layout { grid-template-columns: 1fr; height: auto; }
 }
 
 .bs-tree, .bs-inspector {
@@ -7780,7 +7837,10 @@ textarea {
   border-radius: var(--radius);
   padding: var(--sp-3);
 }
+.bs-canvas--3d { flex: 1 1 auto; min-height: 480px; border: 1px solid var(--color-card-border); border-radius: var(--radius); overflow: hidden; background: var(--color-bg); }
 .bs-tree__head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: var(--sp-2); }
+.bs-tree__head-actions { display: flex; gap: var(--sp-1); }
+.bs-tree__head-actions button { width: auto; min-width: 28px; height: 28px; padding: 0 var(--sp-2); border-radius: var(--radius-sm); border: 1px solid var(--color-card-border-strong); background: var(--color-bg-elev); color: var(--color-text); cursor: pointer; font-size: 12px; }
 .bs-tree__head button { width: 28px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--color-card-border-strong); background: var(--color-bg-elev); color: var(--color-text); cursor: pointer; }
 .bs-tree ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
 .bs-tree__item {
@@ -7813,8 +7873,39 @@ textarea {
 .bs-axis { stroke: rgba(255, 255, 255, 0.14); stroke-width: 1; }
 .bs-wall { fill: none; stroke: var(--color-text); stroke-linecap: round; stroke-linejoin: round; }
 .bs-wall--sel { stroke: var(--color-accent); }
+/* Filled wall body (inner/outer face + fill). */
+.bs-wall-body { fill: rgba(232, 237, 246, 0.22); stroke: var(--color-text); stroke-width: 1.2; stroke-linejoin: miter; }
+.bs-wall-body--sel { fill: rgba(245, 158, 11, 0.24); stroke: var(--color-accent); }
+.bs-wall-centre { fill: none; stroke: rgba(255, 255, 255, 0.22); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+/* Openings drawn as architectural symbols INSIDE the wall cutout + endpoints. */
+.bs-opening { fill: none; }
+/* Jamb lines close the notch across the two wall faces (all types). */
+.bs-opening-jamb { stroke: var(--color-text); stroke-width: 1.2; stroke-linecap: round; }
+/* Window: outer/inner face lines + centre glass line (cyan). */
+.bs-opening-win .bs-opening-face { stroke: var(--color-cyan); stroke-width: 1.4; }
+.bs-opening-win .bs-opening-glass { stroke: var(--color-cyan); stroke-width: 1.4; }
+.bs-opening-roofwin .bs-opening-face { stroke: var(--color-cyan); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.bs-opening-roofwin .bs-opening-glass { stroke: var(--color-cyan); stroke-width: 1.4; stroke-dasharray: 4 3; }
+/* Door: leaf line + swing arc (amber). */
+.bs-opening-door .bs-opening-leaf { stroke: var(--color-accent); stroke-width: 1.6; stroke-linecap: round; }
+.bs-opening-door .bs-opening-swing { stroke: var(--color-accent); stroke-width: 1.1; stroke-dasharray: 3 3; }
+.bs-opening-door .bs-opening-jamb { stroke: var(--color-accent); }
+/* Passage (Durchgang): open gap → faint dashed jambs only. */
+.bs-opening-passage .bs-opening-jamb { stroke: var(--color-muted); stroke-dasharray: 4 3; }
+.bs-opening--sel .bs-opening-jamb,
+.bs-opening--sel .bs-opening-face,
+.bs-opening--sel .bs-opening-glass,
+.bs-opening--sel .bs-opening-leaf { stroke: var(--color-accent-strong); }
+.bs-opening-handle { fill: var(--color-bg); stroke: var(--color-cyan); stroke-width: 2; cursor: grab; }
+/* Two-click opening placement preview (start/end jamb ticks + span band). */
+.bs-place-tick { stroke: var(--color-accent-strong); stroke-width: 2; }
+.bs-place-band { stroke: var(--color-accent); stroke-width: 3; stroke-dasharray: 5 3; }
+/* Armed storey-delete confirm state. */
+.bs-danger--armed { background: var(--color-danger); color: #fff; font-weight: 700; }
 .bs-space { fill: rgba(59, 130, 246, 0.14); stroke: var(--color-info); stroke-width: 1.5; }
 .bs-space--sel { fill: rgba(245, 158, 11, 0.16); stroke: var(--color-accent); }
+.bs-vertex { fill: var(--color-accent-strong); stroke: var(--color-accent-contrast); stroke-width: 1.5; cursor: grab; }
+.bs-vertex:hover { fill: var(--color-accent); r: 6.5; }
 .bs-draft { fill: none; stroke: var(--color-accent-strong); stroke-width: 2; stroke-dasharray: 5 4; }
 .bs-draft-node { fill: var(--color-accent-strong); }
 .bs-cursor { fill: none; stroke: var(--color-accent); stroke-width: 1.5; }
@@ -7847,9 +7938,12 @@ textarea {
 }
 .bs-field { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); margin: var(--sp-1) 0; font-size: 12px; }
 .bs-field input, .bs-field select { min-height: 32px; width: 130px; background: var(--color-bg-elev); color: var(--color-text); border: 1px solid var(--color-card-border-strong); border-radius: var(--radius-sm); padding: 2px 6px; }
-.bs-openings { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.bs-openings li { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--color-muted); }
-.bs-danger { margin-top: var(--sp-3); width: 100%; }
+.bs-openings { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.bs-openings li { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--color-muted); border: 1px solid var(--color-card-border); border-radius: var(--radius-sm); padding: var(--sp-2); }
+.bs-opening__head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--color-text); }
+.bs-opening__del { flex: 0 0 auto; }
+.bs-opening__fields { display: grid; grid-template-columns: 1fr; gap: 2px; }
+.bs-inspector .bs-danger { margin-top: var(--sp-3); width: 100%; }
 .bs-valid-ok { color: var(--color-success); }
 .bs-issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .bs-issue button { width: 100%; text-align: left; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--color-danger); border-radius: var(--radius-sm); color: var(--color-text); padding: var(--sp-1) var(--sp-2); cursor: pointer; font-size: 12px; }
@@ -8539,6 +8633,9 @@ textarea {
 /* Building Studio — underlays + calibration (Phase 2). */
 .bs-calib-pt { fill: var(--color-accent-strong); stroke: var(--color-accent-contrast); stroke-width: 1; }
 .bs-calib-line { stroke: var(--color-accent); stroke-width: 1.5; stroke-dasharray: 5 4; }
+/* Freeform crop overlay (Phase 2, BME-04). */
+.bs-crop-pt { fill: var(--color-info); stroke: var(--color-accent-contrast); stroke-width: 1; }
+.bs-crop-poly { fill: rgba(59, 130, 246, 0.14); stroke: var(--color-info); stroke-width: 1.5; stroke-dasharray: 6 4; }
 .bs-calib-bar {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
   margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3);
@@ -8582,6 +8679,26 @@ textarea {
     var(--color-card);
   box-shadow: var(--shadow-2);
 }
+.bs-onboarding__close {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border, var(--color-card-border-strong));
+  background: rgba(7, 17, 29, 0.55);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+.bs-onboarding__close:hover { background: rgba(7, 17, 29, 0.8); border-color: var(--color-accent); }
 .bs-onboarding__text {
   display: flex;
   flex-direction: column;
@@ -8610,6 +8727,34 @@ textarea {
   }
   .bs-onboarding__text { max-width: none; }
 }
+
+/* (Opening symbols are styled above via .bs-opening-jamb/-face/-glass/-leaf/-swing.) */
+
+/* Room labels (name + area) on the canvas. */
+.bs-space-label { fill: var(--color-text); font-size: 12px; font-weight: 600; paint-order: stroke; stroke: rgba(0,0,0,0.55); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+.bs-space-label__area { fill: var(--color-muted); font-weight: 500; font-size: 11px; }
+
+/* Opening glazing / roof-window inline check row. */
+.bs-field--check { justify-content: space-between; }
+.bs-field--check input { width: auto; min-height: 0; }
+
+/* Room list (name + m²). */
+.bs-roomlist { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.bs-roomlist__row { display: flex; flex-direction: column; gap: 4px; padding: var(--sp-1) var(--sp-2); border: 1px solid var(--color-card-border); border-radius: var(--radius-sm); background: var(--color-bg-elev); }
+.bs-roomlist__row--sel { border-color: var(--color-accent); box-shadow: var(--glow-accent); }
+.bs-roomlist__main { display: flex; align-items: center; gap: var(--sp-2); }
+.bs-roomlist__link { display: flex; align-items: center; gap: var(--sp-2); font-size: 11px; color: var(--color-muted); }
+.bs-roomlist__link span { flex: 0 0 auto; }
+.bs-roomlist__link select { flex: 1 1 auto; min-width: 0; min-height: 28px; background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-card-border-strong); border-radius: var(--radius-sm); padding: 2px 6px; }
+.bs-roomlist__pick { flex: 0 0 auto; width: 24px; height: 24px; border-radius: var(--radius-sm); border: 1px solid var(--color-card-border-strong); background: var(--color-bg); color: var(--color-text); cursor: pointer; }
+.bs-roomlist__name { flex: 1 1 auto; min-width: 0; background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-card-border-strong); border-radius: var(--radius-sm); padding: 2px 6px; font: inherit; font-size: 12px; }
+.bs-roomlist__area { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--color-muted); font-size: 12px; }
+.bs-roomlist__del { flex: 0 0 auto; width: 24px; height: 24px; border-radius: var(--radius-sm); border: 1px solid var(--color-danger); background: transparent; color: var(--color-danger); cursor: pointer; }
+
+/* Desktop-only block for the studio on narrow screens. */
+.bs-mobile-block { padding: var(--sp-6); text-align: center; display: flex; flex-direction: column; gap: var(--sp-2); align-items: center; color: var(--color-muted); }
+.bs-mobile-block strong { font-size: 1.1rem; color: var(--color-text); }
+.bs-mobile-block p { max-width: 32rem; margin: 0; }
 
 /* Building Studio — live cross-session "model changed elsewhere" banner. */
 .bs-stale {
@@ -8667,25 +8812,26 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-2) var(--sp-3);
-  margin-top: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
+  gap: var(--sp-1) var(--sp-2);
+  margin-top: 0;
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--color-card-border);
   border-radius: var(--radius);
   background: var(--color-card);
 }
 .bs-projects__field { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: 12px; color: var(--color-muted); }
 .bs-projects select, .bs-projects__rename {
-  min-height: 32px;
-  padding: 2px var(--sp-3);
+  min-height: 28px;
+  padding: 2px var(--sp-2);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-card-border-strong);
   background: var(--color-bg-elev);
   color: var(--color-text);
 }
 .bs-projects button {
-  min-height: 32px;
-  padding: var(--sp-1) var(--sp-3);
+  min-height: 28px;
+  padding: 2px var(--sp-2);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-card-border-strong);
   background: var(--color-bg-elev);
@@ -8693,6 +8839,8 @@ textarea {
   cursor: pointer;
 }
 .bs-projects button:disabled { opacity: 0.5; cursor: default; }
+/* Project delete must NOT stretch full-width (unlike the inspector delete). */
+.bs-projects .bs-danger { width: auto; margin-top: 0; margin-left: auto; }
 
 /* Design-system showcase (premium-ui-rework T-02). */
 .showcase__swatches { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-2); }
@@ -8788,3 +8936,240 @@ textarea {
 .bs-thermal__scenario-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .bs-thermal__scenario-list li { display: flex; align-items: center; gap: var(--sp-2); font-size: 12px; }
 .bs-thermal__scenario-list li span { flex: 1; }
+
+
+/* ================================================================== *
+ * Räume & Fenster — rebuilt page (v2.1, no drag-and-drop).
+ * New sectioned card layout + shared schedule editor (.rsched).
+ * ================================================================== */
+
+/* Room list + devices panel layout. */
+.tab-rooms__rooms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--sp-4, 16px);
+  margin-top: var(--sp-4, 16px);
+}
+.tab-rooms__devices {
+  margin-top: var(--sp-5, 24px);
+  padding-top: var(--sp-4, 16px);
+  border-top: 1px solid var(--color-card-border);
+}
+.tab-rooms__devices h4 {
+  margin: var(--sp-4, 16px) 0 var(--sp-2, 8px);
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+/* Room card head: name grows, floor + priority + delete follow. */
+.room-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  margin-bottom: var(--sp-2, 8px);
+}
+.room-card__prio-edit,
+.room-card__floor-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+.room-card__prio-edit select,
+.room-card__floor-edit input {
+  background: var(--color-bg-elev, var(--color-bg));
+  color: var(--color-text);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 4px 8px;
+  min-height: 32px;
+  font: inherit;
+}
+.room-card__floor-edit input { width: 6.5em; }
+
+/* Sections inside a room card. */
+.room-card__section {
+  margin-top: var(--sp-3, 12px);
+  padding-top: var(--sp-3, 12px);
+  border-top: 1px solid var(--color-card-border);
+}
+.room-card__section-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-faint, var(--color-muted));
+  margin-bottom: var(--sp-2, 8px);
+}
+.room-card__hint {
+  display: block;
+  font-size: 11.5px;
+  color: var(--color-muted);
+  margin-top: 4px;
+}
+
+/* Editable target temperatures (2×2 grid of small inputs). */
+.room-card__targets {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-2, 8px);
+}
+.room-card__target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.room-card__target span { flex: 1 1 auto; min-width: 0; }
+.room-card__target input {
+  width: 4.5em;
+  background: var(--color-bg-elev, var(--color-bg));
+  color: var(--color-text);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 4px 6px;
+  min-height: 32px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.room-card__indoor-select {
+  width: 100%;
+  background: var(--color-bg-elev, var(--color-bg));
+  color: var(--color-text);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 6px 8px;
+  min-height: 36px;
+  font: inherit;
+}
+
+/* Window rows: head + two-column controls + block editor. */
+.room-card__window-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.room-card__window-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2, 8px);
+  margin-top: 6px;
+}
+.room-card__window-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--color-muted);
+  min-width: 0;
+}
+.room-card__window-controls select {
+  background: var(--color-bg-elev, var(--color-bg));
+  color: var(--color-text);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 5px 8px;
+  min-height: 34px;
+  font: inherit;
+  min-width: 0;
+}
+.room-card__window-sched { margin-top: 8px; }
+@media (max-width: 560px) {
+  .room-card__window-controls { grid-template-columns: 1fr; }
+  .room-card__targets { grid-template-columns: 1fr; }
+}
+
+/* ---- Shared schedule editor (.rsched) — weekday chips + time range ---- */
+.rsched { display: flex; flex-direction: column; gap: var(--sp-2, 8px); }
+.rsched__empty { margin: 0; font-size: 12px; color: var(--color-muted); font-style: italic; }
+.rsched__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  padding: var(--sp-2, 8px);
+  background: var(--color-bg-elev, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm, 8px);
+}
+.rsched__days { display: inline-flex; gap: 3px; flex-wrap: wrap; }
+.rsched__day {
+  min-width: 30px;
+  padding: 4px 6px;
+  border: 1px solid var(--color-card-border);
+  background: transparent;
+  color: var(--color-muted);
+  border-radius: var(--radius-pill, 999px);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rsched__day--on {
+  background: linear-gradient(180deg, var(--color-accent-strong, var(--color-accent)), var(--color-accent));
+  color: var(--color-accent-contrast, #1a1205);
+  border-color: transparent;
+  font-weight: 700;
+}
+.rsched__presets { display: inline-flex; gap: 4px; }
+.rsched__preset {
+  padding: 3px 8px;
+  border: 1px solid var(--color-card-border);
+  background: transparent;
+  color: var(--color-muted);
+  border-radius: var(--radius-pill, 999px);
+  font-size: 11px;
+  cursor: pointer;
+}
+.rsched__preset:hover { border-color: var(--color-accent); color: var(--color-text); }
+.rsched__times { display: inline-flex; align-items: center; gap: 6px; }
+.rsched__times label { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--color-muted); }
+.rsched__times input[type='time'] {
+  background: var(--color-bg, #0b0e14);
+  color: var(--color-text);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 3px 6px;
+  min-height: 32px;
+  font: inherit;
+}
+.rsched__del {
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px;
+}
+.rsched__del:hover { color: var(--color-danger); }
+.rsched__meta { display: inline-flex; gap: 4px; align-items: center; }
+.rsched__tag {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(120, 130, 150, 0.18);
+  color: var(--color-muted);
+}
+.rsched__tag--active {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--color-accent-strong, var(--color-accent));
+  font-weight: 700;
+}
+.rsched__add {
+  align-self: flex-start;
+  border: 1px solid var(--color-card-border);
+  background: var(--color-bg-elev, transparent);
+  color: var(--color-text);
+  border-radius: var(--radius-sm, 6px);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rsched__add:hover { border-color: var(--color-accent); }

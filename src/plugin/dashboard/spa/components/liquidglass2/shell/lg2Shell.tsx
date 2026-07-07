@@ -26,6 +26,7 @@ import { MODULES, WARNINGS_MODULE, isModuleActive } from '../../../navModel.js';
 import { Icon } from '../../icons.js';
 import { HelpGlyph } from './lg2Primitives.js';
 import { ConfigPanel } from './lg2ConfigPanel.js';
+import { Lg2PullToRefresh } from './lg2PullToRefresh.js';
 import { theme, themeStyle, autoAccent, fillPaint, fillBase } from './lg2Theme.js';
 import { usePreblurWallpaper } from './lg2Preblur.js';
 
@@ -307,6 +308,7 @@ export function Lg2Shell(props: {
 
   return (
     <div class={`${cls}${expertMode.value ? ' lg2-expert-on' : ''}${preblurOn ? ' lg2-preblur' : ''}`} style={rootStyle as JSX.CSSProperties} data-testid={props.testId ?? 'liquid-glass2'}>
+      <Lg2PullToRefresh />
       <Sidebar clock={clock} currentUrl={url} onConfig={(): void => setCfgOpen(true)} />
       {props.children}
       <UpdateBanner />

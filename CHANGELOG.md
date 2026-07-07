@@ -3,6 +3,51 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.5
+
+- **Gebäude-Studio – Stockwerke löschen:** Das Löschen von Stockwerken funktioniert wieder. Der native Bestätigungsdialog (`window.confirm`) wird im HCU-Webview blockiert; ersetzt durch eine **Inline-Bestätigung** (🗑 → „Löschen?" → bestätigen, ✕ bricht ab). Das letzte verbleibende Stockwerk bleibt geschützt.
+- **Gebäude-Studio – Öffnungen per 2 Klicks:** Fenster, Türen und Durchgänge werden jetzt durch **zwei Klicks auf der Wand** platziert – erster Klick = Startpunkt, zweiter Klick = Endpunkt; **Breite = Distanz** dazwischen (aufs Raster gerundet). Mit Live-Vorschau (Laibungs-Ticks + Spannband) und Breiten-Anzeige; Esc bricht ab.
+- **Echte Aussparung + Symbol:** An jeder Öffnung entsteht eine echte Lücke in der Wand, in der Tür/Fenster/Durchgang gezeichnet werden – nichts wird mehr über die Wand gelegt.
+
+## 2.0.4f2
+
+- **Hausübersicht:** Die farbige **Temperatur-Kante** der Raum-Kacheln ist wieder deutlich als **Farbband** am linken Rand sichtbar und färbt sich **immer nach dem Messwert** (grün < 24 °C, blau 24–26 °C, rot > 26 °C), sobald ein Messwert vorliegt — nicht mehr grau, wenn kein Sensor formal gebunden ist.
+
+## 2.0.4f1
+
+- **Gebäude-Studio 3D deutlich verbessert.** Das **Dach beschneidet jetzt immer die Räume** — keine Wände mehr, die durch das Dach stoßen (auch ein Obergeschoss im Dachraum wird an der Dachschräge gekappt).
+- **Dächer haben nur noch Schrägflächen.** Giebel, Krüppelwalm-Giebel und der Kniestock-Bereich werden aus der **obersten Wand** gebildet, die automatisch bis zum Dach aufgefüllt und an den Dachschrägen abgeschnitten wird. Kein senkrechtes „Wandstück" mehr am Dach.
+- **Dachüberstand wirkt in 3D** (Standard **1 m**): die Traufe ragt hinaus und hängt entlang der Neigung herunter, der First bleibt auf Wandspann-Höhe.
+- **Dachfenster sitzen im Dach** (nicht in der Wand) und lassen **PV-Aussparungen**; **PV liegt auf der Dachschräge** statt flach auf dem Geschoss-Deckel.
+- **Wand-Bezugskante** (Mitte/Außen/Innen) beim Zeichnen und **Snapping auf Wand-Innen-/Außenkanten**; saubere **L-Ecken** auch am Raum-Schlusspunkt.
+- **Räume und Fenster** lassen sich mit der HeatShield-Konfiguration **verknüpfen**.
+
+## 2.0.4
+
+- **Gebäude-Studio (Grundriss-Editor) stark erweitert.** Grundriss zeichnen mit **Auto-Schluss**: Wand und Raum schließen automatisch, sobald man wieder auf den Startpunkt klickt. **Feineres Raster** (1/2/5/10 cm zusätzlich zu 0,25/0,5/1 m) und **starkes Snapping** auf vorhandene Ecken. Punkte lassen sich **nachträglich verschieben** (ziehen) und **löschen** (Alt+Klick); Wände/Räume/Öffnungen einzeln löschbar.
+- **Fenster & Türen** mit Höhe, Breite, **Verglasung (1-/2-/3-fach)** und **Dachfenster**-Option; werden jetzt auch **im 2D-Plan** angezeigt. **Wände** mit wählbarer Standard-Dicke (Innen 11,5/17,5 cm, Außen 24/30/36,5 cm). **Dachüberstand** einstellbar.
+- **Raumliste** mit editierbarem Namen und **m²**; Raumname + Fläche direkt im Plan. **Keller** anlegbar (unter dem EG). **2D- und 3D-Ansicht im selben Viewport** umschaltbar.
+- **Kompaktere, platzsparende Oberfläche**: Projektwahl in der Kopfzeile, sekundäre Aktionen im **„Mehr"-Menü**, kontextuelle Wand-Aktionen, schließbare Hilfe-Kachel. Nur-Desktop-Hinweis auf schmalen Screens.
+- **Hausübersicht**: die Kachel-Flächen färben sich nach Raumtemperatur (grün < 24 °C, blau 24–26 °C, rot > 26 °C); das „Fenster offen"-Symbol nutzt die Textfarbe des Raumnamens.
+
+## 2.0.3f2
+
+- **Pull-to-Refresh (Mobile).** Am Seitenanfang nach unten ziehen löst einen Reload der Seite aus — für iOS-WebViews/Standalone, die keine native Geste haben. Ein Glas-Indikator (drehender Pfeil) folgt gedämpft dem Zug und wird grün ab der Auslöseschwelle. Nur Touch-Geräte, nur am Scroll-Anfang; horizontales Wischen, normales Scrollen und Overlays bleiben unberührt. Respektiert `prefers-reduced-motion` und die iOS Safe-Area.
+
+## 2.0.3f1
+
+- **Mobile-Feinschliff.** Wetter-Chip im gestapelten Header **rechtsbündig**; **Automatik-Schalter** mit derselben Glas-Transparenz wie der Wetter-Chip (Sheen + Scrim + Panel + Bevel, inkl. Static-Glass/Lite).
+- **Doppelte Scrollbalken behoben.** `.lg2-demo`/`.lg2-main` nutzen `overflow-x: clip` statt `hidden` — `hidden` erzwang laut CSS-Spec `overflow-y: auto` und machte beide zu vertikalen Scroll-Containern. Mobile scrollt jetzt (auch im Experten-Modus) natürlich über den Body.
+- **Bottom-Navigation passt vollständig.** Die Tabs verteilen sich flexibel über die Leistenbreite (`flex: 1 1 auto`, Labels mit Ellipsis); auf sehr schmalen Handys scrollt die Leiste weiterhin.
+
+## 2.0.3
+
+- **Mobile-Oberfläche überarbeitet.** Neue iPhone-taugliche **Bottom-Navigation**: die Seitenleiste wird zu einer festen, unten angedockten Glas-Leiste mit horizontal scrollbaren Tabs (Icon + Beschriftung), sodass **alle** Bereiche (auch Nachrichten, Hilfe, Darstellung, Ansicht) auf dem Handy erreichbar sind. Respektiert die iOS Safe-Areas.
+- **Wetter-Chip zeigt den Ort** (statt eines Strichs, wenn der Himmelszustand unbekannt ist). Der **Automatik-Schalter** trägt auf dem Handy wieder seinen Text, und der Titel „Übersicht" wird nicht mehr unter der Statusleiste/Notch abgeschnitten.
+- **Einstellungs-Kacheln exakt im Liquid-Glass-Look.** Ursache behoben: die Landing-Kacheln nutzten nur eine flache Panel-Füllung statt der vollen Glas-Rezeptur (Sheen + Scrim + Panel, Bevel, Specular-Rim) — jetzt identisch zu allen anderen V2-Karten, inkl. Lite/Static-Glass/High-FPS.
+- **Symbol-Schatten & Kachel-Rahmen konfigurierbar.** Neuer Regler „Schatten-Stärke" für den Glyph-Schatten (jetzt standardmäßig an und sichtbarer) sowie „Kachel-Rahmen" mit **Rahmen-Stärke** (0–3 px) und **Rahmen-Farbe** (Auto oder frei wählbar).
+- **Layout-Fix (schmale Fenster).** Die kompakte Icon-Leiste (`navRail`) ist jetzt auf Desktop/Tablet beschränkt; auf schmalen Fenstern (≤ 820 px) quetscht sie den Inhalt nicht mehr in einen 72-px-Streifen und es gibt keine doppelten Scrollbalken mehr.
+
 ## 2.0.2
 
 - **Hausübersicht neu aufgebaut.** Die Räume erscheinen als klares Kachelraster (max. 4×3 = 12 Räume; darüber scrollt das Raster in der Karte) mit farbigem Status-Balken. Ein Klick öffnet ein reiches Popup mit Werten und **manueller Steuerung** (Auf / 50 % / Zu, Slider) sowie „Detailansicht öffnen". Das frühere 3D-Haus im Hintergrund entfällt; der **Hero oben** ist ein flexibler Platzhalter, der den freien Platz füllt, sodass die Kacheln nur so hoch sind wie nötig.

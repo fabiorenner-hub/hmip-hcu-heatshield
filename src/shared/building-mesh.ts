@@ -27,7 +27,7 @@ export interface Vec3 {
   z: number;
 }
 
-export type FaceKind = 'wall' | 'floor' | 'ceiling' | 'roof' | 'pv';
+export type FaceKind = 'wall' | 'floor' | 'ceiling' | 'roof' | 'pv' | 'roofwin';
 
 export interface MeshFace {
   vertices: Vec3[];
@@ -84,6 +84,64 @@ export function clipPolygonBelowZ(vertices: readonly Vec3[], cutZ: number): Vec3
       out.push(cur);
     } else if (prevIn) {
       out.push(intersect(prev, cur));
+    }
+  }
+  return out.length >= 3 ? out : null;
+}
+
+/**
+ * A plane `nx·x + ny·y + nz·z = d` with the normal pointing UP (`nz ≥ 0`).
+ * "Below the plane" (the side the roof solid is on) is `n·p ≤ d`.
+ */
+interface Plane { nx: number; ny: number; nz: number; d: number }
+
+/** Newell-normal plane through a polygon; `null` if degenerate or near-vertical. */
+function planeFromPolygon(verts: readonly Vec3[]): Plane | null {
+  if (verts.length < 3) return null;
+  let nx = 0;
+  let ny = 0;
+  let nz = 0;
+  for (let i = 0; i < verts.length; i += 1) {
+    const a = verts[i] as Vec3;
+    const b = verts[(i + 1) % verts.length] as Vec3;
+    nx += (a.y - b.y) * (a.z + b.z);
+    ny += (a.z - b.z) * (a.x + b.x);
+    nz += (a.x - b.x) * (a.y + b.y);
+  }
+  const len = Math.hypot(nx, ny, nz);
+  if (len < 1e-9) return null;
+  nx /= len; ny /= len; nz /= len;
+  if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+  const v0 = verts[0] as Vec3;
+  return { nx, ny, nz, d: nx * v0.x + ny * v0.y + nz * v0.z };
+}
+
+/**
+ * Clip a polygon to the half-space at/below a plane (`n·p ≤ d`) via
+ * Sutherland–Hodgman. Entirely-below → unchanged; entirely-above → `null`;
+ * spanning → clipped with vertices inserted exactly on the plane. Used to trim
+ * walls/ceilings under a roof so nothing pokes through the roof surface.
+ */
+function clipPolygonBelowPlane(verts: readonly Vec3[], p: Plane): Vec3[] | null {
+  if (verts.length < 3) return null;
+  const val = (v: Vec3): number => p.nx * v.x + p.ny * v.y + p.nz * v.z - p.d;
+  const out: Vec3[] = [];
+  for (let i = 0; i < verts.length; i += 1) {
+    const cur = verts[i] as Vec3;
+    const prev = verts[(i + verts.length - 1) % verts.length] as Vec3;
+    const cIn = val(cur) <= 1e-6;
+    const pIn = val(prev) <= 1e-6;
+    const cross = (): Vec3 => {
+      const va = val(prev);
+      const vb = val(cur);
+      const tt = va === vb ? 0 : va / (va - vb);
+      return { x: prev.x + (cur.x - prev.x) * tt, y: prev.y + (cur.y - prev.y) * tt, z: prev.z + (cur.z - prev.z) * tt };
+    };
+    if (cIn) {
+      if (!pIn) out.push(cross());
+      out.push(cur);
+    } else if (pIn) {
+      out.push(cross());
     }
   }
   return out.length >= 3 ? out : null;
@@ -221,68 +279,81 @@ function buildRoofFaces(
     diagnostics.push({ code: 'STOREY_NO_FOOTPRINT', message: `Storey ${storey.name} has no walls for the roof footprint.`, refId: roof.id });
     return [];
   }
-  const zBase = storey.elevationM + storey.heightM;
+  const storeyTop = storey.elevationM + storey.heightM;
+  // Kniestock / knee wall: the roof mounts on a low vertical wall above the
+  // storey top, so the eaves (where the slope starts) sit `knee` metres higher.
+  const knee = roof.type === 'flat' ? 0 : Math.max(0, roof.kneeHeightM ?? 0);
+  const zBase = storeyTop + knee;
   const { minX, minY, maxX, maxY } = box;
-  const spanY = maxY - minY;
   const pitch = (roof.pitchDeg * Math.PI) / 180;
   const face = (vertices: Vec3[]): MeshFace => ({ vertices, kind: 'roof', entityId: roof.id, storeyId: storey.id });
+  // NOTE: a roof emits ONLY sloped surfaces. Every vertical closure — the knee
+  // wall (Kniestock), gable triangles and the Krüppelwalm gablet — is WALL, not
+  // roof. `buildMesh` extrudes the top storey's walls up to the ridge and clips
+  // them to these roof planes, so the walls form those verticals themselves.
+
+  // Roof overhang (Dachüberstand): the eaves extend `overhang` metres beyond
+  // the walls on every side and hang DOWN the slope (z drops by overhang·tanθ),
+  // while the ridge stays at the wall-span height. So we build the slopes on an
+  // expanded footprint with a lowered eaves base; at the wall line the roof is
+  // back at `zBase`, so wall clipping is unaffected.
+  const overhang = Math.max(0, roof.overhangM ?? 0);
+  const bMinX = minX - overhang;
+  const bMinY = minY - overhang;
+  const bMaxX = maxX + overhang;
+  const bMaxY = maxY + overhang;
+  const bSpanY = bMaxY - bMinY;
+  const zEave = zBase - overhang * Math.tan(pitch);
+  const bBox = { minX: bMinX, minY: bMinY, maxX: bMaxX, maxY: bMaxY };
 
   const flatCap = (): MeshFace[] => [
     face([
-      { x: minX, y: minY, z: zBase },
-      { x: maxX, y: minY, z: zBase },
-      { x: maxX, y: maxY, z: zBase },
-      { x: minX, y: maxY, z: zBase },
+      { x: bMinX, y: bMinY, z: zEave },
+      { x: bMaxX, y: bMinY, z: zEave },
+      { x: bMaxX, y: bMaxY, z: zEave },
+      { x: bMinX, y: bMaxY, z: zEave },
     ]),
   ];
 
+  const slopes: MeshFace[] = ((): MeshFace[] => {
   switch (roof.type) {
     case 'flat':
       return flatCap();
     case 'shed': {
-      const dh = spanY * Math.tan(pitch);
+      const dh = bSpanY * Math.tan(pitch);
       return [
         face([
-          { x: minX, y: minY, z: zBase },
-          { x: maxX, y: minY, z: zBase },
-          { x: maxX, y: maxY, z: zBase + dh },
-          { x: minX, y: maxY, z: zBase + dh },
+          { x: bMinX, y: bMinY, z: zEave },
+          { x: bMaxX, y: bMinY, z: zEave },
+          { x: bMaxX, y: bMaxY, z: zEave + dh },
+          { x: bMinX, y: bMaxY, z: zEave + dh },
         ]),
       ];
     }
     case 'gable': {
-      const midY = (minY + maxY) / 2;
-      const ridgeZ = zBase + (spanY / 2) * Math.tan(pitch);
+      const midY = (bMinY + bMaxY) / 2;
+      const ridgeZ = zEave + (bSpanY / 2) * Math.tan(pitch);
       // Two sloped rectangles (south + north) meeting at the ridge along x.
       const south = face([
-        { x: minX, y: minY, z: zBase },
-        { x: maxX, y: minY, z: zBase },
-        { x: maxX, y: midY, z: ridgeZ },
-        { x: minX, y: midY, z: ridgeZ },
+        { x: bMinX, y: bMinY, z: zEave },
+        { x: bMaxX, y: bMinY, z: zEave },
+        { x: bMaxX, y: midY, z: ridgeZ },
+        { x: bMinX, y: midY, z: ridgeZ },
       ]);
       const north = face([
-        { x: minX, y: midY, z: ridgeZ },
-        { x: maxX, y: midY, z: ridgeZ },
-        { x: maxX, y: maxY, z: zBase },
-        { x: minX, y: maxY, z: zBase },
+        { x: bMinX, y: midY, z: ridgeZ },
+        { x: bMaxX, y: midY, z: ridgeZ },
+        { x: bMaxX, y: bMaxY, z: zEave },
+        { x: bMinX, y: bMaxY, z: zEave },
       ]);
-      // Two gable end triangles.
-      const west = face([
-        { x: minX, y: minY, z: zBase },
-        { x: minX, y: midY, z: ridgeZ },
-        { x: minX, y: maxY, z: zBase },
-      ]);
-      const east = face([
-        { x: maxX, y: minY, z: zBase },
-        { x: maxX, y: midY, z: ridgeZ },
-        { x: maxX, y: maxY, z: zBase },
-      ]);
-      return [south, north, west, east];
+      // The two gable ends are VERTICAL → they are formed by the walls (clipped
+      // to these slopes), not emitted as roof faces.
+      return [south, north];
     }
     case 'hip':
-      return hipFamilyFaces(roof, box, zBase, false, face);
+      return hipFamilyFaces(roof, bBox, zEave, false, face);
     case 'half_hip':
-      return hipFamilyFaces(roof, box, zBase, true, face);
+      return hipFamilyFaces(roof, bBox, zEave, true, face);
     default:
       diagnostics.push({
         code: 'ROOF_TYPE_UNSUPPORTED',
@@ -291,6 +362,8 @@ function buildRoofFaces(
       });
       return flatCap();
   }
+  })();
+  return slopes;
 }
 
 /**
@@ -375,12 +448,11 @@ function hipFamilyFaces(
       W(uMax, vNknee, kneeZ), W(uMax, vMax, zBase), W(uMin, vMax, zBase),
       W(uMin, vNknee, kneeZ), W(u0, vMid, ridgeZ), W(u1, vMid, ridgeZ),
     ]),
-    // Low-u end: small hip triangle above a vertical gablet.
+    // Low-/high-u ends: the small hip triangle (sloped) only. The vertical
+    // gablet below it (eaves→knee) is WALL, formed by clipping the end wall to
+    // these slopes — a roof never emits a vertical face.
     face([W(uMin, vSknee, kneeZ), W(uMin, vNknee, kneeZ), W(u0, vMid, ridgeZ)]),
-    face([W(uMin, vMin, zBase), W(uMin, vMax, zBase), W(uMin, vNknee, kneeZ), W(uMin, vSknee, kneeZ)]),
-    // High-u end.
     face([W(uMax, vNknee, kneeZ), W(uMax, vSknee, kneeZ), W(u1, vMid, ridgeZ)]),
-    face([W(uMax, vMax, zBase), W(uMax, vMin, zBase), W(uMax, vSknee, kneeZ), W(uMax, vNknee, kneeZ)]),
   ];
 }
 
@@ -392,9 +464,45 @@ export function buildMesh(model: BuildingModel, options?: BuildMeshOptions): Bui
   const faces: MeshFace[] = [];
   const diagnostics: MeshDiagnostic[] = [];
 
+  // 1. Roofs FIRST — they drive two things about the walls below them:
+  //    (a) clip planes: every roof trims the structural geometry of its storey
+  //        and everything above to the roof underside (nothing pokes through);
+  //    (b) wall cap: the TOPMOST storey under a roof has its walls extruded all
+  //        the way up to the ridge, then clipped — so the walls (not the roof)
+  //        form the gable / Krüppelwalm gablet / Kniestock. A roof only ever
+  //        emits sloped faces.
+  const roofClips: Array<{ minElevationM: number; planes: Plane[] }> = [];
+  const wallCapZ = new Map<string, number>();
+  for (const roof of model.roofs) {
+    const storey = model.storeys.find((s) => s.id === roof.storeyId);
+    if (storey === undefined) continue;
+    const roofFaces = buildRoofFaces(roof, storey, opts, diagnostics);
+    faces.push(...roofFaces);
+    const planes: Plane[] = [];
+    let maxZ = -Infinity;
+    for (const rf of roofFaces) {
+      for (const v of rf.vertices) if (v.z > maxZ) maxZ = v.z;
+      if (rf.kind !== 'roof') continue;
+      const pl = planeFromPolygon(rf.vertices);
+      if (pl !== null && pl.nz > 0.2) planes.push(pl); // only downward-capping planes
+    }
+    if (planes.length > 0) roofClips.push({ minElevationM: storey.elevationM, planes });
+    // Topmost storey at/above the roof storey fills up to the ridge.
+    const covered = model.storeys.filter((s) => s.elevationM >= storey.elevationM - 1e-6);
+    const top = covered.reduce((a, b) => (b.elevationM > a.elevationM ? b : a), covered[0] ?? storey);
+    if (Number.isFinite(maxZ)) wallCapZ.set(top.id, Math.max(wallCapZ.get(top.id) ?? -Infinity, maxZ));
+  }
+
+  // 2. Walls + rooms.
   for (const storey of model.storeys) {
     const z0 = storey.elevationM;
-    const wallTop = (w: Wall): number => z0 + (w.heightM ?? storey.heightM ?? opts.defaultWallHeightM);
+    const capZ = wallCapZ.get(storey.id);
+    const wallTop = (w: Wall): number => {
+      const normal = z0 + (w.heightM ?? storey.heightM ?? opts.defaultWallHeightM);
+      // Under a roof, fill the top storey's walls up to the ridge; the roof
+      // clip then trims them exactly to the slopes.
+      return capZ !== undefined && capZ > normal ? capZ : normal;
+    };
 
     // Walls → extruded boxes with openings cut as holes.
     for (const wall of storey.walls) {
@@ -419,22 +527,103 @@ export function buildMesh(model: BuildingModel, options?: BuildMeshOptions): Bui
     }
   }
 
-  // Roofs.
-  for (const roof of model.roofs) {
-    const storey = model.storeys.find((s) => s.id === roof.storeyId);
-    if (storey === undefined) continue;
-    faces.push(...buildRoofFaces(roof, storey, opts, diagnostics));
+  // Roof windows (Dachfenster) — a panel set INTO the roof plane (hostRoofId),
+  // never on a wall. Placed on the primary slope like the PV grid.
+  for (const storey of model.storeys) {
+    for (const o of storey.openings) {
+      if (o.roofWindow !== true || o.hostRoofId === undefined) continue;
+      const roof = model.roofs.find((r) => r.id === o.hostRoofId);
+      if (roof === undefined) continue;
+      const f = buildRoofWindowFace(o, roof, storey);
+      if (f !== null) faces.push(f);
+    }
   }
 
-  // PV arrays — a module grid laid on the roof footprint (BME-14).
+  // PV arrays — a module grid laid on the roof plane (BME-14).
   for (const pv of model.pvArrays) {
     faces.push(...buildPvFaces(pv, model));
   }
 
-  return { faces, bounds: computeBounds(faces), diagnostics };
+  // Trim structural faces (walls/ceilings/floors) to the underside of every
+  // roof whose storey is at or below the face's storey — the roof clips the
+  // rooms. Roof/PV/roof-window faces are left untouched.
+  const finalFaces: MeshFace[] = roofClips.length === 0 ? faces : (() => {
+    const elevById = new Map(model.storeys.map((s) => [s.id, s.elevationM]));
+    const out: MeshFace[] = [];
+    for (const f of faces) {
+      if (f.kind !== 'wall' && f.kind !== 'floor' && f.kind !== 'ceiling') { out.push(f); continue; }
+      const el = elevById.get(f.storeyId);
+      let polys: Vec3[][] = [f.vertices];
+      for (const rc of roofClips) {
+        if (el === undefined || el < rc.minElevationM - 1e-6) continue; // roof storey + above
+        for (const plane of rc.planes) {
+          polys = polys.flatMap((poly) => { const c = clipPolygonBelowPlane(poly, plane); return c === null ? [] : [c]; });
+        }
+      }
+      for (const poly of polys) out.push({ ...f, vertices: poly });
+    }
+    return out;
+  })();
+
+  return { faces: finalFaces, bounds: computeBounds(finalFaces), diagnostics };
 }
 
-/** Lay a PV module grid, centred on the hosting roof's storey footprint. */
+/**
+ * Place a roof window (Dachfenster) as a single quad ON the primary roof slope
+ * (above any Kniestock), positioned along the ridge by `offsetM` and sized
+ * `widthM` (along ridge) × `heightM` (up the slope). Returns `null` for a flat
+ * roof (a Dachfenster needs a slope). Slightly offset above the surface so it
+ * reads on top of the roof.
+ */
+function buildRoofWindowFace(opening: Opening, roof: Roof, storey: Storey): MeshFace | null {
+  if (roof.type === 'flat' || roof.pitchDeg <= 0) return null;
+  const box = bbox(storeyFootprint(storey));
+  if (box === null) return null;
+  const storeyTop = storey.elevationM + storey.heightM;
+  const knee = Math.max(0, roof.kneeHeightM ?? 0);
+  const zEaves = storeyTop + knee;
+  const spanX = box.maxX - box.minX;
+  const spanY = box.maxY - box.minY;
+  const alongX = ridgeAlongX(roof, spanX, spanY);
+  const uMin = alongX ? box.minX : box.minY;
+  const uMax = alongX ? box.maxX : box.maxY;
+  const vMin = alongX ? box.minY : box.minX;
+  const vMax = alongX ? box.maxY : box.maxX;
+  const vMid = (vMin + vMax) / 2;
+  const pitch = (roof.pitchDeg * Math.PI) / 180;
+  const rise = ((vMax - vMin) / 2) * Math.tan(pitch);
+  const slopeLen = Math.hypot(vMid - vMin, rise);
+  const nUp = 0.06;
+  const W = (u: number, s: number): Vec3 => {
+    const t = slopeLen <= 0 ? 0 : Math.max(0, Math.min(1, s / slopeLen));
+    const v = vMin + t * (vMid - vMin);
+    const z = zEaves + t * rise + nUp * Math.cos(pitch);
+    const vv = v - nUp * Math.sin(pitch);
+    return alongX ? { x: u, y: vv, z } : { x: vv, y: u, z };
+  };
+  const w = Math.min(opening.widthM, Math.max(0.1, uMax - uMin));
+  const ua = Math.max(uMin, Math.min(uMax - w, uMin + opening.offsetM));
+  const ub = ua + w;
+  const sMid = slopeLen / 2;
+  const sa = Math.max(0.05, sMid - opening.heightM / 2);
+  const sb = Math.min(slopeLen - 0.05, sMid + opening.heightM / 2);
+  return {
+    kind: 'roofwin',
+    entityId: opening.id,
+    storeyId: storey.id,
+    vertices: [W(ua, sa), W(ub, sa), W(ub, sb), W(ua, sb)],
+  };
+}
+
+/**
+ * Lay a PV module grid ON the hosting roof's INCLINED plane — never on the flat
+ * storey "lid". Modules follow the roof pitch and sit above any knee wall
+ * (Kniestock). For a sloped roof the grid is placed on the primary slope (the
+ * eaves→ridge half facing the ridge-perpendicular direction), tilting with the
+ * roof; a flat roof keeps a level grid on the cap. `columns` run along the
+ * ridge, `rows` up the slope. Faces slightly offset (+0.05 m normal) so they
+ * read above the roof surface.
+ */
 function buildPvFaces(pv: PvArray, model: BuildingModel): MeshFace[] {
   const roofId = (pv.roofFaceId.split(':')[0] ?? '');
   const roof = model.roofs.find((r) => r.id === roofId);
@@ -443,29 +632,89 @@ function buildPvFaces(pv: PvArray, model: BuildingModel): MeshFace[] {
   if (storey === undefined) return [];
   const box = bbox(storeyFootprint(storey));
   if (box === null) return [];
-  const z = storey.elevationM + storey.heightM + 0.05;
   const gap = pv.gapM ?? 0.02;
-  const totalW = pv.columns * pv.moduleWidthM + (pv.columns - 1) * gap;
-  const totalD = pv.rows * pv.moduleHeightM + (pv.rows - 1) * gap;
-  const cx = (box.minX + box.maxX) / 2;
-  const cy = (box.minY + box.maxY) / 2;
-  const x0 = cx - totalW / 2;
-  const y0 = cy - totalD / 2;
+  const storeyTop = storey.elevationM + storey.heightM;
+  const knee = roof.type === 'flat' ? 0 : Math.max(0, roof.kneeHeightM ?? 0);
+  const zEaves = storeyTop + knee;
+
+  // Flat roof → level grid centred on the cap (a touch above the surface).
+  if (roof.type === 'flat' || roof.pitchDeg <= 0) {
+    const z = zEaves + 0.05;
+    const totalW = pv.columns * pv.moduleWidthM + (pv.columns - 1) * gap;
+    const totalD = pv.rows * pv.moduleHeightM + (pv.rows - 1) * gap;
+    const cx = (box.minX + box.maxX) / 2;
+    const cy = (box.minY + box.maxY) / 2;
+    const x0 = cx - totalW / 2;
+    const y0 = cy - totalD / 2;
+    const out: MeshFace[] = [];
+    for (let r = 0; r < pv.rows; r += 1) {
+      for (let c = 0; c < pv.columns; c += 1) {
+        const mx = x0 + c * (pv.moduleWidthM + gap);
+        const my = y0 + r * (pv.moduleHeightM + gap);
+        out.push({
+          kind: 'pv', entityId: pv.id, storeyId: roof.storeyId,
+          vertices: [
+            { x: mx, y: my, z }, { x: mx + pv.moduleWidthM, y: my, z },
+            { x: mx + pv.moduleWidthM, y: my + pv.moduleHeightM, z }, { x: mx, y: my + pv.moduleHeightM, z },
+          ],
+        });
+      }
+    }
+    return out;
+  }
+
+  // Sloped roof → place on the primary slope plane (eaves → ridge).
+  const spanX = box.maxX - box.minX;
+  const spanY = box.maxY - box.minY;
+  const alongX = ridgeAlongX(roof, spanX, spanY);
+  const uMin = alongX ? box.minX : box.minY;
+  const uMax = alongX ? box.maxX : box.maxY;
+  const vMin = alongX ? box.minY : box.minX;
+  const vMax = alongX ? box.maxY : box.maxX;
+  const vMid = (vMin + vMax) / 2;
+  const pitch = (roof.pitchDeg * Math.PI) / 180;
+  const rise = (vMax - vMin) / 2 * Math.tan(pitch);
+  const slopeLen = Math.hypot(vMid - vMin, rise); // eaves→ridge distance on the plane
+  // Roof-window footprints in (u along ridge, s up slope) — PV modules skip
+  // these so a Dachfenster leaves a real cut-out in the array.
+  const winRects: Array<{ ua: number; ub: number; sa: number; sb: number }> = [];
+  for (const o of storey.openings) {
+    if (o.roofWindow !== true || o.hostRoofId !== roof.id) continue;
+    const ww = Math.min(o.widthM, Math.max(0.1, uMax - uMin));
+    const wua = Math.max(uMin, Math.min(uMax - ww, uMin + o.offsetM));
+    const sMidW = slopeLen / 2;
+    winRects.push({ ua: wua, ub: wua + ww, sa: Math.max(0.05, sMidW - o.heightM / 2), sb: Math.min(slopeLen - 0.05, sMidW + o.heightM / 2) });
+  }
+  const overlapsWindow = (ua: number, ub: number, sa: number, sb: number): boolean =>
+    winRects.some((wr) => ua < wr.ub && ub > wr.ua && sa < wr.sb && sb > wr.sa);
+  // World point on the primary slope: `u` along ridge, `s` = metres up the
+  // slope from the eaves. Normal offset lifts modules just above the surface.
+  const nUp = 0.05; // small clearance along the plane normal
+  const W = (u: number, s: number): Vec3 => {
+    const t = slopeLen <= 0 ? 0 : s / slopeLen;
+    const v = vMin + t * (vMid - vMin);
+    const z = zEaves + t * rise + nUp * Math.cos(pitch);
+    const vOff = -nUp * Math.sin(pitch); // pull slightly toward the eaves-normal
+    const vv = v + vOff;
+    return alongX ? { x: u, y: vv, z } : { x: vv, y: u, z };
+  };
+  // Grid extent: columns along u (ridge), rows up the slope. Clamp to the plane.
+  const totalU = pv.columns * pv.moduleWidthM + (pv.columns - 1) * gap;
+  const totalS = pv.rows * pv.moduleHeightM + (pv.rows - 1) * gap;
+  const uCentre = (uMin + uMax) / 2;
+  const u0 = uCentre - totalU / 2;
+  const s0 = Math.max(0.1, (slopeLen - totalS) / 2); // centre up the slope, keep off the eaves
   const out: MeshFace[] = [];
   for (let r = 0; r < pv.rows; r += 1) {
     for (let c = 0; c < pv.columns; c += 1) {
-      const mx = x0 + c * (pv.moduleWidthM + gap);
-      const my = y0 + r * (pv.moduleHeightM + gap);
+      const ua = u0 + c * (pv.moduleWidthM + gap);
+      const ub = ua + pv.moduleWidthM;
+      const sa = s0 + r * (pv.moduleHeightM + gap);
+      const sb = sa + pv.moduleHeightM;
+      if (overlapsWindow(ua, ub, sa, sb)) continue; // leave a cut-out for roof windows
       out.push({
-        kind: 'pv',
-        entityId: pv.id,
-        storeyId: roof.storeyId,
-        vertices: [
-          { x: mx, y: my, z },
-          { x: mx + pv.moduleWidthM, y: my, z },
-          { x: mx + pv.moduleWidthM, y: my + pv.moduleHeightM, z },
-          { x: mx, y: my + pv.moduleHeightM, z },
-        ],
+        kind: 'pv', entityId: pv.id, storeyId: roof.storeyId,
+        vertices: [W(ua, sa), W(ub, sa), W(ub, sb), W(ua, sb)],
       });
     }
   }
@@ -497,12 +746,13 @@ export interface FaceCounts {
   ceiling: number;
   roof: number;
   pv: number;
+  roofwin: number;
   total: number;
 }
 
 /** Count faces by kind — handy for the structured scene tree (a11y) + tests. */
 export function faceCounts(mesh: BuildingMesh): FaceCounts {
-  const c: FaceCounts = { wall: 0, floor: 0, ceiling: 0, roof: 0, pv: 0, total: mesh.faces.length };
+  const c: FaceCounts = { wall: 0, floor: 0, ceiling: 0, roof: 0, pv: 0, roofwin: 0, total: mesh.faces.length };
   for (const f of mesh.faces) c[f.kind] += 1;
   return c;
 }

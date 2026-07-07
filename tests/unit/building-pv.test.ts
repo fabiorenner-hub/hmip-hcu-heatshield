@@ -9,6 +9,7 @@ import {
   newEditorState,
   addWall,
   addRoof,
+  addRoofWindow,
   addPvArray,
   updatePvArray,
   removePvArray,
@@ -84,6 +85,28 @@ describe('PV in the mesh', () => {
     const s1 = addPvArray(defaultEditorContext(), state, { roofId, rows: 2, columns: 3, moduleWidthM: 1, moduleHeightM: 1, gapM: 0.05 });
     const c = faceCounts(buildMesh(s1.model));
     expect(c.pv).toBe(6); // 2 × 3 modules
+  });
+
+  it('leaves a cut-out where a roof window overlaps the PV grid', () => {
+    const { state, roofId } = houseWithRoof();
+    // Dense small modules covering the slope.
+    const s1 = addPvArray(defaultEditorContext(), state, { roofId, rows: 4, columns: 6, moduleWidthM: 0.9, moduleHeightM: 0.9, gapM: 0.03 });
+    const before = faceCounts(buildMesh(s1.model)).pv;
+    // A large roof window centred on the slope must remove some modules.
+    const s2 = addRoofWindow(defaultEditorContext(), s1, { roofId, offsetM: 3, widthM: 2, heightM: 2 });
+    const after = faceCounts(buildMesh(s2.model)).pv;
+    expect(after).toBeLessThan(before);
+  });
+
+  it('places modules ON the inclined roof plane, not the flat storey lid', () => {
+    const { state, roofId } = houseWithRoof(); // gable, pitch 30, storey top = 2.5
+    const s1 = addPvArray(defaultEditorContext(), state, { roofId, rows: 2, columns: 2, moduleWidthM: 1, moduleHeightM: 1 });
+    const pv = buildMesh(s1.model).faces.filter((f) => f.kind === 'pv');
+    const zs = pv.flatMap((f) => f.vertices.map((v) => v.z));
+    // Above the eaves (storey top) — never sitting on the flat lid at 2.5.
+    expect(Math.max(...zs)).toBeGreaterThan(2.5);
+    // Modules tilt with the roof → their z varies up the slope.
+    expect(Math.max(...zs) - Math.min(...zs)).toBeGreaterThan(0.1);
   });
 });
 

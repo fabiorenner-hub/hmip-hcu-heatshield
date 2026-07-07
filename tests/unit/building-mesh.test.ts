@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildMesh, faceCounts, clipPolygonBelowZ, type BuildingMesh } from '../../src/shared/building-mesh.js';
-import { newBuildingModel, newEditorState, addWall, addSpace, addOpening, defaultEditorContext } from '../../src/shared/building-editor.js';
+import { newBuildingModel, newEditorState, addWall, addSpace, addOpening, addRoof, addRoofWindow, addStorey, defaultEditorContext } from '../../src/shared/building-editor.js';
 import type { BuildingModel, Roof } from '../../src/shared/building-model.js';
 
 function squareModel(): BuildingModel {
@@ -56,11 +56,95 @@ describe('buildMesh', () => {
     expect(faceCounts(mesh).roof).toBe(1);
   });
 
-  it('gable roof adds two slopes + two gable ends (4 faces) with a raised ridge', () => {
+  it('gable roof is TWO sloped faces (the vertical gable ends are walls) with a raised ridge', () => {
     const mesh = buildMesh(withRoof(squareModel(), 'gable', 45));
-    expect(faceCounts(mesh).roof).toBe(4);
+    expect(faceCounts(mesh).roof).toBe(2); // only the two slopes; gables are wall
     // Ridge higher than the eaves: mesh top z above the storey top (2.5).
     expect(mesh.bounds.max.z).toBeGreaterThan(2.5);
+  });
+
+  it('knee wall (Kniestock) raises the eaves/ridge; walls fill up to the roof (no extra strips)', () => {
+    const base = withRoof(squareModel(), 'gable', 45);
+    const noKnee = buildMesh(base);
+    const roof0 = base.roofs[0]!;
+    const withKnee = buildMesh({ ...base, roofs: [{ ...roof0, kneeHeightM: 0.8 }] });
+    // The whole roof (ridge included) sits 0.8 m higher with the knee.
+    expect(withKnee.bounds.max.z).toBeCloseTo(noKnee.bounds.max.z + 0.8, 3);
+    // Walls fill up to the roof — their top rises 0.8 m too, not via extra faces.
+    const wallMaxZ = (m: ReturnType<typeof buildMesh>): number => Math.max(...m.faces.filter((f) => f.kind === 'wall').flatMap((f) => f.vertices.map((v) => v.z)));
+    expect(wallMaxZ(withKnee)).toBeCloseTo(wallMaxZ(noKnee) + 0.8, 3);
+  });
+
+  it('flat roof ignores kneeHeightM (no half-storey on a flat cap)', () => {
+    const base = withRoof(squareModel(), 'flat');
+    const roof0 = base.roofs[0]!;
+    const a = buildMesh(base);
+    const b = buildMesh({ ...base, roofs: [{ ...roof0, kneeHeightM: 1 }] });
+    expect(faceCounts(b).wall).toBe(faceCounts(a).wall);
+    expect(b.bounds.max.z).toBeCloseTo(a.bounds.max.z, 3);
+  });
+
+  it('a roof on a lower storey clips the walls of the storey above (nothing pokes through)', () => {
+    const ctx = defaultEditorContext();
+    let state = newEditorState(newBuildingModel(ctx, { latitude: 52.5, longitude: 13.4, timezone: 'Europe/Berlin' }));
+    // EG (elevation 0, height 2.5) with a square footprint.
+    state = addWall(ctx, state, { axis: [{ x: 0, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 6 }, { x: 0, y: 6 }, { x: 0, y: 0 }] });
+    const egId = state.model.storeys[0]!.id;
+    // OG stacked on top (elevation 2.5, height 2.5) with the same footprint.
+    state = addStorey(ctx, state, { name: 'OG', elevationM: 2.5, heightM: 2.5 });
+    const ogId = state.activeStoreyId!;
+    state = addWall(ctx, state, { axis: [{ x: 0, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 6 }, { x: 0, y: 6 }, { x: 0, y: 0 }] });
+    // Gable roof on the EG — the OG now lives inside the roof space.
+    state = addRoof(ctx, state, { storeyId: egId, type: 'gable', pitchDeg: 35 });
+    const mesh = buildMesh(state.model);
+    const roofZ = Math.max(...mesh.faces.filter((f) => f.kind === 'roof').flatMap((f) => f.vertices.map((v) => v.z)));
+    // Without clipping the OG wall top would reach 5.0 m; clipped it must stay
+    // at or below the roof ridge.
+    const ogWallZ = Math.max(
+      ...mesh.faces.filter((f) => f.kind === 'wall' && f.storeyId === ogId).flatMap((f) => f.vertices.map((v) => v.z)),
+    );
+    expect(ogWallZ).toBeLessThanOrEqual(roofZ + 1e-6);
+    expect(ogWallZ).toBeLessThan(5.0); // definitely trimmed below the un-clipped top
+    // The EG walls (below the eaves) are untouched.
+    const egWallZ = Math.max(
+      ...mesh.faces.filter((f) => f.kind === 'wall' && f.storeyId === egId).flatMap((f) => f.vertices.map((v) => v.z)),
+    );
+    expect(egWallZ).toBeCloseTo(2.5, 6);
+  });
+
+  it('roof window (Dachfenster) sits on the slope, not a wall; flat roof has none', () => {
+    const ctx = defaultEditorContext();
+    let state = newEditorState(newBuildingModel(ctx, { latitude: 52.5, longitude: 13.4, timezone: 'Europe/Berlin' }));
+    state = addWall(ctx, state, { axis: [{ x: 0, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 6 }, { x: 0, y: 6 }, { x: 0, y: 0 }] });
+    const storeyId = state.model.storeys[0]!.id;
+    state = addRoof(ctx, state, { storeyId, type: 'gable', pitchDeg: 35 });
+    const roofId = state.model.roofs[0]!.id;
+    state = addRoofWindow(ctx, state, { roofId });
+    const mesh = buildMesh(state.model);
+    expect(faceCounts(mesh).roofwin).toBe(1);
+    // Sits above the eaves (storey top 2.5), i.e. on the slope.
+    const rw = mesh.faces.find((f) => f.kind === 'roofwin')!;
+    expect(Math.max(...rw.vertices.map((v) => v.z))).toBeGreaterThan(2.5);
+    // A flat roof cannot carry a roof window.
+    const flat = { ...state.model, roofs: [{ ...state.model.roofs[0]!, type: 'flat' as const, pitchDeg: 0 }] };
+    expect(faceCounts(buildMesh(flat)).roofwin).toBe(0);
+  });
+
+  it('roof overhang extends the eaves beyond the walls but keeps the ridge height', () => {
+    const base = withRoof(squareModel(), 'gable', 40); // 4×4 footprint
+    const roof0 = base.roofs[0]!;
+    const noOh = buildMesh({ ...base, roofs: [{ ...roof0, overhangM: 0 }] });
+    const withOh = buildMesh({ ...base, roofs: [{ ...roof0, overhangM: 1 }] });
+    // Roof footprint grows outward by the overhang on every side.
+    const roofX = (m: ReturnType<typeof buildMesh>): number =>
+      Math.max(...m.faces.filter((f) => f.kind === 'roof').flatMap((f) => f.vertices.map((v) => v.x)));
+    expect(roofX(withOh)).toBeCloseTo(roofX(noOh) + 1, 5);
+    // Ridge height is unchanged (overhang hangs down the slope, ridge stays put).
+    const ridge = (m: ReturnType<typeof buildMesh>): number => Math.max(...m.faces.filter((f) => f.kind === 'roof').flatMap((f) => f.vertices.map((v) => v.z)));
+    expect(ridge(withOh)).toBeCloseTo(ridge(noOh), 5);
+    // The overhanging eaves hang below the wall-top eaves height.
+    const minRoofZ = Math.min(...withOh.faces.filter((f) => f.kind === 'roof').flatMap((f) => f.vertices.map((v) => v.z)));
+    expect(minRoofZ).toBeLessThan(2.5);
   });
 
   it('shed roof adds one sloped face', () => {
@@ -77,14 +161,17 @@ describe('buildMesh', () => {
     expect(mesh.bounds.max.z).toBeGreaterThan(2.5);
   });
 
-  it('half-hip (Krüppelwalm) is a distinct generator: 6 faces incl. vertical gablets', () => {
+  it('half-hip (Krüppelwalm) is a distinct generator: 4 sloped faces (gablet is wall)', () => {
     const mesh: BuildingMesh = buildMesh(withRoof(squareModel(), 'half_hip', 35));
-    expect(faceCounts(mesh).roof).toBe(6); // 2 slopes + 2 hip triangles + 2 gablets
+    expect(faceCounts(mesh).roof).toBe(4); // 2 main slopes + 2 hip triangles; NO vertical gablet
     expect(mesh.diagnostics.some((d) => d.code === 'ROOF_TYPE_UNSUPPORTED')).toBe(false);
     expect(mesh.bounds.max.z).toBeGreaterThan(2.5);
-    // The gablet knee sits below the ridge → a distinct silhouette from a full hip.
+    // The half-hip's end hips start at a mid knee height → geometrically distinct
+    // from a full hip even though both now have 4 sloped faces.
     const hip = buildMesh(withRoof(squareModel(), 'hip', 35));
-    expect(faceCounts(hip).roof).not.toBe(faceCounts(mesh).roof);
+    expect(JSON.stringify(mesh.faces.filter((f) => f.kind === 'roof'))).not.toBe(
+      JSON.stringify(hip.faces.filter((f) => f.kind === 'roof')),
+    );
   });
 
   it('hip/half-hip honour ridgeAzimuthDeg for the ridge axis (deterministic)', () => {

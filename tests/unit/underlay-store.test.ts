@@ -56,6 +56,24 @@ describe('underlayStore', () => {
     expect(updated?.rotationDeg).toBe(40);
   });
 
+  it('persists a normalised freeform crop polygon and clears it', async () => {
+    const res = await addUnderlay(PNG_DATA_URL, { storeyId: 's1' }, { dataDir });
+    if (!res.ok) throw new Error('add failed');
+    expect(res.meta.crop).toEqual([]);
+    // Out-of-range points are clamped; a valid triangle survives the round-trip.
+    const withCrop = await updateUnderlay(
+      res.meta.id,
+      { crop: [{ x: -0.5, y: 0 }, { x: 1.5, y: 0 }, { x: 0.5, y: 1.2 }] },
+      { dataDir },
+    );
+    expect(withCrop?.crop).toEqual([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0.5, y: 1 }]);
+    // Survives a reload from disk.
+    expect((await listUnderlays({ dataDir }))[0]?.crop).toHaveLength(3);
+    // Fewer than three points → crop cleared.
+    const cleared = await updateUnderlay(res.meta.id, { crop: [{ x: 0.1, y: 0.1 }] }, { dataDir });
+    expect(cleared?.crop).toEqual([]);
+  });
+
   it('reads the stored binary and deletes it', async () => {
     const res = await addUnderlay(PNG_DATA_URL, { storeyId: 's1' }, { dataDir });
     if (!res.ok) throw new Error('add failed');

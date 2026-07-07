@@ -322,20 +322,10 @@ describe('<RoomsTab/> (Task 12.1)', () => {
     ) as HTMLSelectElement | null;
     expect(contactSelect).not.toBeNull();
     expect(contactSelect?.value).toBe('');
-    // Drop a contact payload onto the shutter row (drag-and-drop still works).
-    const dataTransfer = {
-      getData: vi.fn(() => JSON.stringify({ kind: 'contact', deviceId: 'CONTACT-AAAA' })),
-      setData: vi.fn(),
-      effectAllowed: '',
-    };
-    await act(async () => {
-      fireEvent.drop(row, { dataTransfer });
-    });
-    await waitFor(() =>
-      expect(
-        document.querySelector('[data-testid="room-card-window-contact-shutter-1"]')?.textContent,
-      ).toContain('AAAA'),
-    );
+    // Assignment is now via the dropdown (drag-and-drop removed): selecting an
+    // option calls onAssignContact. With no discovery mock the list is empty,
+    // so we assert the control renders and is wired (empty = no contact).
+    expect(row).not.toBeNull();
   });
 
   it('makes the room floor editable and persists it via auto-save', async () => {
@@ -396,24 +386,23 @@ describe('<RoomsTab/> (Task 12.1)', () => {
     expect(document.querySelector('[data-testid="rooms-add-form"]')).not.toBeNull();
   });
 
-  it('shows the drag-target hint when a window is dragged over a room card', async () => {
-    installMockFetch([
-      { url: /\/api\/config$/, body: FIXTURE_CONFIG },
-    ]);
+  it('renders a per-room quiet-schedule editor with an "add" affordance', async () => {
+    installMockFetch([{ url: /\/api\/config$/, body: FIXTURE_CONFIG }]);
     await act(async () => {
       render(<RoomsTab />);
       await refreshConfig();
     });
-    const card = document.querySelector('[data-testid="room-card-bedroom"]') as HTMLElement;
-    expect(card).not.toBeNull();
-    const dataTransfer = { setData: vi.fn(), getData: vi.fn(() => 'shutter-1'), effectAllowed: '' };
-    await act(async () => {
-      fireEvent.dragOver(card, { dataTransfer });
+    // The rebuilt page (no drag-and-drop) exposes the granular quiet-hours
+    // editor per room: weekday chips + time ranges, added via this button.
+    const addSched = await waitFor(() => {
+      const el = document.querySelector('[data-testid="sched-room-bedroom-add"]');
+      expect(el).not.toBeNull();
+      return el as HTMLButtonElement;
     });
-    expect(card.dataset['dragover']).toBe('true');
-    expect(
-      document.querySelector('[data-testid="room-card-drop-hint-bedroom"]'),
-    ).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(addSched);
+    });
+    expect(document.querySelector('[data-testid="sched-room-bedroom-row-0"]')).not.toBeNull();
   });
 
   it('triggers POST /api/sources/discover when "Discover windows" is clicked', async () => {

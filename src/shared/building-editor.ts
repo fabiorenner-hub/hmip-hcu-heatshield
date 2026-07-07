@@ -25,6 +25,7 @@ import type {
   Space,
   WallBoundary,
   OpeningType,
+  GlazingType,
   Roof,
   RoofType,
   PvArray,
@@ -158,6 +159,28 @@ export function snapToGrid(p: Point, stepM: number): Point {
   return { x: Math.round(p.x / stepM) * stepM, y: Math.round(p.y / stepM) * stepM };
 }
 
+/**
+ * Snap `p` to the nearest candidate vertex within `maxDistM` metres, or return
+ * `null` when none is close enough. Used for strong point-snapping so polylines
+ * and room polygons close exactly on existing endpoints/vertices. Pure.
+ */
+export function nearestVertex(
+  candidates: readonly Point[],
+  p: Point,
+  maxDistM: number,
+): Point | null {
+  let best: Point | null = null;
+  let bestD = maxDistM;
+  for (const c of candidates) {
+    const d = Math.hypot(c.x - p.x, c.y - p.y);
+    if (d <= bestD) {
+      best = c;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
 export type AngleConstraint = 'ortho' | 'deg45' | 'free';
 
 /**
@@ -281,6 +304,54 @@ export function addStorey(ctx: EditorContext, state: EditorState, input: StoreyI
   return { ...state, model: { ...state.model, storeys }, activeStoreyId: storey.id, selection: [] };
 }
 
+/**
+ * Duplicate a storey and stack the copy directly ABOVE it (same walls,
+ * openings and spaces, transferred upward). All ids are regenerated and
+ * `opening.hostWallId` is remapped to the copied walls so referential
+ * integrity holds. The roof is NOT copied (roofs cap the top storey). The new
+ * storey becomes active.
+ */
+export function duplicateStorey(
+  ctx: EditorContext,
+  state: EditorState,
+  storeyId: string,
+  direction: 'up' | 'down' = 'up',
+): EditorState {
+  const src = state.model.storeys.find((s) => s.id === storeyId);
+  if (src === undefined) return state;
+  const wallIdMap = new Map<string, string>();
+  const walls = src.walls.map((w) => {
+    const id = ctx.newId();
+    wallIdMap.set(w.id, id);
+    return { ...w, id, axis: w.axis.map((p) => ({ ...p })) };
+  });
+  const openings = src.openings
+    .filter((o) => o.hostWallId !== undefined && wallIdMap.has(o.hostWallId))
+    .map((o) => ({ ...o, id: ctx.newId(), hostWallId: wallIdMap.get(o.hostWallId as string) as string }));
+  const spaces = src.spaces.map((sp) => ({
+    ...sp,
+    id: ctx.newId(),
+    polygon: sp.polygon.map((p) => ({ ...p })),
+    thermalZoneId: null,
+  }));
+  const copy: Storey = {
+    id: ctx.newId(),
+    name: t2(src.name),
+    elevationM: direction === 'down' ? src.elevationM - src.heightM : src.elevationM + src.heightM,
+    heightM: src.heightM,
+    walls,
+    openings,
+    spaces,
+  };
+  const storeys = [...state.model.storeys, copy].sort((a, b) => a.elevationM - b.elevationM);
+  return { ...state, model: { ...state.model, storeys }, activeStoreyId: copy.id, selection: [] };
+}
+
+/** Derive a "(Kopie)" name without a translation dependency in the pure core. */
+function t2(name: string): string {
+  return name.endsWith(')') ? name : `${name} (Kopie)`;
+}
+
 export function updateStorey(
   state: EditorState,
   storeyId: string,
@@ -319,6 +390,7 @@ export interface RoofInput {
   pitchDeg: number;
   ridgeAzimuthDeg?: number;
   overhangM?: number;
+  kneeHeightM?: number;
 }
 
 /**
@@ -332,6 +404,7 @@ export interface RoofPatch {
   pitchDeg?: number;
   ridgeAzimuthDeg?: number | null;
   overhangM?: number | null;
+  kneeHeightM?: number | null;
 }
 
 /** Clamp a pitch into the schema range [0, 80] (flat forces 0). */
@@ -363,7 +436,9 @@ export function addRoof(
     storeyId: input.storeyId,
     pitchDeg: clampPitch(input.type, input.pitchDeg),
     ...(input.ridgeAzimuthDeg !== undefined ? { ridgeAzimuthDeg: normAzimuth(input.ridgeAzimuthDeg) } : {}),
-    ...(input.overhangM !== undefined ? { overhangM: Math.max(0, input.overhangM) } : {}),
+    // Default roof overhang (Dachüberstand) is 1 m unless explicitly given.
+    overhangM: Math.max(0, input.overhangM ?? 1),
+    ...(input.kneeHeightM !== undefined && input.kneeHeightM > 0 ? { kneeHeightM: input.kneeHeightM } : {}),
   };
   const kept = allowMultiple
     ? state.model.roofs
@@ -391,6 +466,8 @@ export function updateRoof(
     if (ridge !== null) next.ridgeAzimuthDeg = normAzimuth(ridge);
     const overhang = patch.overhangM !== undefined ? patch.overhangM : (r.overhangM ?? null);
     if (overhang !== null) next.overhangM = Math.max(0, overhang);
+    const knee = patch.kneeHeightM !== undefined ? patch.kneeHeightM : (r.kneeHeightM ?? null);
+    if (knee !== null && knee > 0) next.kneeHeightM = knee;
     return next;
   });
   return { ...state, model: { ...state.model, roofs } };
@@ -463,7 +540,9 @@ export interface RoofSection {
   spanM: number;
   /** Wall top above the storey floor (m). */
   wallHeightM: number;
-  /** Ridge/high-eave rise above the wall top (m). */
+  /** Knee-wall (Kniestock) height above the wall top before the slope (m). */
+  kneeHeightM: number;
+  /** Ridge/high-eave rise above the eaves (wall top + knee) (m). */
   ridgeHeightM: number;
   pitchDeg: number;
   /**
@@ -487,6 +566,8 @@ export function roofSectionProfile(state: EditorState, roofId: string): RoofSect
   const info = roofPlaneInfo(state, roofId);
   if (info === null) return null;
   const wallHeightM = storey.heightM > 0 ? storey.heightM : 2.5;
+  const kneeHeightM = roof.type === 'flat' ? 0 : Math.max(0, roof.kneeHeightM ?? 0);
+  const eavesY = wallHeightM + kneeHeightM; // roof starts sloping here
   // Ridge axis: along X (east–west) when the azimuth is ~90/270°, else along Y;
   // without a hint it follows the longer footprint axis. The section span is the
   // dimension PERPENDICULAR to the ridge.
@@ -500,20 +581,20 @@ export function roofSectionProfile(state: EditorState, roofId: string): RoofSect
   let ridgeHeightM: number;
   if (roof.type === 'flat') {
     ridgeHeightM = 0;
-    profile = [{ x: 0, y: wallHeightM }, { x: spanM, y: wallHeightM }];
+    profile = [{ x: 0, y: eavesY }, { x: spanM, y: eavesY }];
   } else if (roof.type === 'shed') {
     ridgeHeightM = spanM * Math.tan(pitchRad);
-    profile = [{ x: 0, y: wallHeightM }, { x: spanM, y: wallHeightM + ridgeHeightM }];
+    profile = [{ x: 0, y: eavesY }, { x: spanM, y: eavesY + ridgeHeightM }];
   } else {
     // gable / hip / half_hip — symmetric ridge in the middle.
     ridgeHeightM = (spanM / 2) * Math.tan(pitchRad);
     profile = [
-      { x: 0, y: wallHeightM },
-      { x: spanM / 2, y: wallHeightM + ridgeHeightM },
-      { x: spanM, y: wallHeightM },
+      { x: 0, y: eavesY },
+      { x: spanM / 2, y: eavesY + ridgeHeightM },
+      { x: spanM, y: eavesY },
     ];
   }
-  return { type: roof.type, spanM, wallHeightM, ridgeHeightM, pitchDeg: roof.pitchDeg, profile };
+  return { type: roof.type, spanM, wallHeightM, kneeHeightM, ridgeHeightM, pitchDeg: roof.pitchDeg, profile };
 }
 
 /**
@@ -639,6 +720,23 @@ export function moveWallVertex(
   return { ...state, model };
 }
 
+/**
+ * Delete a vertex from a wall polyline. A wall needs ≥2 points, so removing a
+ * vertex that would drop it below 2 deletes the whole wall (and its openings).
+ */
+export function deleteWallVertex(state: EditorState, wallId: string, index: number): EditorState {
+  const s = activeStorey(state);
+  if (s === null) return state;
+  const wall = s.walls.find((w) => w.id === wallId);
+  if (wall === undefined || index < 0 || index >= wall.axis.length) return state;
+  if (wall.axis.length <= 2) return deleteWall(state, wallId);
+  const model = mapStorey(state.model, s.id, (st) => ({
+    ...st,
+    walls: st.walls.map((w) => (w.id === wallId ? { ...w, axis: w.axis.filter((_, i) => i !== index) } : w)),
+  }));
+  return { ...state, model };
+}
+
 export function deleteWall(state: EditorState, wallId: string): EditorState {
   const s = activeStorey(state);
   if (s === null) return state;
@@ -662,6 +760,8 @@ export interface OpeningInput {
   widthM: number;
   heightM: number;
   sillM?: number;
+  glazing?: GlazingType;
+  roofWindow?: boolean;
 }
 
 export function addOpening(
@@ -680,13 +780,99 @@ export function addOpening(
     offsetM: Math.max(0, input.offsetM),
     widthM: input.widthM,
     heightM: input.heightM,
-    sillM: input.sillM ?? (input.type === 'door' ? 0 : 0.9),
+    // Windows sit on a sill; doors and passages (Durchgang) go to the floor.
+    sillM: input.sillM ?? (input.type === 'window' ? 0.9 : 0),
+    // Only windows carry glazing; doors and passages have none.
+    ...(input.type === 'window' ? { glazing: input.glazing ?? 'double' } : {}),
+    ...(input.roofWindow === true ? { roofWindow: true } : {}),
   };
   const model = mapStorey(state.model, s.id, (st) => ({
     ...st,
     openings: [...st.openings, opening],
   }));
   return { ...state, model, selection: [opening.id] };
+}
+
+export interface RoofWindowInput {
+  roofId: string;
+  offsetM?: number;
+  widthM?: number;
+  heightM?: number;
+  glazing?: GlazingType;
+}
+
+/**
+ * Add a roof window (Dachfenster) to the storey's roof. Unlike a façade
+ * opening it is hosted by the ROOF (`hostRoofId`), not a wall — no synthetic
+ * wall is created. `offsetM` positions it along the ridge; `widthM`/`heightM`
+ * are its size in the roof plane. Requires a roof on the active storey.
+ */
+export function addRoofWindow(
+  ctx: EditorContext,
+  state: EditorState,
+  input: RoofWindowInput,
+): EditorState {
+  const s = activeStorey(state);
+  if (s === null) return state;
+  const roof = state.model.roofs.find((r) => r.id === input.roofId && r.storeyId === s.id);
+  if (roof === undefined) return state; // roof window needs a roof on this storey
+  const opening: Opening = {
+    id: ctx.newId(),
+    type: 'window',
+    hostRoofId: roof.id,
+    offsetM: Math.max(0, input.offsetM ?? 0),
+    widthM: input.widthM !== undefined && input.widthM > 0 ? input.widthM : 0.78,
+    heightM: input.heightM !== undefined && input.heightM > 0 ? input.heightM : 1.4,
+    sillM: 0,
+    glazing: input.glazing ?? 'double',
+    roofWindow: true,
+  };
+  const model = mapStorey(state.model, s.id, (st) => ({ ...st, openings: [...st.openings, opening] }));
+  return { ...state, model, selection: [opening.id] };
+}
+
+export interface OpeningPatch {
+  widthM?: number;
+  heightM?: number;
+  offsetM?: number;
+  sillM?: number;
+  glazing?: GlazingType;
+  roofWindow?: boolean;
+  /** Link to a config window; `null` clears it, `undefined` keeps it. */
+  linkedWindowId?: string | null;
+}
+
+/**
+ * Edit a hosted opening's geometry (width/height/offset/sill). Values are
+ * clamped to sane minimums; `undefined` fields are left unchanged. Pure.
+ */
+export function updateOpening(
+  state: EditorState,
+  openingId: string,
+  patch: OpeningPatch,
+): EditorState {
+  const s = activeStorey(state);
+  if (s === null) return state;
+  const model = mapStorey(state.model, s.id, (st) => ({
+    ...st,
+    openings: st.openings.map((o) => {
+      if (o.id !== openingId) return o;
+      const next: Opening = {
+        ...o,
+        ...(patch.widthM !== undefined ? { widthM: Math.max(0.1, patch.widthM) } : {}),
+        ...(patch.heightM !== undefined ? { heightM: Math.max(0.1, patch.heightM) } : {}),
+        ...(patch.offsetM !== undefined ? { offsetM: Math.max(0, patch.offsetM) } : {}),
+        ...(patch.sillM !== undefined ? { sillM: Math.max(0, patch.sillM) } : {}),
+        ...(patch.glazing !== undefined ? { glazing: patch.glazing } : {}),
+        ...(patch.roofWindow !== undefined ? { roofWindow: patch.roofWindow } : {}),
+      };
+      // `null` clears the config-window link; a string sets it.
+      if (patch.linkedWindowId === null) delete next.linkedWindowId;
+      else if (patch.linkedWindowId !== undefined) next.linkedWindowId = patch.linkedWindowId;
+      return next;
+    }),
+  }));
+  return { ...state, model };
 }
 
 export function deleteOpening(state: EditorState, openingId: string): EditorState {
@@ -726,13 +912,59 @@ export function addSpace(ctx: EditorContext, state: EditorState, input: SpaceInp
 export function updateSpace(
   state: EditorState,
   spaceId: string,
-  patch: Partial<Pick<Space, 'name' | 'useProfileId'>>,
+  patch: Partial<Pick<Space, 'name' | 'useProfileId'>> & { linkedRoomId?: string | null },
 ): EditorState {
   const s = activeStorey(state);
   if (s === null) return state;
   const model = mapStorey(state.model, s.id, (st) => ({
     ...st,
-    spaces: st.spaces.map((sp) => (sp.id === spaceId ? { ...sp, ...patch } : sp)),
+    spaces: st.spaces.map((sp) => {
+      if (sp.id !== spaceId) return sp;
+      const next: Space = { ...sp };
+      if (patch.name !== undefined) next.name = patch.name;
+      if (patch.useProfileId !== undefined) next.useProfileId = patch.useProfileId;
+      // `null` clears the link (exactOptionalPropertyTypes → delete the key);
+      // a string sets it; `undefined` leaves it unchanged.
+      if (patch.linkedRoomId === null) delete next.linkedRoomId;
+      else if (patch.linkedRoomId !== undefined) next.linkedRoomId = patch.linkedRoomId;
+      return next;
+    }),
+  }));
+  return { ...state, model };
+}
+
+export function moveSpaceVertex(
+  state: EditorState,
+  spaceId: string,
+  index: number,
+  point: Point,
+): EditorState {
+  const s = activeStorey(state);
+  if (s === null) return state;
+  const model = mapStorey(state.model, s.id, (st) => ({
+    ...st,
+    spaces: st.spaces.map((sp) => {
+      if (sp.id !== spaceId) return sp;
+      if (index < 0 || index >= sp.polygon.length) return sp;
+      return { ...sp, polygon: sp.polygon.map((p, i) => (i === index ? point : p)) };
+    }),
+  }));
+  return { ...state, model };
+}
+
+/**
+ * Delete a vertex from a room polygon. A polygon needs ≥3 points, so removing a
+ * vertex that would drop it below 3 deletes the whole room.
+ */
+export function deleteSpaceVertex(state: EditorState, spaceId: string, index: number): EditorState {
+  const s = activeStorey(state);
+  if (s === null) return state;
+  const sp = s.spaces.find((x) => x.id === spaceId);
+  if (sp === undefined || index < 0 || index >= sp.polygon.length) return state;
+  if (sp.polygon.length <= 3) return deleteSpace(state, spaceId);
+  const model = mapStorey(state.model, s.id, (st) => ({
+    ...st,
+    spaces: st.spaces.map((x) => (x.id === spaceId ? { ...x, polygon: x.polygon.filter((_, i) => i !== index) } : x)),
   }));
   return { ...state, model };
 }

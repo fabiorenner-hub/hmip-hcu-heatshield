@@ -825,6 +825,20 @@ function heatBand(load01: number | undefined): 'low' | 'mid' | 'high' | null {
   return 'low';
 }
 
+/**
+ * Indoor-temperature tone, matching the overview legend thresholds
+ * (green < 24 °C · blue 24–26 °C · red > 26 °C). Used to tint the shutter
+ * tile face so a room's heat state reads at a glance.
+ */
+function tempTone(tempC: number | null): 'ok' | 'mid' | 'hot' | 'unknown' {
+  if (tempC === null || !Number.isFinite(tempC)) return 'unknown';
+  if (tempC > 26) return 'hot';
+  if (tempC >= 24) return 'mid';
+  return 'ok';
+}
+
+
+
 function RoomBadge(props: {
   room: RoomDetail;
   left: number;
@@ -849,6 +863,10 @@ function RoomBadge(props: {
   const status = room.status;
   const next = room.nextAction;
   const band = props.heatmapOn ? heatBand(room.heatLoad01) : null;
+  // Colour the left tone edge by the room temperature whenever a finite reading
+  // exists (green/blue/red per the legend); only a truly missing reading stays
+  // grey. `tempTone` already returns 'unknown' for null/NaN.
+  const heatTone = tempTone(room.indoorTempC);
   const fresh = room.indoorTempState ?? 'fresh';
   const title = next !== null ? `${tServer(next.reason)} (${statusLabel(status)})` : statusLabel(status);
   const tempStr = room.indoorTempC === null || !Number.isFinite(animTemp) ? '–' : `${animTemp.toFixed(1)}°`;
@@ -864,6 +882,7 @@ function RoomBadge(props: {
         props.selected ? 'room-badge--selected' : '',
         preview ? 'room-badge--preview' : '',
         band !== null ? `room-badge--heat-${band}` : '',
+        `room-badge--tone-${heatTone}`,
       ]
         .filter(Boolean)
         .join(' ')}

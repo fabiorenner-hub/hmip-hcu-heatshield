@@ -236,6 +236,10 @@ function Body(props: { snap: DashboardSnapshot }): JSX.Element {
   const cloud = cloudPercent(snap);
   const condition: [string, string] =
     cloud === null ? ['–', '–'] : cloud < 25 ? ['Klarer Himmel', 'Clear sky'] : cloud < 70 ? ['Leicht bewölkt', 'Partly cloudy'] : ['Bewölkt', 'Cloudy'];
+  // Weather chip primary line: show the configured Ort (location name) instead
+  // of a bare dash when the sky condition is unknown. Falls back to condition.
+  const ort = (config.value?.dwd?.regionName ?? '').trim();
+  const weatherPrimary = ort !== '' ? ort : t(...condition);
 
   const indoorTrend = (snap.trajectories?.indoorForecastWithShade ?? []).map((p) => p.tempC);
   const radiationTrend = (snap.forecastTimeline ?? []).map((c) => c.radiationWm2);
@@ -270,7 +274,7 @@ function Body(props: { snap: DashboardSnapshot }): JSX.Element {
           <div class="lg2-weather" data-testid="lg2-weather">
             <Icon name="sonne" size={26} class="lg2-weather__icon" />
             <div>
-              <div class="lg2-weather__cond">{t(...condition)}</div>
+              <div class="lg2-weather__cond">{weatherPrimary}</div>
               <div class="lg2-weather__vals">
                 {outdoor === null ? '–' : `${num1(outdoor)} °C`}
                 {humidity01 !== null && ` · ${Math.round(humidity01 * 100)} % r.F.`}

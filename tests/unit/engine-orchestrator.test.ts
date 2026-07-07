@@ -736,6 +736,25 @@ describe('runCycle — ventilation lockout', () => {
     const entry = out.decisionRecord.windowDecisions[0]!;
     expect(entry.blockedBy).not.toBe('venting');
   });
+
+  it('STORM overrides a per-window "Automatik aus" block — safety force-open wins', async () => {
+    const win = { ...bedroomRoofWindow(), automationBlocked: true };
+    const config = mkConfig({ rooms: [hotRoom], windows: [win] });
+    const { deps, setShutterLevel } = mkDeps(config);
+    const snapshot = mkSnapshot({
+      rooms: [{ id: 'schlafzimmer', tempC: 27, priority: 'very_high' }],
+      windSpeedMs: 14, // above storm threshold
+      windows: [{ config: win, contactState: 'closed' }],
+    });
+
+    const out = await runCycle(snapshot, deps);
+
+    expect(out.mode).toBe('STORM');
+    // The per-window automation block must NOT suppress a storm force-open.
+    expect(setShutterLevel).toHaveBeenCalledTimes(1);
+    const entry = out.decisionRecord.windowDecisions[0]!;
+    expect(entry.blockedBy).not.toBe('blocked');
+  });
 });
 
 // ---------------------------------------------------------------------------

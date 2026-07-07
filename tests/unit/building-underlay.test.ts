@@ -6,9 +6,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   pixelToModel,
+  modelToPixel,
+  modelToImageFraction,
   calibrateTwoPoint,
   effectiveMpp,
   clampUnderlayDisplay,
+  normalizeCropPolygon,
+  cropPolygonToPixels,
+  hasCrop,
   DEFAULT_MPP,
 } from '../../src/shared/building-underlay.js';
 
@@ -65,5 +70,66 @@ describe('clampUnderlayDisplay', () => {
 
   it('coerces a non-positive metersPerPixel to null', () => {
     expect(clampUnderlayDisplay({ metersPerPixel: 0 }).metersPerPixel).toBeNull();
+  });
+
+  it('normalises a crop polygon in the patch path', () => {
+    const out = clampUnderlayDisplay({ crop: [{ x: -1, y: 0.5 }, { x: 2, y: 0.5 }, { x: 0.5, y: 0.5 }] });
+    expect(out.crop).toEqual([{ x: 0, y: 0.5 }, { x: 1, y: 0.5 }, { x: 0.5, y: 0.5 }]);
+  });
+});
+
+describe('modelToPixel', () => {
+  it('is the inverse of pixelToModel', () => {
+    for (const u of [base, { ...base, rotationDeg: 37, offsetXM: 2, offsetYM: -1 }]) {
+      const m = pixelToModel(123, 45, u);
+      const px = modelToPixel(m.x, m.y, u);
+      expect(px.x).toBeCloseTo(123, 5);
+      expect(px.y).toBeCloseTo(45, 5);
+    }
+  });
+
+  it('maps a model point to an image fraction', () => {
+    const u = { ...base, metersPerPixel: 0.01, widthPx: 200, heightPx: 100 };
+    // pixel (100, 50) → model (1, -0.5); fraction back = (0.5, 0.5).
+    const f = modelToImageFraction({ x: 1, y: -0.5 }, u);
+    expect(f.x).toBeCloseTo(0.5, 6);
+    expect(f.y).toBeCloseTo(0.5, 6);
+  });
+});
+
+describe('normalizeCropPolygon', () => {
+  it('clamps coordinates into [0,1]', () => {
+    expect(normalizeCropPolygon([{ x: -0.2, y: 1.5 }, { x: 0.5, y: 0.5 }, { x: 2, y: -1 }])).toEqual([
+      { x: 0, y: 1 },
+      { x: 0.5, y: 0.5 },
+      { x: 1, y: 0 },
+    ]);
+  });
+
+  it('drops the crop when fewer than three valid points remain', () => {
+    expect(normalizeCropPolygon([{ x: 0.1, y: 0.1 }, { x: 0.2, y: 0.2 }])).toEqual([]);
+    expect(normalizeCropPolygon([{ x: 0.1, y: 0.1 }, { x: NaN, y: 0.2 }, { x: 0.3, y: 0.3 }])).toEqual([]);
+  });
+
+  it('defensively handles non-array / malformed JSON input', () => {
+    expect(normalizeCropPolygon(undefined)).toEqual([]);
+    expect(normalizeCropPolygon('nope')).toEqual([]);
+    expect(normalizeCropPolygon([1, null, { x: 'a', y: 0 }])).toEqual([]);
+  });
+});
+
+describe('cropPolygonToPixels / hasCrop', () => {
+  it('scales fractions to pixel coordinates', () => {
+    expect(cropPolygonToPixels([{ x: 0, y: 0 }, { x: 1, y: 0.5 }], 200, 100)).toEqual([
+      { x: 0, y: 0 },
+      { x: 200, y: 50 },
+    ]);
+  });
+
+  it('reports a usable crop only with three or more points', () => {
+    expect(hasCrop({ crop: [] })).toBe(false);
+    expect(hasCrop({ crop: [{ x: 0, y: 0 }, { x: 1, y: 0 }] })).toBe(false);
+    expect(hasCrop({ crop: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }] })).toBe(true);
+    expect(hasCrop({})).toBe(false);
   });
 });

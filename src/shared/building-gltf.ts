@@ -23,6 +23,7 @@ const KIND_COLOR: Record<FaceKind, [number, number, number, number]> = {
   ceiling: [0.6, 0.65, 0.72, 1],
   roof: [0.96, 0.62, 0.04, 1],
   pv: [0.23, 0.51, 1, 1],
+  roofwin: [0.21, 0.84, 0.9, 1],
 };
 
 interface Primitive {

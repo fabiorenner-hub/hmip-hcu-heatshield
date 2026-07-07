@@ -27,6 +27,8 @@ export type BuildingModelIssueCode =
   | 'DUPLICATE_ID'
   | 'OPENING_HOST_WALL_MISSING'
   | 'OPENING_HOST_WALL_WRONG_STOREY'
+  | 'OPENING_HOST_ROOF_MISSING'
+  | 'OPENING_HOST_ROOF_WRONG_STOREY'
   | 'SPACE_THERMAL_ZONE_MISSING'
   | 'WALL_CONSTRUCTION_MISSING'
   | 'ROOF_STOREY_MISSING'
@@ -56,6 +58,8 @@ export function validateBuildingModel(model: BuildingModel): BuildingModelValida
   const constructionIds = new Set(model.constructions.map((c) => c.id));
   const storeyIds = new Set(model.storeys.map((s) => s.id));
   const thermalZoneIds = new Set(model.thermalZones.map((z2) => z2.id));
+  // Roof id → hosting storey id, for roof-window (Dachfenster) host checks.
+  const roofStoreyById = new Map(model.roofs.map((r) => [r.id, r.storeyId]));
 
   // Global id uniqueness across every element that carries a uuid.
   const seen = new Set<string>();
@@ -86,15 +90,24 @@ export function validateBuildingModel(model: BuildingModel): BuildingModelValida
 
     storey.openings.forEach((opening, oi) => {
       note(opening.id, `storeys[${si}].openings[${oi}]`);
-      // An opening's host wall must exist AND live on the SAME storey.
-      if (!wallIds.has(opening.hostWallId)) {
-        const existsElsewhere = model.storeys.some((s) =>
-          s.walls.some((w) => w.id === opening.hostWallId),
-        );
+      const path = `storeys[${si}].openings[${oi}]`;
+      if (opening.hostRoofId !== undefined) {
+        // Roof window (Dachfenster): its roof must exist AND cap THIS storey.
+        const roofStorey = roofStoreyById.get(opening.hostRoofId);
+        if (roofStorey === undefined) {
+          issues.push({ code: 'OPENING_HOST_ROOF_MISSING', path, refId: opening.hostRoofId });
+        } else if (roofStorey !== storey.id) {
+          issues.push({ code: 'OPENING_HOST_ROOF_WRONG_STOREY', path, refId: opening.hostRoofId });
+        }
+      } else if (opening.hostWallId === undefined || !wallIds.has(opening.hostWallId)) {
+        // Façade opening: its host wall must exist AND live on the SAME storey.
+        const existsElsewhere =
+          opening.hostWallId !== undefined &&
+          model.storeys.some((s) => s.walls.some((w) => w.id === opening.hostWallId));
         issues.push({
           code: existsElsewhere ? 'OPENING_HOST_WALL_WRONG_STOREY' : 'OPENING_HOST_WALL_MISSING',
-          path: `storeys[${si}].openings[${oi}]`,
-          refId: opening.hostWallId,
+          path,
+          ...(opening.hostWallId !== undefined ? { refId: opening.hostWallId } : {}),
         });
       }
     });

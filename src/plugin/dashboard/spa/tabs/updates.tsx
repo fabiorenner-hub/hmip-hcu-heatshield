@@ -21,6 +21,101 @@ interface ChangelogEntry {
 function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '2.0.5',
+    items: [
+      t(
+        'Gebäude-Studio: Stockwerke lassen sich wieder löschen (Inline-Bestätigung 🗑 → „Löschen?", da der native Dialog im HCU-Webview blockiert ist). Das letzte Stockwerk bleibt geschützt.',
+        'Building Studio: storeys can be deleted again (inline confirm 🗑 → “Delete?”, since the native dialog is blocked in the HCU webview). The last remaining storey stays protected.',
+      ),
+      t(
+        'Fenster, Türen und Durchgänge werden per zwei Klicks auf der Wand platziert (Ort + Größe = Distanz) mit Live-Vorschau. An der Öffnung entsteht eine echte Aussparung in der Wand samt Tür-/Fenster-Symbol – nichts wird mehr überlagert.',
+        'Windows, doors and passages are placed with two clicks on the wall (position + size = distance) with a live preview. Each opening cuts a real gap in the wall with the door/window symbol drawn inside — nothing is painted on top anymore.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.4f2',
+    items: [
+      t(
+        'Hausübersicht: Die farbige Temperatur-Kante der Raum-Kacheln ist wieder deutlich als Farbband sichtbar und färbt sich immer nach dem Messwert (grün < 24 °C, blau 24–26 °C, rot > 26 °C), sobald ein Messwert vorliegt.',
+        'House overview: the coloured temperature edge of the room tiles is clearly visible again as a colour band and always reflects the reading (green < 24 °C, blue 24–26 °C, red > 26 °C) whenever a reading exists.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.4f1',
+    items: [
+      t(
+        'Gebäude-Studio 3D: Das Dach beschneidet jetzt immer die Räume – keine Wände mehr, die durchs Dach stoßen. Dächer haben nur noch Schrägflächen; Giebel, Krüppelwalm-Giebel und Kniestock entstehen aus der obersten Wand, die bis zum Dach aufgefüllt wird.',
+        'Building Studio 3D: the roof now always clips the rooms – no walls poking through. Roofs are sloped surfaces only; gables, half-hip gablets and the knee wall are formed by the top wall, which fills up to the roof.',
+      ),
+      t(
+        'Dachüberstand wirkt in 3D (Standard 1 m). Dachfenster sitzen im Dach und lassen PV-Aussparungen; PV liegt auf der Dachschräge statt auf dem Deckel. Wand-Bezugskante (Mitte/Außen/Innen) und Snapping auf Wandkanten; Räume/Fenster mit der Konfiguration verknüpfbar.',
+        'Roof overhang works in 3D (default 1 m). Roof windows sit in the roof and leave PV cut-outs; PV lies on the roof slope, not the storey lid. Wall reference edge (centre/outer/inner) and snapping to wall faces; rooms/windows can be linked to the configuration.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.4',
+    items: [
+      t(
+        'Gebäude-Studio stark erweitert: Grundriss zeichnen mit Auto-Schluss (Wand/Raum schließt am Startpunkt), feineres Raster (1–10 cm) und starkes Snapping auf vorhandene Ecken. Punkte lassen sich nachträglich verschieben (ziehen) und löschen (Alt+Klick).',
+        'Building Studio greatly expanded: draw floor plans with auto-close (wall/room closes on the start point), a finer grid (1–10 cm) and strong snapping to existing corners. Points can be moved (drag) and deleted (Alt-click) afterwards.',
+      ),
+      t(
+        'Fenster & Türen mit Höhe, Breite, Verglasung (1-/2-/3-fach) und Dachfenster-Option – jetzt auch im 2D-Plan sichtbar. Wände mit Standard-Dicke (Innen/Außen). Raumliste mit Namen und m². Keller anlegbar. 2D- und 3D-Ansicht im selben Bereich.',
+        'Windows & doors with height, width, glazing (single/double/triple) and a roof-window option — now shown in the 2D plan too. Walls with a default thickness (interior/exterior). Room list with names and m². Basement supported. 2D and 3D view in the same area.',
+      ),
+      t(
+        'Kompaktere, platzsparende Oberfläche (Projekt in der Kopfzeile, „Mehr"-Menü, schließbare Hilfe-Kachel). Hausübersicht: Kachel-Flächen färben nach Raumtemperatur (grün/blau/rot), Fenster-Symbol in Textfarbe.',
+        'More compact, space-saving UI (project in the header, a "More" menu, dismissible help card). House overview: tile faces coloured by room temperature (green/blue/red), window icon in text colour.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.3f2',
+    items: [
+      t(
+        'Pull-to-Refresh (Mobile): am Seitenanfang nach unten ziehen lädt die Seite neu — für iOS, wo es keine native Geste gibt. Ein Glas-Indikator folgt dem Zug.',
+        'Pull-to-refresh (mobile): pulling down at the top of the page reloads it — for iOS, which has no native gesture. A glass indicator follows the pull.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.3f1',
+    items: [
+      t(
+        'Mobile-Feinschliff: Wetter-Chip rechtsbündig im gestapelten Header; Automatik-Schalter mit gleicher Glas-Transparenz wie der Wetter-Chip.',
+        'Mobile polish: weather chip right-aligned in the stacked header; automation switch with the same glass transparency as the weather chip.',
+      ),
+      t(
+        'Doppelte Scrollbalken behoben (overflow-x: clip statt hidden); Mobile scrollt natürlich über den Body. Bottom-Navigation verteilt sich flexibel und passt vollständig.',
+        'Fixed double scrollbars (overflow-x: clip instead of hidden); mobile scrolls naturally via the body. Bottom navigation distributes flexibly and fits fully.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.3',
+    items: [
+      t(
+        'Mobile-Oberfläche überarbeitet: neue iPhone-taugliche Bottom-Navigation mit Beschriftung — alle Bereiche (auch Nachrichten, Hilfe, Darstellung, Ansicht) sind auf dem Handy erreichbar; respektiert die iOS Safe-Areas.',
+        'Mobile UI reworked: new iPhone-friendly bottom navigation with labels — every area (incl. messages, help, appearance, view) is reachable on the phone; respects iOS safe areas.',
+      ),
+      t(
+        'Wetter-Chip zeigt den Ort, der Automatik-Schalter trägt auf dem Handy wieder seinen Text, und der Titel wird nicht mehr unter der Notch abgeschnitten.',
+        'Weather chip shows the location, the automation switch shows its text again on mobile, and the title is no longer clipped under the notch.',
+      ),
+      t(
+        'Einstellungs-Kacheln jetzt exakt im Liquid-Glass-Look (volle Glas-Rezeptur wie alle V2-Karten). Symbol-Schatten und Kachel-Rahmen (Stärke und Farbe) sind konfigurierbar.',
+        'Settings tiles now exactly in the Liquid Glass look (full glass recipe like all V2 cards). Icon shadow and tile border (strength and colour) are configurable.',
+      ),
+      t(
+        'Layout-Fix: die kompakte Icon-Leiste bricht schmale Fenster nicht mehr (kein gequetschter Inhalt, keine doppelten Scrollbalken).',
+        'Layout fix: the compact icon rail no longer breaks narrow windows (no squeezed content, no double scrollbars).',
+      ),
+    ],
+  },
+  {
     version: '2.0.2',
     items: [
       t(

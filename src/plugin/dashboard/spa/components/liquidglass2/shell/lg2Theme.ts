@@ -88,6 +88,9 @@ export interface Lg2Theme {
   iconTiles: boolean; // app-icon style: neutral gradient tile behind every category glyph (off = normal accent-tinted symbols)
   iconTilesAccent: boolean; // icon tile gradient in the ACCENT colour instead of the neutral black/white gradient
   iconGlyphShadow: boolean; // drop-shadow under the icon glyph (inside the tile)
+  iconShadow: number; // 0..1 strength of the glyph drop-shadow (when iconGlyphShadow on)
+  borderWidth: number; // px card/tile border width (0..3)
+  borderColor: string; // 'auto' = theme hairline; else a hex tile-border colour
   elevation: number; // shadow depth 0..1
   accentAuto: boolean; // derive accent from weather/mode
   navTile: boolean; // wrap nav links in a glass tile
@@ -135,7 +138,8 @@ export const DEFAULT_THEME: Lg2Theme = {
   blur: 30, sat: 150, alpha: 0.13, radius: 'round', bevel: true, liquid: false, lite: false, preblur: true,
   fps: true, fpsNoNestedBlur: true, fpsContentVis: true, fpsContain: true,
   fpsPauseHidden: true, fpsLiteBevel: true, fpsNoSpecular: true,
-  gap: 16, contour: 0.5, sheen: true, iconTiles: false, iconTilesAccent: true, iconGlyphShadow: false, elevation: 0.7,
+  gap: 16, contour: 0.5, sheen: true, iconTiles: false, iconTilesAccent: true, iconGlyphShadow: true, iconShadow: 0.5,
+  borderWidth: 1, borderColor: 'auto', elevation: 0.7,
   accentAuto: true, navTile: true, navRail: false, hover: 'auto',
   background: mkFill({ kind: 'image', image: 'bg-house', opacity: 0.74, blur: 8 }),
   frameAuto: true,
@@ -168,7 +172,8 @@ function preset(over: Partial<Lg2Theme> & { accent: string }): Partial<Lg2Theme>
     radius: 'round', bevel: true, liquid: false, lite: false, preblur: false,
     fps: true, fpsNoNestedBlur: true, fpsContentVis: true, fpsContain: true,
     fpsPauseHidden: true, fpsLiteBevel: true, fpsNoSpecular: true, gap: 16, contour: 0.5,
-    sheen: true, iconTiles: true, iconTilesAccent: true, iconGlyphShadow: false, elevation: 0.7, accentAuto: false, navTile: true,
+    sheen: true, iconTiles: true, iconTilesAccent: true, iconGlyphShadow: true, iconShadow: 0.5,
+    borderWidth: 1, borderColor: 'auto', elevation: 0.7, accentAuto: false, navTile: true,
     navRail: true, hover: 'auto', frameAuto: true, frameShadow: true,
     frameDarken: 55, palette: { ...DEFAULT_PALETTE },
     ...over,
@@ -599,7 +604,12 @@ export function themeStyle(th: Lg2Theme, accent: string): { style: Record<string
     '--lg2-r': rMd,
     '--lg2-r-lg': rLg,
     '--lg2-r-xl': rXl,
-    '--lg2-icontile-glyph-shadow': th.iconGlyphShadow ? 'drop-shadow(0 1px 1px rgba(0,0,0,0.22))' : 'none',
+    // Configurable glyph drop-shadow: strength scales offset, blur and alpha.
+    '--lg2-icontile-glyph-shadow': th.iconGlyphShadow
+      ? `drop-shadow(0 ${(1 + 2 * th.iconShadow).toFixed(1)}px ${(2 + 4 * th.iconShadow).toFixed(1)}px rgba(0,0,0,${(0.2 + 0.35 * th.iconShadow).toFixed(2)}))`
+      : 'none',
+    // Configurable tile/card border width (applied via `--lg2-border-w`).
+    '--lg2-border-w': `${th.borderWidth}px`,
     '--lg2-bg-layer': bgLayer,
     '--lg2-bg-opacity': String(th.background.opacity),
     '--lg2-bg-blur': `${th.background.blur}px`,
@@ -613,6 +623,16 @@ export function themeStyle(th: Lg2Theme, accent: string): { style: Record<string
     '--lg2-shadow': `0 1px 2px rgba(0,0,0,${(0.3 * th.elevation).toFixed(2)}), 0 ${Math.round(10 + th.elevation * 26)}px ${Math.round(20 + th.elevation * 46)}px rgba(0,0,0,${(0.44 * th.elevation).toFixed(2)})`,
     ...textVars(th),
   };
+  // Custom tile-border colour: override the (otherwise white/scheme) hairline
+  // with the chosen hue. Alpha still follows the contour strength so the
+  // "Kontur-Stärke" slider keeps working on top of the custom colour.
+  if (th.borderColor !== 'auto') {
+    const [br, bgc, bb] = hexToRgb(th.borderColor);
+    const a1 = Math.min(1, 0.25 + th.contour * 0.6);
+    const a2 = Math.min(1, a1 + 0.15);
+    style['--lg2-hairline'] = `rgba(${br}, ${bgc}, ${bb}, ${a1.toFixed(3)})`;
+    style['--lg2-hairline-2'] = `rgba(${br}, ${bgc}, ${bb}, ${a2.toFixed(3)})`;
+  }
   // Icon tiles in the accent colour: override the (otherwise neutral,
   // scheme-aware) icon-tile tokens with an accent gradient + contrast glyph.
   if (th.iconTiles && th.iconTilesAccent) {

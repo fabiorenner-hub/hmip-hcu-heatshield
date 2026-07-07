@@ -305,6 +305,26 @@ export function ConfigPanel(props: { onClose: () => void }): JSX.Element {
         </div>
 
         <div class="lg2-cfg__group">
+          <span class="lg2-cfg__label">{t('Kachel-Rahmen', 'Tile border')}</span>
+          <div class="lg2-cfg__row">
+            <span class="lg2-cfg__label" style={{ marginBottom: 0 }}>{t('Rahmen-Stärke', 'Border width')}</span>
+            <input type="range" min={0} max={3} step={0.5} value={th.borderWidth}
+              data-testid="lg2-cfg-borderwidth"
+              onInput={(e): void => tweak({ borderWidth: Number((e.currentTarget as HTMLInputElement).value) })} />
+            <span class="lg2-cfg__val">{th.borderWidth}px</span>
+          </div>
+          <div class="lg2-cfg__row">
+            <span class="lg2-cfg__label" style={{ marginBottom: 0 }}>{t('Rahmen-Farbe', 'Border colour')}</span>
+            <button type="button" class={`lg2-preset${th.borderColor === 'auto' ? ' lg2-preset--on' : ''}`}
+              data-testid="lg2-cfg-bordercolor-auto"
+              onClick={(): void => tweak({ borderColor: 'auto' })}>{t('Auto', 'Auto')}</button>
+            <input type="color" value={th.borderColor === 'auto' ? '#ffffff' : th.borderColor}
+              aria-label={t('Rahmen-Farbe', 'Border colour')}
+              onInput={(e): void => tweak({ borderColor: (e.currentTarget as HTMLInputElement).value })} />
+          </div>
+        </div>
+
+        <div class="lg2-cfg__group">
           <span class="lg2-cfg__label">{t('Schatten-Tiefe', 'Shadow depth')}</span>
           <div class="lg2-cfg__row">
             <input type="range" min={0} max={100} step={5} value={Math.round(th.elevation * 100)}
@@ -356,6 +376,15 @@ export function ConfigPanel(props: { onClose: () => void }): JSX.Element {
                   data-testid="lg2-cfg-iconshadow"
                   onClick={(): void => tweak({ iconGlyphShadow: !th.iconGlyphShadow })} />
               </div>
+              {th.iconGlyphShadow && (
+                <div class="lg2-cfg__row">
+                  <span class="lg2-cfg__label" style={{ marginBottom: 0 }}>{t('Schatten-Stärke', 'Shadow strength')}</span>
+                  <input type="range" min={0} max={100} step={5} value={Math.round(th.iconShadow * 100)}
+                    data-testid="lg2-cfg-iconshadow-strength"
+                    onInput={(e): void => tweak({ iconShadow: Number((e.currentTarget as HTMLInputElement).value) / 100 })} />
+                  <span class="lg2-cfg__val">{Math.round(th.iconShadow * 100)} %</span>
+                </div>
+              )}
             </Fragment>
           )}
         </div>

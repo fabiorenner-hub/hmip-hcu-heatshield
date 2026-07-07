@@ -111,6 +111,25 @@ const RoomSignalsSchema = z.object({
   illumination: SignalBindingSchema.optional(),
 });
 
+// ---------------------------------------------------------------------------
+// Shared movement-block schedule — "do not move on these weekdays within this
+// clock-time window". Used both per-window (`Window.blockSchedules`) and, since
+// v2.1, per-room (`Room.quietSchedules`, the granular successor to the single
+// `noMoveBeforeHour`/`noMoveAfterHour` bounds). STORM always overrides a block.
+// ---------------------------------------------------------------------------
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/u;
+
+export const MoveBlockScheduleSchema = z.object({
+  // JS `Date.getDay()` weekdays the block applies to: 0=Sun … 6=Sat. Empty
+  // array = every day.
+  days: z.array(z.number().int().min(0).max(6)).default([]),
+  // Local clock-time window "HH:MM"–"HH:MM"; wraps across midnight when
+  // start > end (e.g. 22:00 → 10:00).
+  start: z.string().regex(HHMM, 'Erwartet "HH:MM" im 24h-Format').default('22:00'),
+  end: z.string().regex(HHMM, 'Erwartet "HH:MM" im 24h-Format').default('10:00'),
+});
+
 export const RoomSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -130,6 +149,14 @@ export const RoomSchema = z.object({
   // Example: noMoveBeforeHour=7, noMoveAfterHour=22 → moves only 07:00–21:59.
   noMoveBeforeHour: z.number().int().min(0).max(23).optional(),
   noMoveAfterHour: z.number().int().min(1).max(24).optional(),
+  // Granular per-room quiet schedules (v2.1): a list of {weekdays + clock-time
+  // window} rules during which NO automatic move is dispatched for this room's
+  // shutters. Finer-grained successor to the `noMoveBeforeHour`/`noMoveAfterHour`
+  // hour bounds (both continue to work and are honoured together). STORM always
+  // overrides. Empty/omitted = never blocked by a schedule. Optional (not
+  // `.default([])`) so existing Room literals across the app stay valid; the
+  // engine and UI both treat `undefined` as "no schedules".
+  quietSchedules: z.array(MoveBlockScheduleSchema).optional(),
   // Building thermal inertia (Thermal_Inertia) as time constant τ in minutes
   // (predictive-control-dashboard Requirement 2.2). Higher = slower indoor
   // response. Default 120 min applied at read time; optional in config.
@@ -151,17 +178,10 @@ export const RoomSchema = z.object({
 // the per-room `noMoveBeforeHour`/`noMoveAfterHour` hour bounds.
 // ---------------------------------------------------------------------------
 
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/u;
-
-export const WindowBlockScheduleSchema = z.object({
-  // JS `Date.getDay()` weekdays the block applies to: 0=Sun … 6=Sat. Empty
-  // array = every day.
-  days: z.array(z.number().int().min(0).max(6)).default([]),
-  // Local clock-time window "HH:MM"–"HH:MM"; wraps across midnight when
-  // start > end (e.g. 22:00 → 10:00).
-  start: z.string().regex(HHMM, 'Erwartet "HH:MM" im 24h-Format').default('22:00'),
-  end: z.string().regex(HHMM, 'Erwartet "HH:MM" im 24h-Format').default('10:00'),
-});
+// Per-window block schedule — identical shape to the shared room schedule
+// (defined above as `MoveBlockScheduleSchema`). Kept as a named export for
+// backward compatibility with existing imports and derived types.
+export const WindowBlockScheduleSchema = MoveBlockScheduleSchema;
 
 // ---------------------------------------------------------------------------
 // Window — physical opening with shutter device + geometry + safety flags.

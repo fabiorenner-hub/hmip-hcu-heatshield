@@ -891,9 +891,11 @@ export async function runCycle(
     let moved = false;
     let blockedBy: BlockedBy | undefined;
 
-    if (winCfg.automationBlocked) {
+    if (modeDecision.mode !== 'STORM' && winCfg.automationBlocked) {
       // Per-window automation block: never move, but keep the full
       // decision row so the UI still shows risk/target for context.
+      // STORM is exempt (guarded above) — a storm force-open must NEVER be
+      // suppressed by a per-window "Automatik aus" flag (safety precedence).
       moved = false;
       blockedBy = 'blocked';
       if (log !== undefined) {
@@ -948,6 +950,25 @@ export async function runCycle(
       blockedBy = 'pause';
       if (log !== undefined) {
         log('info', 'window held by per-window block schedule', {
+          windowId: winCfg.id,
+          roomId: winCfg.roomId,
+        });
+      }
+    } else if (
+      modeDecision.mode !== 'STORM' &&
+      windowScheduleBlocked(
+        snapshot.now,
+        deps.config.location.timezone,
+        roomCfgById.get(winCfg.roomId)?.quietSchedules,
+      )
+    ) {
+      // Per-room quiet schedule (weekday + clock-time window) — the granular
+      // successor to noMoveBeforeHour/noMoveAfterHour. Applies to every shutter
+      // in the room. Hold the position; STORM is exempt (guarded above).
+      moved = false;
+      blockedBy = 'pause';
+      if (log !== undefined) {
+        log('info', 'window held by room quiet schedule', {
           windowId: winCfg.id,
           roomId: winCfg.roomId,
         });

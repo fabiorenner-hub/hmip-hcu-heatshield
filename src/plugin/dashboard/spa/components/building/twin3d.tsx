@@ -23,6 +23,7 @@ const KIND_FILL: Record<FaceKind, string> = {
   ceiling: 'rgba(154, 166, 184, 0.10)',
   roof: 'rgba(245, 158, 11, 0.28)',
   pv: 'rgba(59, 130, 246, 0.55)',
+  roofwin: 'rgba(53, 214, 231, 0.5)',
 };
 const KIND_STROKE: Record<FaceKind, string> = {
   wall: 'rgba(232, 237, 246, 0.5)',
@@ -30,6 +31,7 @@ const KIND_STROKE: Record<FaceKind, string> = {
   ceiling: 'rgba(154, 166, 184, 0.45)',
   roof: 'rgba(245, 158, 11, 0.8)',
   pv: 'rgba(120, 170, 255, 0.95)',
+  roofwin: 'rgba(53, 214, 231, 0.95)',
 };
 
 /** Live room-state overlay (digital-twin-renderer T-03 / BME-16). */
@@ -137,7 +139,7 @@ export function Twin3D(props: { model: BuildingModel; roomStates?: RoomOverlay[]
   const visibleFaces: MeshFace[] = useMemo(
     () => {
       const base = mesh.faces.filter(
-        (f) => (storeyFilter === 'all' || f.storeyId === storeyFilter) && (showRoof || f.kind !== 'roof'),
+        (f) => (storeyFilter === 'all' || f.storeyId === storeyFilter) && (showRoof || (f.kind !== 'roof' && f.kind !== 'roofwin')),
       );
       if (!clipOn) return base;
       // Section cut: clip every face to the half-space z ≤ cutClamped.
@@ -358,8 +360,8 @@ export function Twin3D(props: { model: BuildingModel; roomStates?: RoomOverlay[]
         <summary>{t('Szenen-Struktur (barrierefrei)', 'Scene structure (accessible)')}</summary>
         <p class="module-panel__hint">
           {t(
-            `${counts.total} Flächen: ${counts.wall} Wand, ${counts.floor} Boden, ${counts.ceiling} Decke, ${counts.roof} Dach, ${counts.pv} PV.`,
-            `${counts.total} faces: ${counts.wall} wall, ${counts.floor} floor, ${counts.ceiling} ceiling, ${counts.roof} roof, ${counts.pv} PV.`,
+            `${counts.total} Flächen: ${counts.wall} Wand, ${counts.floor} Boden, ${counts.ceiling} Decke, ${counts.roof} Dach, ${counts.roofwin} Dachfenster, ${counts.pv} PV.`,
+            `${counts.total} faces: ${counts.wall} wall, ${counts.floor} floor, ${counts.ceiling} ceiling, ${counts.roof} roof, ${counts.roofwin} roof windows, ${counts.pv} PV.`,
           )}
         </p>
         <ul>
