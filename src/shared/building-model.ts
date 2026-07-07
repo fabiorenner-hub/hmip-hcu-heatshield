@@ -115,6 +115,8 @@ export const OpeningSchema = z
   .object({
     id: uuid(),
     type: OpeningTypeSchema,
+    // Optional human label (e.g. "Fenster SO"). Editable in the studio.
+    name: z.string().min(1).optional(),
     // Host reference: a façade opening sits on a wall (`hostWallId`); a roof
     // window (Dachfenster) sits in a roof plane (`hostRoofId`). Exactly one is
     // set. `hostWallId` is OPTIONAL (not required) so roof windows need no

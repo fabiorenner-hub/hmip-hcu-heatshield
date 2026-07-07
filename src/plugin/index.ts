@@ -571,6 +571,9 @@ class HeatShieldBoot {
       logger: this.logBuffer.asLogger,
     });
     this.ownDevices.loadCache(state.ownSwitches);
+    // Seed the "Automatik" switch from config so discovery + the HmIP app show
+    // the current master automation state immediately.
+    this.ownDevices.confirmFromEngine('heatshield-control-automation', config.automationEnabled);
     this.irrigation = new IrrigationController({
       config: () => this.config,
       gardena: () => this.gardena,
@@ -599,6 +602,12 @@ class HeatShieldBoot {
       location: config.location,
       logger: this.logBuffer.asLogger,
       onReevaluate: () => this.runCycleNow(),
+      // Master automation switch (heatshield-control-automation) → config.
+      onSetAutomation: (on) => {
+        this.applyConfigChange((c) => {
+          c.automationEnabled = on;
+        });
+      },
     });
     if (env.noConnect || env.authToken === null) {
       this.connect = null;
@@ -2402,6 +2411,14 @@ class HeatShieldBoot {
       () => undefined,
     );
     this.rebuildNotifications();
+    // Keep the HCU "Automatik" switch in sync with config.automationEnabled
+    // regardless of who changed it (dashboard, Telegram, config PUT). Idempotent
+    // — confirmFromEngine only emits a STATUS_EVENT on an effective change.
+    try {
+      this.ownDevices.confirmFromEngine('heatshield-control-automation', validated.data.automationEnabled);
+    } catch {
+      // never let a switch sync failure break a config change
+    }
     return true;
   }
 

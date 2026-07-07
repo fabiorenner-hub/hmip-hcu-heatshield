@@ -210,6 +210,11 @@ function f1(n: number): string {
  * wind sensor does not silently keep the engine in STORM forever.
  */
 export function checkStormHold(inputs: ModeInputs): { active: boolean; until: Date | null } {
+  // Storm safety can be disabled by the user (settings). When off, the engine
+  // never enters STORM mode and never force-opens on high wind.
+  if (inputs.rules.storm.enabled === false) {
+    return { active: false, until: null };
+  }
   const wind = inputs.windSpeedMs ?? 0;
   const threshold = inputs.rules.storm.thresholdMs;
   const holdMs = inputs.rules.storm.releaseHoldMin * 60 * 1000;

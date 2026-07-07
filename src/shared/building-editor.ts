@@ -260,6 +260,31 @@ export function newEditorState(model: BuildingModel): EditorState {
   };
 }
 
+/**
+ * Update the site metadata (orientation / location / timezone). Only the given
+ * fields change; `northAzimuthDeg` is normalised to [0, 360) and latitude /
+ * longitude are clamped to valid ranges so the model stays schema-valid.
+ */
+export function updateSite(
+  state: EditorState,
+  patch: { northAzimuthDeg?: number; latitude?: number; longitude?: number; timezone?: string },
+): EditorState {
+  const site = { ...state.model.site };
+  if (patch.northAzimuthDeg !== undefined && Number.isFinite(patch.northAzimuthDeg)) {
+    site.northAzimuthDeg = ((patch.northAzimuthDeg % 360) + 360) % 360;
+  }
+  if (patch.latitude !== undefined && Number.isFinite(patch.latitude)) {
+    site.latitude = Math.max(-90, Math.min(90, patch.latitude));
+  }
+  if (patch.longitude !== undefined && Number.isFinite(patch.longitude)) {
+    site.longitude = Math.max(-180, Math.min(180, patch.longitude));
+  }
+  if (patch.timezone !== undefined && patch.timezone.length > 0) {
+    site.timezone = patch.timezone;
+  }
+  return { ...state, model: { ...state.model, site } };
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers.
 // ---------------------------------------------------------------------------
@@ -762,6 +787,7 @@ export interface OpeningInput {
   sillM?: number;
   glazing?: GlazingType;
   roofWindow?: boolean;
+  name?: string;
 }
 
 export function addOpening(
@@ -776,6 +802,7 @@ export function addOpening(
   const opening: Opening = {
     id: ctx.newId(),
     type: input.type,
+    ...(input.name !== undefined && input.name.trim().length > 0 ? { name: input.name.trim() } : {}),
     hostWallId: input.hostWallId,
     offsetM: Math.max(0, input.offsetM),
     widthM: input.widthM,
@@ -799,6 +826,7 @@ export interface RoofWindowInput {
   widthM?: number;
   heightM?: number;
   glazing?: GlazingType;
+  name?: string;
 }
 
 /**
@@ -819,6 +847,7 @@ export function addRoofWindow(
   const opening: Opening = {
     id: ctx.newId(),
     type: 'window',
+    ...(input.name !== undefined && input.name.trim().length > 0 ? { name: input.name.trim() } : {}),
     hostRoofId: roof.id,
     offsetM: Math.max(0, input.offsetM ?? 0),
     widthM: input.widthM !== undefined && input.widthM > 0 ? input.widthM : 0.78,
@@ -838,6 +867,8 @@ export interface OpeningPatch {
   sillM?: number;
   glazing?: GlazingType;
   roofWindow?: boolean;
+  /** Rename; empty string clears the name back to the type default. */
+  name?: string;
   /** Link to a config window; `null` clears it, `undefined` keeps it. */
   linkedWindowId?: string | null;
 }
@@ -866,6 +897,12 @@ export function updateOpening(
         ...(patch.glazing !== undefined ? { glazing: patch.glazing } : {}),
         ...(patch.roofWindow !== undefined ? { roofWindow: patch.roofWindow } : {}),
       };
+      // Rename: a non-empty string sets the label, empty clears it.
+      if (patch.name !== undefined) {
+        const nm = patch.name.trim();
+        if (nm.length > 0) next.name = nm;
+        else delete next.name;
+      }
       // `null` clears the config-window link; a string sets it.
       if (patch.linkedWindowId === null) delete next.linkedWindowId;
       else if (patch.linkedWindowId !== undefined) next.linkedWindowId = patch.linkedWindowId;

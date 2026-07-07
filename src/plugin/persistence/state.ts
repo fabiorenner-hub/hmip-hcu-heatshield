@@ -155,12 +155,39 @@ export async function readState(
     throw err;
   }
 
+  migrateOwnSwitches(parsed);
+
   const result = safeParseState(parsed);
   if (!result.success) {
     await bestEffortUnlink(target);
     return null;
   }
   return result.data;
+}
+
+/**
+ * Forward-migrate a persisted state's `ownSwitches` to the canonical id set
+ * (order + membership). Older state files predate later switches (e.g. the
+ * v2.0.7 `heatshield-control-automation`); rather than reject and reset the
+ * whole runtime state, we rebuild the array in `OwnSwitchIdSchema.options`
+ * order, keeping existing rows and appending defaults for any missing id.
+ * Unknown/extra rows are dropped. Mutates `parsed` in place; no-ops on any
+ * unexpected shape (the subsequent `safeParseState` handles those).
+ */
+function migrateOwnSwitches(parsed: unknown): void {
+  if (typeof parsed !== 'object' || parsed === null) return;
+  const obj = parsed as { ownSwitches?: unknown };
+  if (!Array.isArray(obj.ownSwitches)) return;
+  const existing = new Map<string, unknown>();
+  for (const row of obj.ownSwitches) {
+    if (typeof row === 'object' && row !== null && typeof (row as { id?: unknown }).id === 'string') {
+      existing.set((row as { id: string }).id, row);
+    }
+  }
+  const now = new Date().toISOString();
+  obj.ownSwitches = OwnSwitchIdSchema.options.map(
+    (id) => existing.get(id) ?? { id, value: false, engineConfirmed: false, updatedAt: now },
+  );
 }
 
 /**

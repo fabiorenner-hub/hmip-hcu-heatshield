@@ -41,6 +41,7 @@ import type { Mode } from '../../src/shared/types.js';
 const NOW = new Date('2025-07-15T12:00:00.000Z');
 
 const STORM_RULES = {
+  enabled: true,
   thresholdMs: 13.9,
   releaseMs: 8.0,
   releaseHoldMin: 10,
@@ -147,6 +148,26 @@ describe('checkStormHold', () => {
     const past = new Date(NOW.getTime() - 1);
     const r = checkStormHold(mkInputs({ windSpeedMs: 0, stormHoldUntil: past }));
     expect(r).toEqual({ active: false, until: null });
+  });
+
+  it('is disabled (never active) when rules.storm.enabled === false, even at high wind', () => {
+    const r = checkStormHold(
+      mkInputs({
+        windSpeedMs: 30,
+        rules: { storm: { ...STORM_RULES, enabled: false }, nightCooling: NIGHT_COOLING_RULES },
+      }),
+    );
+    expect(r).toEqual({ active: false, until: null });
+  });
+
+  it('determineMode never picks STORM when storm is disabled', () => {
+    const r = determineMode(
+      mkInputs({
+        windSpeedMs: 30,
+        rules: { storm: { ...STORM_RULES, enabled: false }, nightCooling: NIGHT_COOLING_RULES },
+      }),
+    );
+    expect(r.mode).not.toBe('STORM');
   });
 });
 

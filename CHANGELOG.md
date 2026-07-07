@@ -3,6 +3,21 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.7
+
+- **Sturmschutz deaktivierbar:** In den Einstellungen (Regeln → Automatik-Erweiterungen) lässt sich der Sturmschutz-Zwangsöffner abschalten. Standard bleibt **an** (Sicherheit).
+- **Virtuelles HCU-Gerät „Hitzeschutz Automatik":** ein neuer SWITCH, mit dem sich die Automatik ein/aus schalten lässt – nutzbar in HCU-Automationen und in der HmIP-App. Bidirektional mit `automationEnabled` synchron (Dashboard/Telegram/HCU). Alte State-Dateien werden migriert (5 → 6 Schalter, ohne Datenverlust).
+- **Kompass-Rose ein-/ausblendbar:** die Windrose im Gebäude-Studio ist nicht mehr dauerhaft eingeblendet (🧭-Button).
+- **Kühl-Soll-Temperatur:** neuer setzbarer Parameter (Regeln), der eine Ziel-Innentemperatur für alle Räume vorgibt und das Komfortband entsprechend verschiebt. Optional – ohne Angabe gelten die per-Raum-Ziele wie bisher.
+
+## 2.0.6
+
+- **3D-Ansicht war gespiegelt** (Nord/Süd) – jetzt korrekt in derselben Ausrichtung wie die 2D-Ansicht.
+- **Saubere Wandecken (L) im 3D-Modell** – Wände werden im 3D-Mesh gehrt (wie in 2D), keine klaffenden/überlappenden Ecken mehr.
+- **Fenster/Türen/Durchgänge haben Namen** (editierbar); beim 2-Klick-Platzieren automatisch vergeben.
+- **Klick auf ein Fenster im Plan** wählt es aus und springt direkt zu dessen Einstellungen (Zeile hervorgehoben, in den sichtbaren Bereich gescrollt).
+- **Kompass-Rose** über der Zeichenfläche zeigt und stellt die Gebäudeausrichtung (Norden) ein – per Ziehen, ↺/↻ (15°) oder Gradeingabe; wirkt auch auf die Sonnen-/Schattenberechnung im 3D.
+
 ## 2.0.5
 
 - **Gebäude-Studio – Stockwerke löschen:** Das Löschen von Stockwerken funktioniert wieder. Der native Bestätigungsdialog (`window.confirm`) wird im HCU-Webview blockiert; ersetzt durch eine **Inline-Bestätigung** (🗑 → „Löschen?" → bestätigen, ✕ bricht ab). Das letzte verbleibende Stockwerk bleibt geschützt.

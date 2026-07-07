@@ -79,7 +79,7 @@ function mkConfig(overrides: Partial<Config> = {}): Config {
         maxIncidenceAngleFacadeDeg: 90,
         maxIncidenceAngleRoofDeg: 95,
       },
-      storm: { thresholdMs: 13.9, releaseMs: 8.0, releaseHoldMin: 10 },
+      storm: { enabled: true, thresholdMs: 13.9, releaseMs: 8.0, releaseHoldMin: 10 },
       nightCooling: { enabled: true, deltaC: 1.5, reopenAtSunriseOffsetMin: -30 },
       manualOverrideMinutes: 60,
     },

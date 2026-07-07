@@ -704,12 +704,26 @@ export async function runCycle(
     // warning_c, and strong_shade_c are shifted down by
     // `vacationOffsetC` — `critical_c` stays as the hard ceiling.
     const roomTempC = room?.tempC ?? null;
-    const baseRoomTargets = room?.targets ?? {
+    const rawRoomTargets = room?.targets ?? {
       target_c: 23,
       warning_c: 24.5,
       strong_shade_c: 25,
       critical_c: 26,
     };
+    // Global cooling target (Kühl-Soll): when set, shift the whole comfort band
+    // so `target_c` becomes `coolTargetC` (warning/strong/critical ride along,
+    // preserving each room's relative margins). Absent = per-room targets as-is.
+    const coolTargetC = deps.config.rules.comfort.coolTargetC;
+    const coolShift = coolTargetC !== undefined ? coolTargetC - rawRoomTargets.target_c : 0;
+    const baseRoomTargets =
+      coolShift !== 0
+        ? {
+            target_c: rawRoomTargets.target_c + coolShift,
+            warning_c: rawRoomTargets.warning_c + coolShift,
+            strong_shade_c: rawRoomTargets.strong_shade_c + coolShift,
+            critical_c: rawRoomTargets.critical_c + coolShift,
+          }
+        : rawRoomTargets;
     const roomTargets =
       vacationOffsetC > 0
         ? {

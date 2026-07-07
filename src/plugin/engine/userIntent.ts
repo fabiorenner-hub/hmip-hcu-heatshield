@@ -338,6 +338,12 @@ export function applyUserSwitchToggle(
       effects.reevaluate = true;
       return { next, effects };
     }
+
+    case 'heatshield-control-automation': {
+      // Master automation on/off maps to config, not runtime intent — the
+      // bridge handles it before the reducer runs. No-op here for exhaustiveness.
+      return { next, effects };
+    }
   }
 }
 

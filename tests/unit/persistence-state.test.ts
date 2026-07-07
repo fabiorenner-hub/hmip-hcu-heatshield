@@ -82,16 +82,17 @@ describe('emptyRuntimeState', () => {
     expect(() => parseState(empty)).not.toThrow();
   });
 
-  it('produces exactly five own-switch rows in canonical order', () => {
+  it('produces exactly six own-switch rows in canonical order', () => {
     const empty = emptyRuntimeState();
 
-    expect(empty.ownSwitches).toHaveLength(5);
+    expect(empty.ownSwitches).toHaveLength(6);
     expect(empty.ownSwitches.map((s) => s.id)).toEqual([
       'heatshield-state-active',
       'heatshield-state-forecast',
       'heatshield-state-night-cooling',
       'heatshield-control-pause',
       'heatshield-control-vacation',
+      'heatshield-control-automation',
     ]);
     for (const row of empty.ownSwitches) {
       expect(row.value).toBe(false);
@@ -157,12 +158,40 @@ describe('readState', () => {
     expect(await pathExists(target)).toBe(false);
   });
 
-  it('returns null AND removes the file when ownSwitches has only four entries', async () => {
+  it('migrates a legacy 5-switch state to 6 on read (appends heatshield-control-automation)', async () => {
+    const target = tmpStatePath();
+    const empty = emptyRuntimeState();
+    // Legacy file predating the automation switch: drop it, keep the other 5.
+    const legacy = {
+      ...empty,
+      ownSwitches: empty.ownSwitches.filter((s) => s.id !== 'heatshield-control-automation'),
+    };
+    // Mark one legacy row so we can prove existing values are preserved.
+    legacy.ownSwitches[3] = { ...legacy.ownSwitches[3]!, value: true, engineConfirmed: true };
+    expect(legacy.ownSwitches).toHaveLength(5);
+    await fs.writeFile(target, JSON.stringify(legacy), 'utf8');
+
+    const result = await readState({ statePath: target });
+
+    expect(result).not.toBeNull();
+    expect(result!.ownSwitches).toHaveLength(6);
+    expect(result!.ownSwitches.map((s) => s.id)).toContain('heatshield-control-automation');
+    // Preserved legacy value.
+    const pause = result!.ownSwitches.find((s) => s.id === 'heatshield-control-pause');
+    expect(pause?.value).toBe(true);
+    // Appended automation defaults to off.
+    const auto = result!.ownSwitches.find((s) => s.id === 'heatshield-control-automation');
+    expect(auto?.value).toBe(false);
+  });
+
+  it('returns null AND removes the file when a switch row is malformed', async () => {
     const target = tmpStatePath();
     const empty = emptyRuntimeState();
     const broken = {
       ...empty,
-      ownSwitches: empty.ownSwitches.slice(0, 4),
+      // A row with a non-boolean value survives migration (id is kept) but
+      // fails schema validation → readState rejects + unlinks.
+      ownSwitches: empty.ownSwitches.map((s, i) => (i === 0 ? { ...s, value: 'nope' } : s)),
     };
     await fs.writeFile(target, JSON.stringify(broken), 'utf8');
 
@@ -254,7 +283,7 @@ describe('writeState + readState round-trip', () => {
   });
 });
 
-describe('parseState — five-ownSwitches constraint', () => {
+describe('parseState — six-ownSwitches constraint', () => {
   it('throws a ZodError when ownSwitches has only four entries', () => {
     const empty = emptyRuntimeState();
     const broken = {
@@ -265,7 +294,7 @@ describe('parseState — five-ownSwitches constraint', () => {
     expect(() => parseState(broken)).toThrow(ZodError);
   });
 
-  it('throws a ZodError when ownSwitches has six entries', () => {
+  it('throws a ZodError when ownSwitches has seven entries', () => {
     const empty = emptyRuntimeState();
     const broken = {
       ...empty,

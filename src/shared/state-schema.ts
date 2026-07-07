@@ -121,6 +121,8 @@ export const OwnSwitchIdSchema = z.enum([
   'heatshield-state-night-cooling',
   'heatshield-control-pause',
   'heatshield-control-vacation',
+  // Master automation on/off (maps to config.automationEnabled). Added v2.0.7.
+  'heatshield-control-automation',
 ]);
 
 /**
@@ -211,7 +213,7 @@ export const RuntimeStateSchema = z.object({
   currentMode: ModeSchema.nullable(),
   lastCycleAt: IsoTimestampSchema.nullable(),
   windows: z.array(WindowRuntimeStateSchema),
-  ownSwitches: z.array(OwnSwitchStateSchema).length(5),
+  ownSwitches: z.array(OwnSwitchStateSchema).length(6),
   stormHoldUntil: IsoTimestampSchema.nullable(),
   userIntent: UserIntentStateSchema.default({
     paused: false,

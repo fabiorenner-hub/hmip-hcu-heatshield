@@ -619,7 +619,7 @@ describe('Connect API end-to-end — DISCOVER produces no ERROR_RESPONSE', () =>
       devices: Array<{ deviceType: string }>;
     };
     expect(discoverBody.success).toBe(true);
-    expect(discoverBody.devices).toHaveLength(5);
+    expect(discoverBody.devices).toHaveLength(6);
     for (const dev of discoverBody.devices) {
       expect(dev.deviceType).toBe('SWITCH');
     }

@@ -65,7 +65,9 @@ function project(v: Vec3, azDeg: number, elDeg: number): Projected {
   const a = (azDeg * Math.PI) / 180;
   const p = (elDeg * Math.PI) / 180;
   const rx = v.x * Math.cos(a) - v.y * Math.sin(a);
-  const ry = v.x * Math.sin(a) + v.y * Math.cos(a);
+  // Negated so +y (north) points UP on screen, matching the 2D editor
+  // (which uses sy = -y). Without this the 3D view is mirrored north/south.
+  const ry = -(v.x * Math.sin(a) + v.y * Math.cos(a));
   return {
     x: rx,
     y: ry * Math.sin(p) - v.z * Math.cos(p),

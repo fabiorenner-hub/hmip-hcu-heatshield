@@ -116,6 +116,7 @@ function singleRoomConfig(prelookMinutes: number = 60): Config {
         maxIncidenceAngleRoofDeg: 95,
       },
       storm: {
+        enabled: true,
         thresholdMs: 13.9,
         releaseMs: 8,
         releaseHoldMin: 10,

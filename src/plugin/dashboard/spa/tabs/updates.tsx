@@ -21,6 +21,32 @@ interface ChangelogEntry {
 function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '2.0.7',
+    items: [
+      t(
+        'Sturmschutz lässt sich in den Einstellungen deaktivieren (Standard bleibt an). Neues virtuelles HCU-Gerät „Hitzeschutz Automatik" (SWITCH) schaltet die Automatik ein/aus – auch in HCU-Automationen und der HmIP-App nutzbar.',
+        'Storm protection can be disabled in the settings (default stays on). New virtual HCU device “Heat Shield Automation” (SWITCH) turns automation on/off — usable in HCU automations and the HmIP app.',
+      ),
+      t(
+        'Kompass-Rose im Gebäude-Studio ein-/ausblendbar. Neuer Parameter „Kühl-Soll-Temperatur": gibt eine Ziel-Innentemperatur für alle Räume vor.',
+        'Compass rose in the Building Studio can be shown/hidden. New “cooling target temperature” parameter: sets a target indoor temperature for all rooms.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.6',
+    items: [
+      t(
+        'Gebäude-Studio 3D: Die 3D-Ansicht war gespiegelt (Nord/Süd) und ist jetzt korrekt wie die 2D-Ansicht. Wandecken (L) werden im 3D-Modell sauber (gehrt) dargestellt.',
+        'Building Studio 3D: the 3D view was mirrored (north/south) and now matches the 2D view. Wall corners (L) are rendered cleanly (mitred) in the 3D model.',
+      ),
+      t(
+        'Fenster, Türen und Durchgänge haben jetzt Namen (editierbar); ein Klick auf ein Fenster im Plan springt direkt zu dessen Einstellungen. Neue Kompass-Rose zeigt und stellt die Gebäudeausrichtung (Norden) ein.',
+        'Windows, doors and passages now have names (editable); clicking a window in the plan jumps straight to its settings. A new compass rose shows and sets the building orientation (north).',
+      ),
+    ],
+  },
+  {
     version: '2.0.5',
     items: [
       t(

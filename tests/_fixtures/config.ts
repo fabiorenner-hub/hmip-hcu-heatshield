@@ -179,6 +179,7 @@ export function validRealisticConfig(): Record<string, unknown> {
         maxIncidenceAngleRoofDeg: 95,
       },
       storm: {
+        enabled: true,
         thresholdMs: 13.9,
         releaseMs: 8.0,
         releaseHoldMin: 10,

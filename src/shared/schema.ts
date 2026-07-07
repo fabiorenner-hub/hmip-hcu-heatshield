@@ -230,6 +230,12 @@ export const ComfortRulesSchema = z
   .object({
     // Indoor temperature at which the room is considered uncomfortably warm.
     maxIndoorTempC: z.number().default(25),
+    // Cooling target (Kühl-Soll): the indoor temperature the automation aims to
+    // keep rooms at. When set, each room's comfort target (`target_c`) is
+    // shifted to this value and the room's warning/strong/critical offsets ride
+    // along, so the whole comfort band moves with the cool target. Optional —
+    // absent = use each room's own configured `target_c` (unchanged behaviour).
+    coolTargetC: z.number().min(16).max(30).optional(),
     // Pre-shading already kicks in slightly below the comfort threshold.
     preShadeTempC: z.number().default(23.5),
     // Indoor/outdoor delta required before night cooling opens shutters.
@@ -315,6 +321,11 @@ export const ModeThresholdsSchema = z
 
 export const StormRulesSchema = z
   .object({
+    // Master switch for the storm safety force-open. Default ON (true) — the
+    // storm force-open is a safety feature and stays enabled unless the user
+    // explicitly disables it in the settings. When false, the engine never
+    // enters STORM mode and never force-opens shutters on high wind.
+    enabled: z.boolean().default(true),
     // Wind speed at which all external shutters are forced open (7.3).
     thresholdMs: z.number().min(0).default(13.9),
     // Wind speed below which the storm hold may be released.

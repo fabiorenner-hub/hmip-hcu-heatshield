@@ -81,7 +81,7 @@ describe('buildOwnDeviceDescriptors', () => {
   it('returns the five descriptors in the canonical OwnSwitchIdSchema order', () => {
     const descriptors = buildOwnDeviceDescriptors(fiveStates(), HEALTHY);
 
-    expect(descriptors).toHaveLength(5);
+    expect(descriptors).toHaveLength(ALL_IDS.length);
     expect(descriptors.map((d) => d.deviceId)).toEqual([...ALL_IDS]);
   });
 
@@ -190,7 +190,7 @@ describe('buildOwnDeviceDescriptors', () => {
         s.id !== 'heatshield-control-vacation',
     );
     const descriptors = buildOwnDeviceDescriptors(partial, HEALTHY);
-    expect(descriptors).toHaveLength(5);
+    expect(descriptors).toHaveLength(ALL_IDS.length);
     for (const d of descriptors) {
       expect(switchStateOf(d).on).toBe(false);
     }
@@ -229,7 +229,7 @@ describe('buildDiscoverResponse', () => {
 
     const body = env.body as { success: boolean; devices: OwnDeviceDescriptor[] };
     expect(body.success).toBe(true);
-    expect(body.devices).toHaveLength(5);
+    expect(body.devices).toHaveLength(ALL_IDS.length);
     expect(body.devices.map((d) => d.deviceId)).toEqual([...ALL_IDS]);
   });
 

@@ -9,6 +9,7 @@ import fc from 'fast-check';
 import {
   addStorey,
   duplicateStorey,
+  updateSite,
   addWall,
   addSpace,
   addOpening,
@@ -303,6 +304,20 @@ describe('command reducer', () => {
     expect(s1.model.storeys).toHaveLength(2);
     const only = removeStorey(removeStorey(s1, s1.model.storeys[0]!.id), s1.model.storeys[1]!.id);
     expect(only.model.storeys.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('updateSite sets + normalises the building orientation (north azimuth)', () => {
+    const { state } = freshState();
+    const s1 = updateSite(state, { northAzimuthDeg: 90 });
+    expect(s1.model.site.northAzimuthDeg).toBe(90);
+    expect(() => parseBuildingModel(s1.model)).not.toThrow();
+    // Wrap into [0, 360).
+    const s2 = updateSite(s1, { northAzimuthDeg: 405 });
+    expect(s2.model.site.northAzimuthDeg).toBe(45);
+    const s3 = updateSite(s2, { northAzimuthDeg: -30 });
+    expect(s3.model.site.northAzimuthDeg).toBe(330);
+    // Other fields untouched.
+    expect(s3.model.site.latitude).toBe(state.model.site.latitude);
   });
 
   it('addSpace creates a room and validates clean', () => {

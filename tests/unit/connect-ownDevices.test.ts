@@ -101,7 +101,7 @@ describe('OwnDeviceManager — cache lifecycle', () => {
     manager.loadCache(input);
     const out = manager.getCache();
 
-    expect(out).toHaveLength(5);
+    expect(out).toHaveLength(ALL_IDS.length);
     expect(out.map((s) => s.id)).toEqual([...ALL_IDS]);
     for (const expected of input) {
       const actual = out.find((s) => s.id === expected.id);

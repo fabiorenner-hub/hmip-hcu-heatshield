@@ -147,11 +147,6 @@ function clipPolygonBelowPlane(verts: readonly Vec3[], p: Plane): Vec3[] | null 
   return out.length >= 3 ? out : null;
 }
 
-function normalize(dx: number, dy: number): { x: number; y: number } {
-  const len = Math.hypot(dx, dy);
-  return len === 0 ? { x: 0, y: 0 } : { x: dx / len, y: dy / len };
-}
-
 function bbox(points: Point[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
   if (points.length === 0) return null;
   let minX = Infinity;
@@ -183,23 +178,75 @@ interface SegmentHole {
   headZ: number;
 }
 
+/**
+ * Per-vertex MITERED offset points (left/right) of a wall polyline, so adjacent
+ * segments share the same corner point — clean L-corners in the extruded mesh
+ * (no gap/overlap). Closed loops (room walls) mitre the shared first/last
+ * vertex too. Mirrors the 2D editor's `wallMiterOffsets`.
+ */
+function wallMiterOffsets(axis: Point[], half: number): { left: Point[]; right: Point[] } {
+  const n = axis.length;
+  const left: Point[] = new Array(n);
+  const right: Point[] = new Array(n);
+  const unit = (p: Point, q: Point): Point | null => {
+    const dx = q.x - p.x;
+    const dy = q.y - p.y;
+    const len = Math.hypot(dx, dy);
+    return len < 1e-9 ? null : { x: dx / len, y: dy / len };
+  };
+  const closed = n >= 3 && Math.hypot((axis[0] as Point).x - (axis[n - 1] as Point).x, (axis[0] as Point).y - (axis[n - 1] as Point).y) < 1e-6;
+  for (let k = 0; k < n; k += 1) {
+    const p = axis[k] as Point;
+    let dIn = k > 0 ? unit(axis[k - 1] as Point, p) : null;
+    let dOut = k < n - 1 ? unit(p, axis[k + 1] as Point) : null;
+    if (closed && k === 0) dIn = unit(axis[n - 2] as Point, axis[n - 1] as Point);
+    if (closed && k === n - 1) dOut = unit(axis[0] as Point, axis[1] as Point);
+    let normal: Point;
+    let scale = half;
+    if (dIn !== null && dOut !== null) {
+      const nIn = { x: -dIn.y, y: dIn.x };
+      const nOut = { x: -dOut.y, y: dOut.x };
+      const mx = nIn.x + nOut.x;
+      const my = nIn.y + nOut.y;
+      const mlen = Math.hypot(mx, my);
+      if (mlen < 1e-6) {
+        normal = nIn;
+      } else {
+        const mUnit = { x: mx / mlen, y: my / mlen };
+        const cosHalf = mUnit.x * nIn.x + mUnit.y * nIn.y;
+        scale = half / Math.max(cosHalf, 0.25);
+        normal = mUnit;
+      }
+    } else if (dOut !== null) {
+      normal = { x: -dOut.y, y: dOut.x };
+    } else if (dIn !== null) {
+      normal = { x: -dIn.y, y: dIn.x };
+    } else {
+      normal = { x: 0, y: 1 };
+    }
+    left[k] = { x: p.x + normal.x * scale, y: p.y + normal.y * scale };
+    right[k] = { x: p.x - normal.x * scale, y: p.y - normal.y * scale };
+  }
+  return { left, right };
+}
+
 function emitWallSegmentFaces(
-  a: Point,
-  b: Point,
-  t: number,
+  sL: Point,
+  eL: Point,
+  sR: Point,
+  eR: Point,
   z0: number,
   z1: number,
   holes: SegmentHole[],
 ): Vec3[][] {
-  const dir = normalize(b.x - a.x, b.y - a.y);
-  const nx = -dir.y * (t / 2);
-  const ny = dir.x * (t / 2);
-  // Point at fraction `f` along the segment, height `z`, on side (+1 outer / -1 inner).
-  const P = (f: number, z: number, side: number): Vec3 => ({
-    x: a.x + (b.x - a.x) * f + nx * side,
-    y: a.y + (b.y - a.y) * f + ny * side,
-    z,
-  });
+  // Point at fraction `f` along the segment, height `z`, side +1 = outer (left
+  // offset), -1 = inner (right offset). The offset lines run between the
+  // MITERED corner points so segment sides meet cleanly at corners.
+  const P = (f: number, z: number, side: number): Vec3 => {
+    const s = side > 0 ? sL : sR;
+    const e = side > 0 ? eL : eR;
+    return { x: s.x + (e.x - s.x) * f, y: s.y + (e.y - s.y) * f, z };
+  };
   const faces: Vec3[][] = [];
   // Bottom, top, and the two end caps are always full.
   faces.push([P(0, z0, 1), P(1, z0, 1), P(1, z0, -1), P(0, z0, -1)]);
@@ -504,16 +551,22 @@ export function buildMesh(model: BuildingModel, options?: BuildMeshOptions): Bui
       return capZ !== undefined && capZ > normal ? capZ : normal;
     };
 
-    // Walls → extruded boxes with openings cut as holes.
+    // Walls → extruded boxes with MITERED corners + openings cut as holes.
     for (const wall of storey.walls) {
       const z1 = wallTop(wall);
+      const miter = wallMiterOffsets(wall.axis, wall.thicknessM / 2);
       let segStartLen = 0;
       for (let i = 1; i < wall.axis.length; i += 1) {
         const a = wall.axis[i - 1] as Point;
         const b = wall.axis[i] as Point;
         const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+        if (segLen < 1e-9) continue;
         const holes = holesForSegment(wall, i - 1, segStartLen, segLen, z0, z1, storey.openings);
-        const quads = emitWallSegmentFaces(a, b, wall.thicknessM, z0, z1, holes);
+        const quads = emitWallSegmentFaces(
+          miter.left[i - 1] as Point, miter.left[i] as Point,
+          miter.right[i - 1] as Point, miter.right[i] as Point,
+          z0, z1, holes,
+        );
         for (const q of quads) faces.push({ vertices: q, kind: 'wall', entityId: wall.id, storeyId: storey.id });
         segStartLen += segLen;
       }

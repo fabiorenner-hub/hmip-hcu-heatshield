@@ -325,6 +325,75 @@ export function RulesTab(): JSX.Element {
         <label class="tab-rules__check">
           <input
             type="checkbox"
+            data-testid="rules-storm-enabled"
+            checked={draftConfig.rules.storm.enabled ?? true}
+            onChange={(e): void => {
+              const on = (e.currentTarget as HTMLInputElement).checked;
+              setDraftConfig((prev) =>
+                prev === null
+                  ? prev
+                  : { ...prev, rules: { ...prev.rules, storm: { ...prev.rules.storm, enabled: on } } },
+              );
+            }}
+          />
+          <span>
+            {t(
+              'Sturmschutz aktiv: öffnet bei hohem Wind alle Rollläden (Sicherheit). Nur deaktivieren, wenn bewusst gewünscht.',
+              'Storm protection active: opens all shutters on high wind (safety). Disable only if you really intend to.',
+            )}
+          </span>
+        </label>
+
+        <label class="tab-rules__check">
+          <input
+            type="checkbox"
+            data-testid="rules-cooltarget-enabled"
+            checked={draftConfig.rules.comfort.coolTargetC !== undefined}
+            onChange={(e): void => {
+              const on = (e.currentTarget as HTMLInputElement).checked;
+              setDraftConfig((prev) => {
+                if (prev === null) return prev;
+                const comfort = { ...prev.rules.comfort };
+                if (on) comfort.coolTargetC = comfort.coolTargetC ?? 24;
+                else delete comfort.coolTargetC;
+                return { ...prev, rules: { ...prev.rules, comfort } };
+              });
+            }}
+          />
+          <span>
+            {t(
+              'Kühl-Soll aktiv: gibt eine Ziel-Innentemperatur für alle Räume vor (verschiebt das Komfortband).',
+              'Cooling target active: sets a target indoor temperature for all rooms (shifts the comfort band).',
+            )}
+          </span>
+        </label>
+        {draftConfig.rules.comfort.coolTargetC !== undefined && (
+          <label class="tab-rules__check">
+            <span>{t('Kühl-Soll-Temperatur', 'Cooling target temperature')}</span>
+            <input
+              type="number"
+              min={16}
+              max={30}
+              step={0.5}
+              value={draftConfig.rules.comfort.coolTargetC}
+              data-testid="rules-cooltarget-value"
+              onChange={(e): void => {
+                const v = Number((e.currentTarget as HTMLInputElement).value);
+                if (!Number.isFinite(v)) return;
+                setDraftConfig((prev) =>
+                  prev === null
+                    ? prev
+                    : { ...prev, rules: { ...prev.rules, comfort: { ...prev.rules.comfort, coolTargetC: Math.max(16, Math.min(30, v)) } } },
+                );
+              }}
+            />
+            <span>°C</span>
+          </label>
+        )}
+
+        <label class="tab-rules__check">
+          <input
+            type="checkbox"
             data-testid="rules-night-inactive"
             checked={draftConfig.rules.automation.pauseBetweenSunsetAndSunrise ?? false}
             onChange={(e): void => {

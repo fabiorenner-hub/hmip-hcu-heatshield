@@ -51,6 +51,7 @@ import {
   addStorey,
   duplicateStorey,
   removeStorey,
+  updateSite,
   addWall,
   addRoof,
   addRoofWindow,
@@ -495,6 +496,8 @@ export function BuildingStudioView(_props: RoutableProps): JSX.Element {
   // Inline two-step confirm for deleting a storey (window.confirm is blocked in
   // the HCU webview, so a native confirm silently no-ops).
   const [armDeleteStorey, setArmDeleteStorey] = useState<boolean>(false);
+  // Compass rose (building orientation) is toggleable — hidden by choice.
+  const [showCompass, setShowCompass] = useState<boolean>(true);
   // Default wall thickness applied to newly drawn walls (Außen/Innen presets).
   const [defaultThicknessM, setDefaultThicknessM] = useState<number>(0.24);
   // Reference edge for newly drawn walls: the traced line is the wall centre,
@@ -716,7 +719,10 @@ export function BuildingStudioView(_props: RoutableProps): JSX.Element {
           const offsetM = Math.min(openingPlace.s0, s);
           const widthM = Math.max(0.1, Math.abs(s - openingPlace.s0));
           const heightM = openingPlace.type === 'window' ? 1.2 : 2;
-          commit(addOpening(CTX, state, { type: openingPlace.type, hostWallId: wall.id, offsetM, widthM, heightM }));
+          const sameType = (storey?.openings ?? []).filter((o) => o.type === openingPlace.type).length;
+          const label = openingPlace.type === 'door' ? t('Tür', 'Door') : openingPlace.type === 'passage' ? t('Durchgang', 'Passage') : t('Fenster', 'Window');
+          const name = `${label} ${sameType + 1}`;
+          commit(addOpening(CTX, state, { type: openingPlace.type, hostWallId: wall.id, offsetM, widthM, heightM, name }));
           setOpeningPlace(null);
         }
         return;
@@ -775,6 +781,14 @@ export function BuildingStudioView(_props: RoutableProps): JSX.Element {
           } else {
             vertexDragRef.current = { kind: vh.kind, id: vh.id, index: vh.index, recorded: false };
           }
+          return;
+        }
+        // Clicking an opening symbol jumps straight to its config: select the
+        // opening AND its host wall, so the wall inspector opens with that
+        // opening highlighted + scrolled into view.
+        const ohit = hitTestOpening(storey, m, view);
+        if (ohit !== null) {
+          transient(setSelection(state, [ohit.wallId, ohit.openingId]));
           return;
         }
         // select: hit-test walls (nearest endpoint/segment) → select or clear.
@@ -1505,6 +1519,21 @@ export function BuildingStudioView(_props: RoutableProps): JSX.Element {
         </aside>
 
         <div class="bs-canvas-wrap">
+          {showCompass ? (
+            <CompassRose
+              northAzimuthDeg={model.site.northAzimuthDeg}
+              onChange={(deg): void => commit(updateSite(state, { northAzimuthDeg: deg }))}
+              onHide={(): void => setShowCompass(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              class="bs-compass-show"
+              data-testid="building-compass-show"
+              title={t('Windrose einblenden', 'Show compass')}
+              onClick={(): void => setShowCompass(true)}
+            >🧭</button>
+          )}
           {show3d ? (
             <div class="bs-canvas bs-canvas--3d" data-testid="building-canvas-3d">
               <Twin3D model={model} roomStates={roomOverlays} />
@@ -1635,6 +1664,7 @@ export function BuildingStudioView(_props: RoutableProps): JSX.Element {
               onAddOpening={(type): void => { setOpeningPlace({ type, wallId: selectedWall.id, s0: null }); }}
               openings={storey.openings.filter((o) => o.hostWallId === selectedWall.id)}
               configWindows={configWindows}
+              selection={state.selection}
               onUpdateOpening={(id, patch): void => commit(updateOpening(state, id, patch))}
               onDeleteOpening={(id): void => commit(deleteOpening(state, id))}
             />
@@ -1814,6 +1844,72 @@ export function BuildingStudioView(_props: RoutableProps): JSX.Element {
 // Hit test (nearest wall within tolerance).
 // ---------------------------------------------------------------------------
 
+/**
+ * Compass rose overlay showing + setting the building orientation
+ * (`site.northAzimuthDeg` = the compass bearing the local +y/up axis points to).
+ * The rose rotates so its N marker points to true north on screen (`-north`);
+ * drag the rose or use the numeric field / cardinal buttons to set it.
+ */
+function CompassRose(props: { northAzimuthDeg: number; onChange: (deg: number) => void; onHide: () => void }): JSX.Element {
+  const north = ((props.northAzimuthDeg % 360) + 360) % 360;
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const dragging = useRef<boolean>(false);
+  const C = 46; // viewBox centre
+  const setFromEvent = (e: PointerEvent): void => {
+    const svg = svgRef.current;
+    if (svg === null) return;
+    const r = svg.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2);
+    const dy = e.clientY - (r.top + r.height / 2);
+    if (Math.hypot(dx, dy) < 4) return;
+    // Screen angle of the pointer, clockwise from up (up = -y).
+    const phi = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    // N appears on screen at angle -north; so pointer angle phi ⇒ north = -phi.
+    props.onChange(((-phi % 360) + 360) % 360);
+  };
+  const nudge = (d: number): void => props.onChange(((north + d) % 360 + 360) % 360);
+  return (
+    <div class="bs-compass" data-testid="building-compass">
+      <button type="button" class="bs-compass__hide" data-testid="building-compass-hide" title={t('Windrose ausblenden', 'Hide compass')} onClick={props.onHide}>✕</button>
+      <svg
+        ref={svgRef}
+        viewBox="0 0 92 92"
+        class="bs-compass__dial"
+        role="img"
+        aria-label={t(`Gebäudeausrichtung: Norden bei ${Math.round(north)}°`, `Building orientation: north at ${Math.round(north)}°`)}
+        onPointerDown={(e: PointerEvent): void => { dragging.current = true; (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId); setFromEvent(e); }}
+        onPointerMove={(e: PointerEvent): void => { if (dragging.current) setFromEvent(e); }}
+        onPointerUp={(): void => { dragging.current = false; }}
+      >
+        <circle cx={C} cy={C} r={42} class="bs-compass__ring" />
+        <g transform={`rotate(${-north} ${C} ${C})`}>
+          {/* Needle: red to N, grey to S. */}
+          <polygon points={`${C},${C - 34} ${C - 6},${C} ${C + 6},${C}`} class="bs-compass__n" />
+          <polygon points={`${C},${C + 34} ${C - 6},${C} ${C + 6},${C}`} class="bs-compass__s" />
+          <text x={C} y={C - 36} class="bs-compass__lbl bs-compass__lbl--n">N</text>
+          <text x={C} y={C + 42} class="bs-compass__lbl">S</text>
+          <text x={C + 38} y={C + 4} class="bs-compass__lbl">O</text>
+          <text x={C - 38} y={C + 4} class="bs-compass__lbl">W</text>
+        </g>
+      </svg>
+      <div class="bs-compass__ctl">
+        <button type="button" title={t('15° gegen den Uhrzeigersinn', '15° counter-clockwise')} onClick={(): void => nudge(-15)}>↺</button>
+        <input
+          type="number"
+          class="bs-compass__num"
+          value={Math.round(north)}
+          min={0}
+          max={359}
+          data-testid="building-compass-input"
+          onChange={(e): void => { const v = Number((e.currentTarget as HTMLInputElement).value); if (Number.isFinite(v)) props.onChange(((v % 360) + 360) % 360); }}
+        />
+        <span class="bs-compass__deg">°</span>
+        <button type="button" title={t('15° im Uhrzeigersinn', '15° clockwise')} onClick={(): void => nudge(15)}>↻</button>
+      </div>
+    </div>
+  );
+}
+
 function hitTestWall(storey: Storey | null, m: Point, view: View): string | null {
   if (storey === null) return null;
   const tolM = 10 / view.scale; // ~10px tolerance in metres
@@ -1825,6 +1921,29 @@ function hitTestWall(storey: Storey | null, m: Point, view: View): string | null
     }
   }
   return best?.id ?? null;
+}
+
+/**
+ * Hit-test a façade opening symbol on the plan: the click must fall within the
+ * opening's span along its host wall AND within the wall thickness (+tol).
+ * Returns the nearest opening + its wall, so a click jumps to its config.
+ */
+function hitTestOpening(storey: Storey | null, m: Point, view: View): { openingId: string; wallId: string } | null {
+  if (storey === null) return null;
+  const tolM = 8 / view.scale;
+  let best: { openingId: string; wallId: string; d: number } | null = null;
+  for (const o of storey.openings) {
+    if (o.hostWallId === undefined) continue; // roof windows aren't on a plan wall
+    const wall = storey.walls.find((w) => w.id === o.hostWallId);
+    if (wall === undefined) continue;
+    const s = projectPointToPolyline(wall.axis, m);
+    if (s < o.offsetM - tolM || s > o.offsetM + o.widthM + tolM) continue;
+    const on = pointAlongPolyline(wall.axis, Math.max(o.offsetM, Math.min(o.offsetM + o.widthM, s)));
+    if (on === null) continue;
+    const d = Math.hypot(m.x - on.p.x, m.y - on.p.y);
+    if (d <= wall.thicknessM / 2 + tolM && (best === null || d < best.d)) best = { openingId: o.id, wallId: wall.id, d };
+  }
+  return best === null ? null : { openingId: best.openingId, wallId: best.wallId };
 }
 
 /**
@@ -2145,8 +2264,9 @@ function WallInspector(props: {
   onAddOpening: (type: 'window' | 'door' | 'passage') => void;
   openings: Opening[];
   configWindows: Array<{ id: string; roomId: string; orientationDeg: number }>;
-  onUpdateOpening: (id: string, patch: { widthM?: number; heightM?: number; offsetM?: number; sillM?: number; glazing?: 'single' | 'double' | 'triple'; roofWindow?: boolean; linkedWindowId?: string | null }) => void;
+  onUpdateOpening: (id: string, patch: { widthM?: number; heightM?: number; offsetM?: number; sillM?: number; glazing?: 'single' | 'double' | 'triple'; roofWindow?: boolean; name?: string; linkedWindowId?: string | null }) => void;
   onDeleteOpening: (id: string) => void;
+  selection: string[];
 }): JSX.Element {
   const { wall } = props;
   const wallLen = segmentLength(wall.axis);
@@ -2173,10 +2293,12 @@ function WallInspector(props: {
       </div>
       {props.openings.length > 0 && (
         <ul class="bs-openings">
-          {props.openings.map((o) => (
-            <li key={o.id} data-testid={`building-opening-${o.id}`}>
+          {props.openings.map((o) => {
+            const typeLabel = o.type === 'door' ? t('Tür', 'Door') : o.type === 'passage' ? t('Durchgang', 'Passage') : t('Fenster', 'Window');
+            return (
+            <li key={o.id} data-testid={`building-opening-${o.id}`} class={props.selection.includes(o.id) ? 'bs-opening--selrow' : ''} ref={(el): void => { if (el !== null && props.selection.includes(o.id)) el.scrollIntoView({ block: 'nearest' }); }}>
               <div class="bs-opening__head">
-                <span>{o.type === 'door' ? t('Tür', 'Door') : o.type === 'passage' ? t('Durchgang', 'Passage') : t('Fenster', 'Window')}</span>
+                <RoomNameField name={o.name ?? typeLabel} testId={`building-opening-name-${o.id}`} onRename={(v): void => props.onUpdateOpening(o.id, { name: v })} />
                 <button type="button" class="bs-opening__del" onClick={(): void => props.onDeleteOpening(o.id)} data-testid={`building-opening-delete-${o.id}`} aria-label={t('Öffnung löschen', 'Delete opening')}>✕</button>
               </div>
               <div class="bs-opening__fields">
@@ -2219,7 +2341,8 @@ function WallInspector(props: {
                 </div>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       <button type="button" class="bs-danger" onClick={props.onDelete} data-testid="building-wall-delete">{t('Wand löschen', 'Delete wall')}</button>
@@ -2371,7 +2494,7 @@ function RoofInspector(props: {
   onDelete: (id: string) => void;
   roofWindows: Opening[];
   onAddRoofWindow: () => void;
-  onUpdateRoofWindow: (id: string, patch: { widthM?: number; heightM?: number; offsetM?: number }) => void;
+  onUpdateRoofWindow: (id: string, patch: { widthM?: number; heightM?: number; offsetM?: number; name?: string }) => void;
   onDeleteRoofWindow: (id: string) => void;
 }): JSX.Element {
   const { roof } = props;
@@ -2459,7 +2582,7 @@ function RoofInspector(props: {
             {props.roofWindows.map((o) => (
               <li key={o.id} data-testid={`building-roofwindow-${o.id}`}>
                 <div class="bs-opening__head">
-                  <span>{t('Dachfenster', 'Roof window')}</span>
+                  <RoomNameField name={o.name ?? t('Dachfenster', 'Roof window')} testId={`building-roofwindow-name-${o.id}`} onRename={(v): void => props.onUpdateRoofWindow(o.id, { name: v })} />
                   <button type="button" class="bs-opening__del" data-testid={`building-roofwindow-del-${o.id}`} onClick={(): void => props.onDeleteRoofWindow(o.id)}>✕</button>
                 </div>
                 <div class="bs-opening__fields">

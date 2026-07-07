@@ -129,6 +129,13 @@ export interface UserInputBridgeDeps {
   readonly now?: () => Date;
   readonly logger?: ConnectLogger;
   readonly onReevaluate?: () => void;
+  /**
+   * Master automation toggle from the `heatshield-control-automation` HCU
+   * switch. Maps to `config.automationEnabled` (config lives outside the
+   * runtime state, so the orchestrator supplies this setter). The orchestrator
+   * reasserts the switch value from the config each cycle.
+   */
+  readonly onSetAutomation?: (on: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -187,6 +194,19 @@ export class UserInputBridge {
    */
   private async handle(input: OwnDeviceUserInput): Promise<void> {
     try {
+      // Master automation switch maps to config, not runtime state. Handle it
+      // separately: flip the config via the injected setter and confirm the
+      // switch value straight back so the HmIP app reflects the toggle.
+      if (input.deviceId === 'heatshield-control-automation') {
+        this.deps.onSetAutomation?.(input.requestedValue);
+        try {
+          this.deps.ownDevices.confirmFromEngine('heatshield-control-automation', input.requestedValue);
+        } catch (err) {
+          this.log('warn', 'confirmFromEngine threw', { deviceId: input.deviceId, err: err instanceof Error ? err.message : String(err) });
+        }
+        this.deps.onReevaluate?.();
+        return;
+      }
       const now = this.now();
 
       // 1. Snapshot persisted state (or fall back to a fresh empty
@@ -313,6 +333,9 @@ export class UserInputBridge {
       case 'heatshield-state-forecast':
       case 'heatshield-state-night-cooling':
         // Not driven by the bridge; orchestrator owns these.
+        return;
+      case 'heatshield-control-automation':
+        // Handled early in `handle` (maps to config, not runtime intent).
         return;
     }
     try {

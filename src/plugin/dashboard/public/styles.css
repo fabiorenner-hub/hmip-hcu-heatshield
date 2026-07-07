@@ -7859,6 +7859,26 @@ textarea {
 .bs-tree__item--active { border-color: var(--color-accent); box-shadow: var(--glow-accent); }
 
 .bs-canvas-wrap { position: relative; }
+/* Compass rose overlay (building orientation). */
+.bs-compass {
+  position: absolute; top: 10px; right: 10px; z-index: 4;
+  width: 92px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 6px; border-radius: var(--radius); background: var(--glass-bg-strong, rgba(10,15,26,0.66));
+  border: 1px solid var(--glass-border); box-shadow: var(--shadow-2); backdrop-filter: blur(8px);
+}
+.bs-compass__dial { width: 92px; height: 92px; touch-action: none; cursor: grab; }
+.bs-compass__dial:active { cursor: grabbing; }
+.bs-compass__ring { fill: rgba(255,255,255,0.03); stroke: var(--color-card-border-strong); stroke-width: 1.5; }
+.bs-compass__n { fill: var(--color-danger); }
+.bs-compass__s { fill: var(--color-muted); }
+.bs-compass__lbl { fill: var(--color-text); font-size: 11px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+.bs-compass__lbl--n { fill: var(--color-danger); }
+.bs-compass__ctl { display: flex; align-items: center; gap: 3px; }
+.bs-compass__ctl button { width: 22px; height: 22px; border-radius: var(--radius-sm); border: 1px solid var(--color-card-border-strong); background: var(--color-bg-elev); color: var(--color-text); cursor: pointer; padding: 0; }
+.bs-compass__num { width: 42px; min-height: 24px; text-align: center; background: var(--color-bg-elev); color: var(--color-text); border: 1px solid var(--color-card-border-strong); border-radius: var(--radius-sm); padding: 1px 2px; font-variant-numeric: tabular-nums; }
+.bs-compass__deg { color: var(--color-muted); font-size: 11px; }
+.bs-compass__hide { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; line-height: 1; padding: 0; border-radius: var(--radius-sm); border: 1px solid var(--color-card-border); background: var(--color-bg-elev); color: var(--color-muted); cursor: pointer; font-size: 11px; }
+.bs-compass-show { position: absolute; top: 10px; right: 10px; z-index: 4; width: 34px; height: 34px; border-radius: var(--radius); border: 1px solid var(--glass-border); background: var(--glass-bg-strong, rgba(10,15,26,0.66)); box-shadow: var(--shadow-2); cursor: pointer; font-size: 18px; }
 .bs-canvas {
   width: 100%;
   height: 640px;
@@ -7942,6 +7962,7 @@ textarea {
 .bs-openings li { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--color-muted); border: 1px solid var(--color-card-border); border-radius: var(--radius-sm); padding: var(--sp-2); }
 .bs-opening__head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--color-text); }
 .bs-opening__del { flex: 0 0 auto; }
+.bs-opening--selrow { border-color: var(--color-accent) !important; box-shadow: var(--glow-accent); }
 .bs-opening__fields { display: grid; grid-template-columns: 1fr; gap: 2px; }
 .bs-inspector .bs-danger { margin-top: var(--sp-3); width: 100%; }
 .bs-valid-ok { color: var(--color-success); }

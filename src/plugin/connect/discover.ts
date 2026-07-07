@@ -131,6 +131,7 @@ export const OWN_DEVICE_FRIENDLY_NAMES: Record<OwnSwitchId, string> = {
   'heatshield-state-night-cooling': 'Nachtkühlung aktiv',
   'heatshield-control-pause': 'Hitzeschutz pausieren',
   'heatshield-control-vacation': 'Hitzeschutz Urlaubsmodus',
+  'heatshield-control-automation': 'Hitzeschutz Automatik',
 };
 
 /**
