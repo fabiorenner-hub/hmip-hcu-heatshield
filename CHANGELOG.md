@@ -3,6 +3,14 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.27
+
+- **Mobile Touch-Leiste optisch an das v2-Design angeglichen.** Die untere Navigationsleiste nutzte eine eigene, hartkodierte Fläche (dunkleres Navy, 62 % Deckkraft), wodurch sie deckender und andersfarbig wirkte als der Rest. Sie verwendet jetzt exakt dieselbe Glas-Rezeptur wie die Karten/Seitenleiste (`--lg2-sheen` + `--lg2-scrim` + `--lg2-panel`, Blur/Sättigung über `--lg2-blur`/`--lg2-sat`) und erbt die Live-Theme-Tokens von `body.ui-v2` — gleiche Transparenz, gleicher Tint, gleicher Blur, folgt Akzent-/Glas-Einstellungen. Das „Mehr"-Sheet analog (etwas festere `--lg2-sidebar`-Füllung für Lesbarkeit).
+- **„Nächste Aktionen": Badge-Überlappung endgültig behoben.** Der 2.0.26-Fix (`minmax(0,1fr)`) korrigierte nur die Grid-Spur; die eigentliche Ursache war, dass `.lg2-action__body` inline war — `overflow/ellipsis` greift bei inline-Elementen nicht, daher lief langer Text über das Badge. `.lg2-action__body` ist jetzt `flex`-Spalte, der Text kürzt sauber mit „…".
+- **Vorhersage (Basis): Tagesplan/Prognoseverlauf wurden weiter abgeschnitten.** `overflow-y:auto` allein reichte nicht — die Flex-Kinder im `height:100vh`-Container hatten Default-`flex-shrink:1` und wurden gestaucht (Inhalt geclippt) statt zu scrollen. Sie sind jetzt auf natürliche Höhe gepinnt (`flex-shrink:0`), die Seite scrollt zuverlässig.
+- **Räume: Stufen-Badge klar als „Risiko" beschriftet.** Das Badge (z. B. „Sehr niedrig") zeigt das Überhitzungsrisiko des Raums, nicht die Temperatur — es trägt jetzt ein „Risiko"-Präfix und einen erklärenden Tooltip.
+- **Automatik aus → keine „nächsten Aktionen".** Ist die Automatik ausgeschaltet, zeigen Übersicht („Nächste Aktionen") und Räume-Liste keine geplanten Fahrten/Zeiten mehr an, sondern einen klaren „Automatik aus"-Hinweis (es würde ohnehin nichts gefahren).
+
 ## 2.0.26
 
 - **Mobile Touch-Navigation ist jetzt Standard bei schmaler Breite.** Bei Smartphone- **und** Tablet-Breite (< 840 px) — und auch, wenn ein Desktop-Fenster schmal gezogen wird — erscheint jetzt die schwebende Apple-Style-Glas-Leiste unten (4 Haupt-Tabs + „Mehr"-Sheet) statt der alten, kollabierten „alle Tabs"-Leiste, die abgeschnitten wurde und deren Beschriftungen sich überlagerten. Die Leiste ist jetzt korrekt im V2-Liquid-Glass-Look (echte Transparenz + Blur). Über **Darstellung** lässt sie sich zusätzlich auf breiteren Tablet-/Desktop-Fenstern aktivieren.

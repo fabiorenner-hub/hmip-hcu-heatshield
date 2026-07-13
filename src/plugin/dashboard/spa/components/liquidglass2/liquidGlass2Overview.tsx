@@ -352,7 +352,11 @@ function Body(props: { snap: DashboardSnapshot }): JSX.Element {
       <div class="lg2-two">
         <section class="lg2-card" data-testid="lg2-actions-card">
           <h3 class="lg2-card__title">{t('Nächste Aktionen', 'Next actions')}</h3>
-          {actions.length === 0 ? (
+          {snap.automationEnabled === false ? (
+            <p class="lg2-hero__lead" data-testid="lg2-actions-autooff">
+              {t('Automatik ist aus — keine geplanten Fahrten.', 'Automation is off — no planned moves.')}
+            </p>
+          ) : actions.length === 0 ? (
             <p class="lg2-hero__lead">{t('Keine Fahrt geplant.', 'No move planned.')}</p>
           ) : (
             <div class="lg2-actions">

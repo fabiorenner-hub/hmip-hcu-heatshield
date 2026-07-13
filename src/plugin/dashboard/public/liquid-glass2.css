@@ -578,7 +578,10 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
   color: var(--lg2-orange-2);
   flex: 0 0 auto;
 }
-.lg2-action__body { min-width: 0; }
+/* Flex column so the name/detail children are blockified — `overflow:hidden` +
+   `text-overflow:ellipsis` are IGNORED on inline elements, which let long
+   room/verb text spill out of the grid cell and over the trailing badge. */
+.lg2-action__body { display: flex; flex-direction: column; min-width: 0; }
 .lg2-action__name { font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lg2-action__detail { font-size: 12px; color: var(--lg2-label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lg2-badge {
@@ -1370,7 +1373,9 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
 .lg2-roomrow__next--none { color: var(--lg2-label-3); font-weight: 500; }
 
 /* Risk badge (list) + risk pill (detail header). */
-.lg2-risk { font-size: 11px; font-weight: 650; padding: 2px 9px; border-radius: 999px; white-space: nowrap; display: inline-flex; align-items: center; }
+.lg2-risk { font-size: 11px; font-weight: 650; padding: 2px 9px; border-radius: 999px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+/* "Risiko"/"Risk" qualifier so the badge is not mistaken for a temperature. */
+.lg2-risk__lbl { font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 9px; opacity: 0.7; }
 .lg2-risk--high { color: #ff8c42; background: rgba(255, 140, 66, 0.16); }
 .lg2-risk--mid { color: #ffcf5b; background: rgba(255, 207, 91, 0.16); }
 .lg2-risk--low { color: #66d66b; background: rgba(102, 214, 107, 0.16); }
@@ -1536,6 +1541,11 @@ body.lg2-demo-open .room-detail__close:hover { border-color: var(--lg2-accent); 
    vertically so the day plan and the "Prognoseverlauf" grid are fully reachable
    at any resolution (`.lg2-main.lg2-fc` beats the base `.lg2-main` overflow). */
 .lg2-main.lg2-fc { overflow-y: auto; overscroll-behavior: contain; }
+/* Direct children must NOT shrink: in a `height:100vh` flex column the default
+   `flex-shrink:1` compresses the Tagesplan card + timeline grid to fit the
+   viewport, clipping their content instead of letting the page scroll. Pinning
+   them to their natural height makes the column overflow → the main scrolls. */
+.lg2-main.lg2-fc > * { flex-shrink: 0; }
 .lg2-fc__controls { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
 .lg2-fc__ctl { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--lg2-label-3); font-weight: 600; }
 .lg2-fc__ctl > span { padding-left: 2px; }
@@ -4033,17 +4043,17 @@ body.lg2-anim-paused .lg2-demo *::after {
   padding-bottom: calc(64px + 22px + env(safe-area-inset-bottom, 0px) + 12px) !important;
 }
 
-/* Bar surface: v2 frosted glass. NB the bar renders OUTSIDE `.lg2-demo`, so the
-   `--lg2-*` tokens are not in scope here — we spell the glass out explicitly
-   (translucent tint + sheen + real backdrop blur) so the transparency and blur
-   actually show and match the v2 look, independent of the v1 `--glass-*`. */
+/* Bar surface: use the EXACT same frosted-glass recipe as the v2 cards /
+   collapsed sidebar bar so the nav belongs to the same family instead of
+   reading as a separate, more opaque slab. The `--lg2-*` tokens ARE in scope:
+   they are defined on `.lg2-demo, body.ui-v2`, and the shell adds `ui-v2` to
+   <body>, so this bar (a <body> descendant, outside `.lg2-demo`) inherits the
+   live theme (tint, translucency, accent, blur). */
 .app--uiv2 .mobile-nav {
-  background:
-    linear-gradient(157deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 62%),
-    rgba(16, 32, 49, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
+  background: var(--lg2-sheen), var(--lg2-scrim), var(--lg2-panel);
+  border: 1px solid var(--lg2-hairline);
+  -webkit-backdrop-filter: blur(var(--lg2-blur, 20px)) saturate(var(--lg2-sat, 1.5));
+  backdrop-filter: blur(var(--lg2-blur, 20px)) saturate(var(--lg2-sat, 1.5));
 }
 .app--uiv2 .mobile-nav__item { color: var(--lg2-label-2, #9fb0c2); }
 .app--uiv2 .mobile-nav__item--active { color: var(--lg2-accent, #ff9d2e); }
@@ -4057,14 +4067,13 @@ body.lg2-anim-paused .lg2-demo *::after {
   color: #fff;
 }
 
-/* "Mehr" sheet: v2 glass + accent (also outside `.lg2-demo` — spell it out). */
+/* "Mehr" sheet: same token recipe, but the slightly more solid `--lg2-sidebar`
+   fill (a modal wants a touch more backing for legibility). */
 .app--uiv2 .mobile-more__sheet {
-  background:
-    linear-gradient(157deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 55%),
-    rgba(16, 32, 49, 0.86);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
-  backdrop-filter: blur(24px) saturate(1.5);
+  background: var(--lg2-sheen), var(--lg2-scrim), var(--lg2-sidebar);
+  border: 1px solid var(--lg2-hairline);
+  -webkit-backdrop-filter: blur(var(--lg2-blur-lg, 28px)) saturate(var(--lg2-sat, 1.5));
+  backdrop-filter: blur(var(--lg2-blur-lg, 28px)) saturate(var(--lg2-sat, 1.5));
 }
 .app--uiv2 .mobile-more__title,
 .app--uiv2 .mobile-more__lbl { color: var(--lg2-label-1, #f4f7fb); }

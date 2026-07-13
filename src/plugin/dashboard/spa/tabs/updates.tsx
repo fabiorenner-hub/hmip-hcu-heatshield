@@ -22,11 +22,36 @@ export interface ChangelogEntry {
 export function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '2.0.27',
+    items: [
+      t(
+        'Mobile Touch-Leiste passt jetzt optisch exakt zum Rest: sie nutzt dieselbe Glas-Rezeptur (Tint, Transparenz, Blur) wie die Karten/Seitenleiste statt einer eigenen, deckenderen Fläche — und folgt dem Live-Theme.',
+        'The mobile touch bar now matches the rest visually: it uses the same glass recipe (tint, transparency, blur) as the cards/sidebar instead of a separate, more opaque surface — and follows the live theme.',
+      ),
+      t(
+        '„Nächste Aktionen": Badge-Überlappung endgültig behoben — lange Raum-/Aktionsnamen liefen bisher über das Status-Badge, weil der Text-Container inline war (Abschneiden mit „…" wirkte nicht). Der Text kürzt jetzt sauber, das Badge bleibt frei.',
+        '"Next actions": badge overlap finally fixed — long room/action names ran over the status badge because the text container was inline (ellipsis had no effect). The text now truncates cleanly and the badge stays clear.',
+      ),
+      t(
+        'Vorhersage (Basis): der Tagesplan wurde je nach Auflösung weiter abgeschnitten. Die Seite scrollt jetzt zuverlässig — die Inhalte werden nicht mehr auf Bildschirmhöhe gestaucht.',
+        'Forecast (basic): the day plan was still cut off at some resolutions. The page now scrolls reliably — content is no longer squeezed to the screen height.',
+      ),
+      t(
+        'Räume: Das Stufen-Badge ist jetzt klar als „Risiko" (Überhitzungsrisiko) beschriftet, damit es nicht mit der Raumtemperatur verwechselt wird.',
+        'Rooms: the level badge is now clearly labelled "Risk" (overheating risk) so it is not mistaken for the room temperature.',
+      ),
+      t(
+        'Ist die Automatik aus, werden keine „nächsten Aktionen" mehr angezeigt (Übersicht und Räume) — es werden ohnehin keine Fahrten ausgeführt.',
+        'When automation is off, no "next actions" are shown any more (overview and rooms) — no moves would run anyway.',
+      ),
+    ],
+  },
+  {
     version: '2.0.26',
     items: [
       t(
-        'Mobile Touch-Navigation ist jetzt Standard bei schmaler Breite (Smartphone und Tablet, < 840 px) — auch wenn ein Desktop-Fenster schmal gezogen wird. Statt der alten, abgeschnittenen „alle Tabs"-Leiste erscheint die schwebende Glas-Leiste unten (4 Tabs + „Mehr"). Sie ist jetzt korrekt im V2-Glas-Look mit echter Transparenz und Blur. Über Darstellung lässt sie sich zusätzlich auf breiteren Fenstern einschalten.',
-        'Mobile touch navigation is now the default at narrow widths (phone and tablet, < 840 px) — including a narrowed desktop window. Instead of the old, cut-off "all tabs" bar you now get the floating glass bar at the bottom (4 tabs + "More"), now correctly in the V2 glass look with real transparency and blur. It can additionally be enabled on wider windows via Appearance.',
+        'Mobile Touch-Navigation ist jetzt Standard bei schmaler Breite (Smartphone und Tablet, < 840 px) — auch wenn ein Desktop-Fenster schmal gezogen wird. Statt der alten, abgeschnittenen „alle Tabs"-Leiste erscheint die schwebende Glas-Leiste unten (4 Tabs + „Mehr"). Über Darstellung lässt sie sich zusätzlich auf breiteren Fenstern einschalten.',
+        'Mobile touch navigation is now the default at narrow widths (phone and tablet, < 840 px) — including a narrowed desktop window. Instead of the old, cut-off "all tabs" bar you now get the floating glass bar at the bottom (4 tabs + "More"). It can additionally be enabled on wider windows via Appearance.',
       ),
       t(
         'Vorhersage (Basis) scrollt jetzt sauber: Tagesplan und Prognoseverlauf wurden je nach Auflösung ohne Scrollbalken abgeschnitten. Die Seite lässt sich jetzt vertikal scrollen und zeigt beide vollständig.',
