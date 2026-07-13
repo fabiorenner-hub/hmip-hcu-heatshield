@@ -36,10 +36,10 @@ const PREVIEW_FLAGS: Array<{ flag: FeatureFlag; de: string; en: string; hintDe: 
   },
   {
     flag: 'mobileUiV2',
-    de: 'Mobile Touch-Navigation',
-    en: 'Mobile touch navigation',
-    hintDe: '5-Punkt-Leiste unten auf Smartphone-Breite.',
-    hintEn: '5-item bottom bar at phone width.',
+    de: 'Mobile Touch-Navigation auch auf breiten Fenstern',
+    en: 'Mobile touch navigation on wide windows too',
+    hintDe: 'Die untere Touch-Leiste ist auf Smartphone-/Tablet-Breite (< 840 px) immer aktiv. Diese Option zeigt sie zusätzlich auf breiteren Tablet-/Desktop-Fenstern.',
+    hintEn: 'The bottom touch bar is always active on phone/tablet widths (< 840 px). This option also shows it on wider tablet/desktop windows.',
   },
 ];
 

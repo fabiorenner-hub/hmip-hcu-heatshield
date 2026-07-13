@@ -550,7 +550,11 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
 .lg2-actions { display: flex; flex-direction: column; gap: var(--lg2-s2); }
 .lg2-action {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  /* `minmax(0, 1fr)` (not `1fr`) lets the body column shrink below its
+     content's min width so the name/detail ellipsis actually kicks in — with
+     plain `1fr` the track keeps min-content width and the trailing badge
+     overlaps long room/verb text. */
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--lg2-s3);
   padding: var(--lg2-s2) var(--lg2-s3);
@@ -1527,6 +1531,11 @@ body.lg2-demo-open .room-detail__close:hover { border-color: var(--lg2-accent); 
  * ================================================================== */
 
 .lg2-fc { display: flex; flex-direction: column; gap: var(--lg2-gap); }
+/* The forecast page is content-heavy (Tagesplan + full timeline grid) and must
+   NOT be squeezed into one clipped 100vh screen. Let the main area scroll
+   vertically so the day plan and the "Prognoseverlauf" grid are fully reachable
+   at any resolution (`.lg2-main.lg2-fc` beats the base `.lg2-main` overflow). */
+.lg2-main.lg2-fc { overflow-y: auto; overscroll-behavior: contain; }
 .lg2-fc__controls { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
 .lg2-fc__ctl { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--lg2-label-3); font-weight: 600; }
 .lg2-fc__ctl > span { padding-left: 2px; }
@@ -1544,7 +1553,7 @@ body.lg2-demo-open .room-detail__close:hover { border-color: var(--lg2-accent); 
 .lg2-fc__banner-btn { flex: 0 0 auto; }
 
 /* The timeline grid: [row label] [N time columns] per logical row. */
-.lg2-fc__grid { padding: 0; overflow: hidden; display: grid; grid-template-columns: clamp(146px, 15vw, 196px) 1fr; flex: 1 1 auto; min-height: 0; }
+.lg2-fc__grid { padding: 0; overflow: hidden; display: grid; grid-template-columns: clamp(146px, 15vw, 196px) 1fr; flex: 0 0 auto; }
 .lg2-fc__rowhead { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--lg2-hairline); min-width: 0; }
 .lg2-fc__rowhead--top { border-top: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--lg2-label-3); font-weight: 700; }
 .lg2-fc__rowicon { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.14); border: 1px solid rgba(var(--lg2-accent-rgb), 0.26); }
@@ -4024,10 +4033,17 @@ body.lg2-anim-paused .lg2-demo *::after {
   padding-bottom: calc(64px + 22px + env(safe-area-inset-bottom, 0px) + 12px) !important;
 }
 
-/* Bar surface: v2 frosted glass. */
+/* Bar surface: v2 frosted glass. NB the bar renders OUTSIDE `.lg2-demo`, so the
+   `--lg2-*` tokens are not in scope here — we spell the glass out explicitly
+   (translucent tint + sheen + real backdrop blur) so the transparency and blur
+   actually show and match the v2 look, independent of the v1 `--glass-*`. */
 .app--uiv2 .mobile-nav {
-  background: var(--lg2-sheen, none), var(--lg2-sidebar, rgba(16, 32, 49, 0.66));
-  border: 1px solid var(--lg2-hairline, rgba(255, 255, 255, 0.12));
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 62%),
+    rgba(16, 32, 49, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
 }
 .app--uiv2 .mobile-nav__item { color: var(--lg2-label-2, #9fb0c2); }
 .app--uiv2 .mobile-nav__item--active { color: var(--lg2-accent, #ff9d2e); }
@@ -4041,10 +4057,14 @@ body.lg2-anim-paused .lg2-demo *::after {
   color: #fff;
 }
 
-/* "Mehr" sheet: v2 glass + accent. */
+/* "Mehr" sheet: v2 glass + accent (also outside `.lg2-demo` — spell it out). */
 .app--uiv2 .mobile-more__sheet {
-  background: var(--lg2-sheen, none), var(--lg2-panel, rgba(16, 32, 49, 0.92));
-  border: 1px solid var(--lg2-hairline, rgba(255, 255, 255, 0.12));
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 55%),
+    rgba(16, 32, 49, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
 }
 .app--uiv2 .mobile-more__title,
 .app--uiv2 .mobile-more__lbl { color: var(--lg2-label-1, #f4f7fb); }

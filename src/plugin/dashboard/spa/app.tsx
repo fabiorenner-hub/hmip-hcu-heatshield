@@ -48,7 +48,7 @@ import { ambientBackground, ambientEnabled } from './ambient.js';
 import { getFlag } from './featureFlags.js';
 import { setUiVersion, uiVersion } from './uiVersion.js';
 import { MODULES, WARNINGS_MODULE, isModuleActive, SETTINGS_LINKS } from './navModel.js';
-import { useBreakpoint, isTabletUp, isPhone } from './responsive.js';
+import { useBreakpoint, isTabletUp, isNarrow } from './responsive.js';
 import { MobileNav } from './components/shell/mobileNav.js';
 import { FreshnessChip } from './components/shell/freshnessChip.js';
 import { APP_VERSION } from './version.js';
@@ -360,10 +360,13 @@ export function App(props: AppProps = {}): JSX.Element {
   // layout + v2 spacing onto. DOM/routes are unchanged.
   const breakpoint = useBreakpoint();
   const premiumShell = getFlag('premiumUiV2') && isTabletUp(breakpoint);
-  // Mobile touch-first shell (Gate 2 G2.3) — opt-in behind `mobileUiV2` and
-  // only at phone widths. Default OFF. Adds a root class for scoped CSS and a
-  // fixed 5-item bottom nav; routes/content are unchanged.
-  const mobileShell = getFlag('mobileUiV2') && isPhone(breakpoint);
+  // Mobile touch-first shell (Apple-style bottom nav: 4 tabs + "Mehr" sheet).
+  // Now the DEFAULT at narrow widths (phones + compact tablets, < 840px) where
+  // the vertical sidebar would otherwise collapse into a cramped, cut-off
+  // all-tabs bar. The `mobileUiV2` flag additionally forces it on wider
+  // tablet/desktop windows (everything below full desktop) for users who
+  // prefer it. Routes/content are unchanged; only the chrome differs.
+  const mobileShell = isNarrow(breakpoint) || (getFlag('mobileUiV2') && breakpoint !== 'desktop');
 
   // One canonical route set; each <Page> picks the v1/v2 design from `uiVersion`.
   const outlet = (

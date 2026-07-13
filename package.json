@@ -1,6 +1,6 @@
 {
   "name": "hmip-plugin-heatshield",
-  "version": "2.0.25",
+  "version": "2.0.26",
   "description": "Heat Shield HMIP plugin (de.fr.renner.plugin.heatshield) — predictive shutter control for summer heat protection.",
   "private": true,
   "type": "module",

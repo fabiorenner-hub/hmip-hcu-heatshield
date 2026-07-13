@@ -55,6 +55,16 @@ export function isTabletUp(bp: Breakpoint): boolean {
 }
 
 /**
+ * True for "narrow" viewports — phones AND compact tablets (< 840px). At these
+ * widths the vertical v2 sidebar collapses into a cramped, horizontally
+ * scrolling all-tabs bar that gets cut off, so the shell shows the Apple-style
+ * bottom `MobileNav` (4 tabs + "Mehr") instead. Pure.
+ */
+export function isNarrow(bp: Breakpoint): boolean {
+  return bp === 'compactPhone' || bp === 'largePhone' || bp === 'compactTablet';
+}
+
+/**
  * Reactive current breakpoint. Safe in non-DOM / test environments: when
  * `window` is unavailable it returns `desktop` and never subscribes.
  */

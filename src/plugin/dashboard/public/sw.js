@@ -15,7 +15,7 @@
  *     cached shell so the installed app opens offline.
  */
 
-const CACHE = 'heatshield-shell-v173';
+const CACHE = 'heatshield-shell-v174';
 
 const SHELL = ['/', '/app.js', '/styles.css', '/liquid-glass.css', '/liquid-glass2.css', '/manifest.webmanifest', '/icon.svg'];
 

@@ -3,6 +3,12 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.26
+
+- **Mobile Touch-Navigation ist jetzt Standard bei schmaler Breite.** Bei Smartphone- **und** Tablet-Breite (< 840 px) — und auch, wenn ein Desktop-Fenster schmal gezogen wird — erscheint jetzt die schwebende Apple-Style-Glas-Leiste unten (4 Haupt-Tabs + „Mehr"-Sheet) statt der alten, kollabierten „alle Tabs"-Leiste, die abgeschnitten wurde und deren Beschriftungen sich überlagerten. Die Leiste ist jetzt korrekt im V2-Liquid-Glass-Look (echte Transparenz + Blur). Über **Darstellung** lässt sie sich zusätzlich auf breiteren Tablet-/Desktop-Fenstern aktivieren.
+- **Vorhersage (Basis-Ansicht) scrollt sauber.** Tagesplan und Prognoseverlauf wurden je nach Auflösung ohne Scrollbalken abgeschnitten (die Seite versuchte, alles in einen Bildschirm zu pressen). Die Seite scrollt jetzt vertikal; Tagesplan und Prognoseverlauf sind vollständig sichtbar.
+- **„Nächste Aktionen": Badge-Überlappung behoben.** Bei langen Raum-/Aktionsnamen überlagerte das Status-Badge (z. B. „Vorbereitet") den Text. Die Text-Spalte kürzt jetzt korrekt mit „…", das Badge bleibt in seiner Spalte (CSS-Grid `minmax(0,1fr)`).
+
 ## 2.0.25
 
 - **OTA-Installation repariert.** Ein frisch heruntergeladenes OTA-Update wurde beim Neustart fälschlich als beschädigt eingestuft und automatisch zurückgerollt (`lastResult: quarantined`). Ursache: der Bootstrap-Loader verglich den **Gesamt-Hash der Bundle-Datei** (`heatshield-ota-*.json`) mit der **entpackten `main.js`** — die konnten nie übereinstimmen (`sha256-mismatch`). Der Installer persistiert jetzt zusätzlich `mainSha256` (Hash der entpackten `main.js`), und der Loader verifiziert genau diese Datei beim Boot. Der Download-Integritäts-Check (Gesamt-Bundle gegen `manifest.sha256`) bleibt unverändert.

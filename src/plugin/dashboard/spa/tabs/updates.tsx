@@ -22,6 +22,23 @@ export interface ChangelogEntry {
 export function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '2.0.26',
+    items: [
+      t(
+        'Mobile Touch-Navigation ist jetzt Standard bei schmaler Breite (Smartphone und Tablet, < 840 px) — auch wenn ein Desktop-Fenster schmal gezogen wird. Statt der alten, abgeschnittenen „alle Tabs"-Leiste erscheint die schwebende Glas-Leiste unten (4 Tabs + „Mehr"). Sie ist jetzt korrekt im V2-Glas-Look mit echter Transparenz und Blur. Über Darstellung lässt sie sich zusätzlich auf breiteren Fenstern einschalten.',
+        'Mobile touch navigation is now the default at narrow widths (phone and tablet, < 840 px) — including a narrowed desktop window. Instead of the old, cut-off "all tabs" bar you now get the floating glass bar at the bottom (4 tabs + "More"), now correctly in the V2 glass look with real transparency and blur. It can additionally be enabled on wider windows via Appearance.',
+      ),
+      t(
+        'Vorhersage (Basis) scrollt jetzt sauber: Tagesplan und Prognoseverlauf wurden je nach Auflösung ohne Scrollbalken abgeschnitten. Die Seite lässt sich jetzt vertikal scrollen und zeigt beide vollständig.',
+        'Forecast (basic) now scrolls cleanly: the day plan and forecast timeline were cut off without a scrollbar depending on resolution. The page now scrolls vertically and shows both in full.',
+      ),
+      t(
+        '„Nächste Aktionen": das Status-Badge (z. B. „Vorbereitet") überlagerte bei langen Raum-/Aktionsnamen den Text — behoben, der Text kürzt jetzt sauber mit „…".',
+        '"Next actions": the status badge (e.g. "Prepared") overlapped the text for long room/action names — fixed; the text now truncates cleanly with "…".',
+      ),
+    ],
+  },
+  {
     version: '2.0.25',
     items: [
       t(
