@@ -22,6 +22,15 @@ export interface ChangelogEntry {
 export function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '2.0.28',
+    items: [
+      t(
+        'Rückrollung: die Änderungen am Räume-Tab aus 2.0.27 (Risiko-Label, Ausblenden der „Nächste Aktion" bei ausgeschalteter Automatik) wurden zurückgenommen, da sie den Räume-Tab gestört haben — der Räume-Tab entspricht wieder dem bewährten Stand. Die übrigen 2.0.27-Verbesserungen (Glas-Optik der Touch-Leiste, Badge-Fix in „Nächste Aktionen", scrollende Vorhersage) bleiben erhalten.',
+        'Rollback: the 2.0.27 changes to the Rooms tab (risk label, hiding "Next action" when automation is off) were reverted because they disrupted the Rooms tab — the Rooms tab is back to its proven state. The other 2.0.27 improvements (glass look of the touch bar, badge fix in "Next actions", scrolling forecast) remain.',
+      ),
+    ],
+  },
+  {
     version: '2.0.27',
     items: [
       t(

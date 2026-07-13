@@ -3,6 +3,10 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.28
+
+- **Rückrollung der Räume-Änderungen aus 2.0.27.** Die in 2.0.27 am Räume-Tab vorgenommenen Änderungen (Risiko-Label am Stufen-Badge, Ausblenden der „Nächste Aktion" bei ausgeschalteter Automatik) werden zurückgenommen, weil sie den Räume-Tab gestört haben. Der Räume-Tab entspricht wieder dem bewährten Stand vor 2.0.27. Die übrigen 2.0.27-Verbesserungen bleiben erhalten: Glas-Optik der mobilen Touch-Leiste, Fix der Badge-Überlappung in „Nächste Aktionen" (Übersicht), scrollende Vorhersage-Basisansicht sowie der „Automatik aus"-Hinweis in der Übersicht.
+
 ## 2.0.27
 
 - **Mobile Touch-Leiste optisch an das v2-Design angeglichen.** Die untere Navigationsleiste nutzte eine eigene, hartkodierte Fläche (dunkleres Navy, 62 % Deckkraft), wodurch sie deckender und andersfarbig wirkte als der Rest. Sie verwendet jetzt exakt dieselbe Glas-Rezeptur wie die Karten/Seitenleiste (`--lg2-sheen` + `--lg2-scrim` + `--lg2-panel`, Blur/Sättigung über `--lg2-blur`/`--lg2-sat`) und erbt die Live-Theme-Tokens von `body.ui-v2` — gleiche Transparenz, gleicher Tint, gleicher Blur, folgt Akzent-/Glas-Einstellungen. Das „Mehr"-Sheet analog (etwas festere `--lg2-sidebar`-Füllung für Lesbarkeit).

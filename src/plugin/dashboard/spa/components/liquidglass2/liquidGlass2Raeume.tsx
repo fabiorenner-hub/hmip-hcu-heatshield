@@ -137,7 +137,7 @@ function RaeumeBody(props: { snap: DashboardSnapshot }): JSX.Element {
       </header>
 
       <div class="lg2-raeume__split">
-        <RoomList rooms={rooms} selectedId={selected?.id ?? null} onSelect={setSelectedId} autoOff={snap.automationEnabled === false} />
+        <RoomList rooms={rooms} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
         {selected !== null
           ? <RoomDetailPanel snap={snap} room={selected} />
           : <div class="lg2-card lg2-raeume__empty">{t('Noch keine Räume eingerichtet.', 'No rooms configured yet.')}</div>}
@@ -150,13 +150,13 @@ function RaeumeBody(props: { snap: DashboardSnapshot }): JSX.Element {
 /* Left: room list                                                            */
 /* -------------------------------------------------------------------------- */
 
-function RoomList(props: { rooms: RoomDetail[]; selectedId: string | null; onSelect: (id: string) => void; autoOff: boolean }): JSX.Element {
+function RoomList(props: { rooms: RoomDetail[]; selectedId: string | null; onSelect: (id: string) => void }): JSX.Element {
   return (
     <div class="lg2-card lg2-roomlist" data-testid="lg2-roomlist">
       <div class="lg2-roomlist__scroll">
         {props.rooms.map((r) => {
           const tone = roomTone(r);
-          const at = props.autoOff ? null : actionTime(r);
+          const at = actionTime(r);
           const on = r.id === props.selectedId;
           return (
             <button type="button" key={r.id}
@@ -167,22 +167,17 @@ function RoomList(props: { rooms: RoomDetail[]; selectedId: string | null; onSel
               <span class="lg2-roomrow__body">
                 <span class="lg2-roomrow__top">
                   <span class="lg2-roomrow__name">{r.name}</span>
-                  <span class={`lg2-risk lg2-risk--${tone}`}
-                    title={t('Überhitzungsrisiko dieses Raums (nicht die aktuelle Temperatur)', 'This room’s overheating risk (not the current temperature)')}>
-                    <span class="lg2-risk__lbl">{t('Risiko', 'Risk')}</span> {t(...TONE_LABEL[tone])}
-                  </span>
+                  <span class={`lg2-risk lg2-risk--${tone}`}>{t(...TONE_LABEL[tone])}</span>
                 </span>
                 <span class="lg2-roomrow__temps">
                   <span class="lg2-roomrow__temp">{num1(r.indoorTempC)} <small>°C</small></span>
                   <span class="lg2-roomrow__temp-lbl">{t('aktuell', 'current')}</span>
                   <span class="lg2-roomrow__shutter">{t('Rollladen', 'Shutter')} {Math.round(r.shutterPercent)} %</span>
                 </span>
-                <span class={`lg2-roomrow__next${(props.autoOff || at === null) ? ' lg2-roomrow__next--none' : ''}`}>
-                  {props.autoOff
-                    ? t('Automatik aus', 'Automation off')
-                    : at !== null
-                      ? `${t('Nächste Aktion', 'Next action')}: ${at}`
-                      : `${t('Nächste Aktion', 'Next action')}: ${t('Keine', 'None')}`}
+                <span class={`lg2-roomrow__next${at === null ? ' lg2-roomrow__next--none' : ''}`}>
+                  {at !== null
+                    ? `${t('Nächste Aktion', 'Next action')}: ${at}`
+                    : `${t('Nächste Aktion', 'Next action')}: ${t('Keine', 'None')}`}
                 </span>
               </span>
               {on && <Icon name="forecast" size={16} />}
