@@ -3,6 +3,11 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.25
+
+- **OTA-Installation repariert.** Ein frisch heruntergeladenes OTA-Update wurde beim Neustart fälschlich als beschädigt eingestuft und automatisch zurückgerollt (`lastResult: quarantined`). Ursache: der Bootstrap-Loader verglich den **Gesamt-Hash der Bundle-Datei** (`heatshield-ota-*.json`) mit der **entpackten `main.js`** — die konnten nie übereinstimmen (`sha256-mismatch`). Der Installer persistiert jetzt zusätzlich `mainSha256` (Hash der entpackten `main.js`), und der Loader verifiziert genau diese Datei beim Boot. Der Download-Integritäts-Check (Gesamt-Bundle gegen `manifest.sha256`) bleibt unverändert.
+- **Hinweis:** Der Bootstrap-Loader ist Teil des Images und **nicht** OTA-updatebar. Dieser Fix greift daher erst nach **einmaliger** Installation dieses `.tar.gz` über HCUweb. Ab dann funktionieren OTA-Updates wie vorgesehen.
+
 ## 2.0.24
 
 - **OTA-taugliche Updates.** Ab dieser Version können Aktualisierungen over-the-air (OTA) bereitgestellt werden.

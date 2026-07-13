@@ -23,7 +23,7 @@ import * as path from 'node:path';
 
 import type { OtaManifest } from './manifest.js';
 import type { ReleaseAsset, FetchLike } from './github.js';
-import { sha256Matches, verifySignature } from './verify.js';
+import { sha256Hex, sha256Matches, verifySignature } from './verify.js';
 
 export interface OtaBundleFile {
   format: string;
@@ -135,6 +135,16 @@ export async function installBundle(
   }
 
   // 5. Write into a fresh staging dir.
+  //
+  // The manifest's `sha256` covers the whole bundle *file* (JSON+base64), which
+  // was verified in step 2 against the downloaded bytes. The bootstrap loader,
+  // however, only sees the *extracted* `main.js` on disk at boot — it cannot
+  // re-hash the transient bundle. So we compute and persist `mainSha256` (the
+  // hash of the decoded `main.js` bytes) into the loader-visible manifest, and
+  // the loader verifies exactly that on every boot. Without this, the loader
+  // compared main.js's hash to the bundle-file hash and ALWAYS quarantined a
+  // freshly installed payload.
+  const mainSha256 = sha256Hex(Buffer.from(parsed.files['main.js'] ?? '', 'base64'));
   const base = otaDir(deps.dataDir);
   const staging = path.join(base, 'staging', manifest.version);
   const active = path.join(base, 'active');
@@ -146,8 +156,13 @@ export async function installBundle(
       await fs.mkdir(path.dirname(dest), { recursive: true });
       await fs.writeFile(dest, Buffer.from(b64, 'base64'));
     }
-    // Persist the verified manifest alongside the payload for the loader.
-    await fs.writeFile(path.join(staging, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+    // Persist the verified manifest alongside the payload for the loader,
+    // augmented with the per-file `mainSha256` the loader actually checks.
+    await fs.writeFile(
+      path.join(staging, 'manifest.json'),
+      `${JSON.stringify({ ...manifest, mainSha256 }, null, 2)}\n`,
+      'utf8',
+    );
   } catch (err) {
     return { ok: false, reason: 'bad-bundle', detail: `staging write failed: ${err instanceof Error ? err.message : String(err)}` };
   }

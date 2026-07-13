@@ -30,7 +30,16 @@ interface OtaStateShape {
 interface MinimalManifest {
   version: string;
   minCoreVersion: string;
+  /** sha256 of the whole bundle *file* (verified at download by the installer). */
   sha256: string;
+  /**
+   * sha256 of the extracted `main.js` bytes on disk. Written by the installer
+   * (v2.0.25+). The loader verifies THIS against `active/main.js` at boot — the
+   * bundle-file `sha256` cannot be re-checked once the payload is extracted.
+   * Optional so payloads staged by an older installer still boot (they rely on
+   * the installer's download-time verification + crash-loop protection).
+   */
+  mainSha256?: string;
 }
 
 export type BundleChoice =
@@ -139,14 +148,19 @@ async function readActiveManifest(): Promise<MinimalManifest | null> {
   try {
     const raw = await fs.readFile(path.join(activeDir(), 'manifest.json'), 'utf8');
     const obj = JSON.parse(raw) as Record<string, unknown>;
-    const { version, minCoreVersion, sha256 } = obj;
+    const { version, minCoreVersion, sha256, mainSha256 } = obj;
     if (
       typeof version === 'string' &&
       typeof minCoreVersion === 'string' &&
       typeof sha256 === 'string' &&
       /^[0-9a-f]{64}$/iu.test(sha256)
     ) {
-      return { version, minCoreVersion, sha256 };
+      return {
+        version,
+        minCoreVersion,
+        sha256,
+        ...(typeof mainSha256 === 'string' && /^[0-9a-f]{64}$/iu.test(mainSha256) ? { mainSha256 } : {}),
+      };
     }
     return null;
   } catch {
@@ -228,7 +242,16 @@ export async function runLoader(): Promise<void> {
     (await fileExists(path.join(activeDir(), 'manifest.json')));
   const manifest = hasActiveBundle ? await readActiveManifest() : null;
   const sha = manifest !== null ? await sha256OfFile(path.join(activeDir(), 'main.js')) : null;
-  const sha256Match = manifest !== null && sha !== null && sha.toLowerCase() === manifest.sha256.toLowerCase();
+  // Verify the extracted `main.js` against the per-file `mainSha256` the
+  // installer persisted. When it is absent (payload staged by an older
+  // installer that only stored the bundle-file hash), we cannot meaningfully
+  // re-hash from disk, so we don't treat it as a mismatch — the installer
+  // already verified the bundle at download and crash-loop protection remains.
+  const sha256Match =
+    manifest !== null &&
+    (manifest.mainSha256 === undefined
+      ? true
+      : sha !== null && sha.toLowerCase() === manifest.mainSha256.toLowerCase());
 
   const choice = decideBundle({
     coreVersion,

@@ -22,6 +22,15 @@ export interface ChangelogEntry {
 export function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '2.0.25',
+    items: [
+      t(
+        'OTA-Installation repariert: ein neu geladenes OTA-Update wurde bisher beim Neustart fälschlich als beschädigt eingestuft und automatisch zurückgerollt (der Bootstrap-Loader prüfte den Bundle-Gesamt-Hash gegen die entpackte main.js). Der Loader verifiziert jetzt exakt die entpackte main.js. Dieser Fix steckt im Image — er greift erst nach einmaliger Installation dieses .tar.gz über HCUweb; danach funktionieren OTA-Updates.',
+        'OTA install fixed: a freshly downloaded OTA update was wrongly flagged as corrupt on restart and rolled back automatically (the bootstrap loader compared the whole-bundle hash to the extracted main.js). The loader now verifies exactly the extracted main.js. This fix lives in the image — it takes effect after installing this .tar.gz once via HCUweb; OTA updates work from then on.',
+      ),
+    ],
+  },
+  {
     version: '2.0.24',
     items: [
       t(

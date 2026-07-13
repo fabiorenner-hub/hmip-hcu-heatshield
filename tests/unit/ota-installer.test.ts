@@ -76,8 +76,18 @@ describe('installBundle', () => {
     // active/ populated.
     expect(await fs.readFile(path.join(dir, 'ota', 'active', 'main.js'), 'utf8')).toContain('main');
     expect(await fs.readFile(path.join(dir, 'ota', 'active', 'public', 'app.js'), 'utf8')).toContain('console.log');
-    const activeManifest = JSON.parse(await fs.readFile(path.join(dir, 'ota', 'active', 'manifest.json'), 'utf8')) as OtaManifest;
+    const activeManifest = JSON.parse(
+      await fs.readFile(path.join(dir, 'ota', 'active', 'manifest.json'), 'utf8'),
+    ) as OtaManifest & { mainSha256?: string };
     expect(activeManifest.version).toBe('v2.1.0');
+    // Regression: the loader verifies the extracted main.js against
+    // `mainSha256`, NOT the whole-bundle `sha256`. The installer must persist
+    // the per-file hash, and it must equal sha256(main.js on disk) — otherwise
+    // the loader quarantines every freshly installed payload (the OTA install
+    // that failed with lastResult="quarantined").
+    const mainBytes = await fs.readFile(path.join(dir, 'ota', 'active', 'main.js'));
+    expect(activeManifest.mainSha256).toBe(sha256Hex(new Uint8Array(mainBytes)));
+    expect(activeManifest.mainSha256).not.toBe(activeManifest.sha256);
   });
 
   it('leaves active/ untouched when sha256 does not match', async () => {
