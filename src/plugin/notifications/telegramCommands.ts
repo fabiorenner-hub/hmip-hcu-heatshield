@@ -27,6 +27,12 @@ export interface TelegramCommandContext {
   setAutomation: (on: boolean) => string;
   /** Set a named setting (`key` + raw value string). */
   setParam: (key: string, value: string) => string;
+  /**
+   * Answer a pending "should the shutter re-close after your manual change?"
+   * question. `yes` releases the manual override so automation resumes;
+   * `no` keeps the shutter held at the user's position for another window.
+   */
+  confirmReclose: (yes: boolean) => string;
 }
 
 function parseOnOff(arg: string): boolean | null {
@@ -132,6 +138,22 @@ export function buildTelegramCommands(
       },
     },
   ];
+
+  commands.push({
+    name: 'ja',
+    aliases: ['yes', 'j'],
+    description: 'Rückfrage bestätigen — Rollladen darf wieder schließen',
+    control: true,
+    run: () => ctx.confirmReclose(true),
+  });
+
+  commands.push({
+    name: 'nein',
+    aliases: ['no', 'n'],
+    description: 'Rückfrage ablehnen — Rollladen bleibt offen (Position halten)',
+    control: true,
+    run: () => ctx.confirmReclose(false),
+  });
 
   commands.push({
     name: 'menu',

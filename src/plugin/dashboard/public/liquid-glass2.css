@@ -700,6 +700,7 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
 
 .lg2-legend { display: flex; flex-wrap: wrap; gap: var(--lg2-s3); font-size: 11.5px; color: var(--lg2-label-2); }
 .lg2-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lg2-legend__note { margin: 6px 0 0; font-size: 11px; color: var(--lg2-label-3); line-height: 1.4; }
 
 .lg2-mini-dot {
   display: inline-flex;
@@ -1586,6 +1587,8 @@ body.lg2-demo-open .room-detail__close:hover { border-color: var(--lg2-accent); 
 .lg2-fc__swatch { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
 .lg2-fc__swatch--risk { background: rgba(255, 140, 66, 0.6); height: 12px; width: 12px; border-radius: 3px; }
 .lg2-fc__updated { font-size: 11.5px; color: var(--lg2-label-3); }
+.lg2-fc__facade { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.lg2-fc__facade--none { color: var(--lg2-label-3); font-weight: 400; }
 .lg2-fc__empty { padding: 40px; text-align: center; color: var(--lg2-label-2); }
 
 .lg2-fc__grid--compact .lg2-fc__rowlabel em { display: none; }
@@ -1779,6 +1782,15 @@ body.lg2-demo-open .room-detail__close:hover { border-color: var(--lg2-accent); 
 .lg2-auto__blockrow > span:last-child { display: flex; flex-direction: column; min-width: 0; }
 .lg2-auto__blockrow b { font-size: 0.86rem; font-weight: 620; }
 .lg2-auto__blockrow em { font-style: normal; font-size: 11px; color: var(--lg2-label-3); }
+
+/* Editable storm-protection control (Automatik status column) */
+.lg2-auto__stormctl { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--lg2-hairline); display: flex; flex-direction: column; gap: 8px; }
+.lg2-auto__stormctl-row { display: flex; align-items: center; gap: 10px; }
+.lg2-auto__stormctl-icon { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--lg2-blue, #4a8cff); background: rgba(74,140,255,0.14); border: 1px solid rgba(74,140,255,0.28); }
+.lg2-auto__stormctl-label { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.lg2-auto__stormctl-label b { font-size: 0.86rem; font-weight: 620; }
+.lg2-auto__stormctl-label em { font-style: normal; font-size: 11px; color: var(--lg2-label-3); line-height: 1.35; }
+.lg2-auto__stormctl-hold { margin: 0; font-size: 11px; color: var(--lg2-label-2); padding-left: 36px; }
 
 /* Decision rationale */
 .lg2-auto__reason { gap: 13px; }
@@ -2497,11 +2509,16 @@ body.ui-v2 .twin-chips .room-badge {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-body.ui-v2 .twin-chips .room-badge--scheduled,
-body.ui-v2 .twin-chips .room-badge--recommended { border-left-color: var(--lg2-accent); }
-body.ui-v2 .twin-chips .room-badge--executing { border-left-color: var(--lg2-green); }
-body.ui-v2 .twin-chips .room-badge--blocked { border-left-color: var(--lg2-red); }
-body.ui-v2 .twin-chips .room-badge--manuallyOverridden { border-left-color: var(--lg2-orange-2); }
+/* The room-tile LEFT EDGE encodes ROOM TEMPERATURE (matches the overview
+   legend: green < 24 / blue 24-26 / red > 26 / grey = no reading). The
+   automation STATUS is shown by the small dot on the right, NOT the edge —
+   so a blocked room at 24.7 C no longer looks like ">26 C". These rules use
+   the same specificity as the (now removed) status-edge rules and reference
+   the identical colour tokens as the legend dots, so edge and legend match. */
+body.ui-v2 .twin-chips .room-badge--tone-ok { border-left-color: var(--color-success); }
+body.ui-v2 .twin-chips .room-badge--tone-mid { border-left-color: var(--color-info); }
+body.ui-v2 .twin-chips .room-badge--tone-hot { border-left-color: var(--color-danger); }
+body.ui-v2 .twin-chips .room-badge--tone-unknown { border-left-color: var(--color-card-border); }
 @media (hover: hover) {
   body.ui-v2 .twin-chips .room-badge:hover {
     background: var(--lg2-hover);
@@ -3749,3 +3766,341 @@ body.lg2-anim-paused .lg2-demo *::after {
   color: var(--lg2-label-2);
 }
 .lg2-cfg__section:first-of-type { margin-top: 2px; padding-top: 0; border-top: 0; }
+
+/* -------------------------------------------------------------------------- */
+/* Tagesplan (24h room plan)                                                  */
+/* -------------------------------------------------------------------------- */
+.lg2-plan { display: flex; flex-direction: column; gap: 14px; padding: 16px 18px; }
+.lg2-plan__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.lg2-plan__title { display: flex; gap: 11px; align-items: flex-start; min-width: 0; }
+.lg2-plan__icon { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.14); border: 1px solid rgba(var(--lg2-accent-rgb), 0.28); }
+.lg2-plan__title h2 { margin: 0; font-size: 1.02rem; font-weight: 650; letter-spacing: -0.01em; }
+.lg2-plan__title p { margin: 2px 0 0; font-size: 12px; color: var(--lg2-label-2); line-height: 1.4; }
+.lg2-plan__controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.lg2-plan__empty, .lg2-plan__nodec, .lg2-plan__note { margin: 0; font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-plan__note { color: var(--lg2-label-3); font-size: 11.5px; }
+.lg2-plan__chartwrap { width: 100%; overflow: hidden; border-radius: var(--lg2-r-md); background: rgba(255,255,255,0.02); border: 1px solid var(--lg2-hairline); }
+.lg2-plan__svg { display: block; width: 100%; height: auto; aspect-ratio: 900 / 300; }
+.lg2-plan__axislbl { font-size: 9px; fill: var(--lg2-label-3); font-family: inherit; }
+.lg2-plan__marklbl { font-size: 9.5px; font-weight: 700; font-family: inherit; }
+.lg2-plan__marker { cursor: pointer; }
+.lg2-plan__crosshair text { font-size: 9.5px; font-weight: 650; }
+.lg2-plan__legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--lg2-label-2); }
+.lg2-plan__legend span { display: inline-flex; align-items: center; gap: 5px; }
+.lg2-plan__sw { width: 12px; height: 3px; border-radius: 2px; display: inline-block; background: var(--lg2-label-3); }
+.lg2-plan__sw--dash { background: repeating-linear-gradient(90deg, var(--lg2-label-3) 0 3px, transparent 3px 6px); }
+.lg2-plan__conf { margin-left: auto; color: var(--lg2-label-3); }
+.lg2-plan__decisions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.lg2-plan__decision { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: var(--lg2-r-sm); background: rgba(255,255,255,0.03); border: 1px solid var(--lg2-hairline); }
+.lg2-plan__dtime { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 650; color: var(--lg2-label-1); min-width: 44px; padding-top: 1px; }
+.lg2-plan__dbadge { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: var(--lg2-r-pill); border: 1px solid; }
+.lg2-plan__dbody { display: flex; flex-direction: column; min-width: 0; }
+.lg2-plan__dbody b { font-size: 0.85rem; font-weight: 620; }
+.lg2-plan__dbody em { font-style: normal; font-size: 11.5px; color: var(--lg2-label-2); line-height: 1.4; }
+@media (max-width: 720px) {
+  .lg2-plan__svg { aspect-ratio: 600 / 320; }
+  .lg2-plan__controls { width: 100%; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Regeln & Grenzwerte (lg2-native, Runde 12)                                 */
+/* -------------------------------------------------------------------------- */
+.lg2-rules { display: flex; flex-direction: column; gap: 16px; }
+.lg2-rules__autosave { font-size: 12px; color: var(--lg2-label-2); align-self: center; }
+/* Inner spacer so no element touches the (rounded, clipped) card edge. */
+.lg2-rules__card { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
+.lg2-rules__card > .lg2-card__title { margin-bottom: 2px; }
+/* Grouped thresholds: a labelled sub-block inside the Schwellwerte card. */
+.lg2-rules__group { display: flex; flex-direction: column; gap: 8px; }
+.lg2-rules__group + .lg2-rules__group { margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--lg2-hairline); }
+.lg2-rules__group-head { margin: 0; font-size: 12px; font-weight: 650; letter-spacing: 0.02em; text-transform: uppercase; color: var(--lg2-label-3); }
+.lg2-rules__empty { color: var(--lg2-label-2); }
+.lg2-rules__error { color: var(--lg2-red, #ff5d57); border: 1px solid rgba(255,93,87,0.4); }
+.lg2-rules__hint { margin: 0; font-size: 12px; color: var(--lg2-label-3); }
+.lg2-rules__profiles { align-self: flex-start; }
+.lg2-rules__preview-err { margin: 0; font-size: 12px; color: var(--lg2-red, #ff5d57); }
+.lg2-rules__preview-mode { margin: 0; font-size: 0.9rem; }
+.lg2-rules__preview-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.lg2-rules__preview-cell { display: inline-flex; flex-direction: column; gap: 1px; padding: 5px 10px; border-radius: var(--lg2-r-sm); background: rgba(255,255,255,0.04); border: 1px solid var(--lg2-hairline); }
+.lg2-rules__preview-cell em { font-style: normal; font-size: 10.5px; color: var(--lg2-label-3); }
+.lg2-rules__preview-cell b { font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+.lg2-rules__sliders { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px 20px; }
+.lg2-rules__slider { display: flex; flex-direction: column; gap: 5px; }
+.lg2-rules__slider-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.lg2-rules__slider-label { font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-rules__slider-val { font-variant-numeric: tabular-nums; font-weight: 650; font-size: 0.9rem; color: var(--lg2-label-1); }
+.lg2-rules__range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; background: rgba(255,255,255,0.12); accent-color: var(--lg2-accent, var(--lg2-orange)); outline: none; }
+.lg2-rules__range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--lg2-accent, var(--lg2-orange)); border: 2px solid #0b1725; cursor: pointer; }
+.lg2-rules__range::-moz-range-thumb { width: 18px; height: 18px; border: 2px solid #0b1725; border-radius: 50%; background: var(--lg2-accent, var(--lg2-orange)); cursor: pointer; }
+.lg2-rules__slider-ref { font-size: 10.5px; color: var(--lg2-label-3); }
+.lg2-rules__toggle { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-rules__toggle > span { min-width: 0; }
+.lg2-rules__num { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--lg2-label-2); }
+.lg2-rules__num-input { display: inline-flex; align-items: center; gap: 5px; }
+.lg2-rules__num-input input { width: 84px; background: var(--lg2-surface-2, rgba(255,255,255,0.05)); color: var(--lg2-label-1); border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-sm); padding: 5px 8px; font: inherit; }
+.lg2-rules__num-input em { font-style: normal; color: var(--lg2-label-3); font-size: 11px; }
+.lg2-rules__row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; }
+.lg2-rules__subhead { margin: 8px 0 0; font-size: 0.92rem; font-weight: 650; color: var(--lg2-label-1); }
+.lg2-rules__sim-note { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--lg2-label-2); }
+@media (max-width: 720px) { .lg2-rules__row2 { grid-template-columns: 1fr; } }
+
+/* Entscheidungsverlauf (lg2-native, Runde 12) */
+.lg2-verlauf__filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 4px; }
+.lg2-verlauf__state { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 12.5px; }
+.lg2-verlauf__state--err { color: var(--lg2-red, #ff5d57); }
+
+/* ================================================================== *
+ * ui-v2-release — FINAL fallback-consistency pass (v159)
+ * ------------------------------------------------------------------
+ * "Alle Seiten auf einmal": every v1 page reused inside
+ * `.lg2-main.lg2-fallback` (system, rooms, sources, diagnostics,
+ * notifications, irrigation-settings, messages, updates, help,
+ * logs-debug, building) now reads as a native Liquid-Glass page. The
+ * scheme-aware `.lg2-demo` token remap + the v88 pass already cover
+ * token-based styling; this block catches the LAST hardcoded colours,
+ * and gives the reused pages one cohesive lg2 treatment for section
+ * typography, tables, generic controls, hover and spacing.
+ * All rules are scoped to `.lg2-main.lg2-fallback` so v1 (uiVersion=v1)
+ * is untouched. Semantic status dots (green/amber/red) are kept on
+ * purpose — status must never be conveyed by colour alone, so the dot
+ * stays a dot but adopts the lg2 semantic palette.
+ * ================================================================== */
+
+/* --- Remaining pure-hardcoded text/badges → lg2 tokens ----------------- */
+.lg2-main.lg2-fallback .room-card__droptarget,
+.lg2-main.lg2-fallback .tab-rooms__droptarget {
+  color: var(--lg2-accent);
+  background: rgba(var(--lg2-accent-rgb), 0.12);
+}
+.lg2-main.lg2-fallback .tab-sources__map-badge,
+.lg2-main.lg2-fallback .tab-sources__legend-chip,
+.lg2-main.lg2-fallback .discovery-status__feature {
+  background: rgba(var(--lg2-blue-rgb, 74, 140, 255), 0.16);
+  border-color: rgba(var(--lg2-blue-rgb, 74, 140, 255), 0.4);
+  color: var(--lg2-blue, #4a8cff);
+}
+
+/* --- Staleness / status dots → lg2 semantic palette (kept as dots) ------ */
+.lg2-main.lg2-fallback .tab-sources__staleness--fresh,
+.lg2-main.lg2-fallback .staleness-dot--fresh { background: var(--lg2-green, #66d66b); }
+.lg2-main.lg2-fallback .tab-sources__staleness--soon,
+.lg2-main.lg2-fallback .staleness-dot--soon { background: var(--lg2-orange, #ff9f0a); }
+.lg2-main.lg2-fallback .tab-sources__staleness--stale,
+.lg2-main.lg2-fallback .staleness-dot--stale { background: var(--lg2-red, #ff5d57); }
+.lg2-main.lg2-fallback .staleness-dot--unknown { background: var(--lg2-label-3); }
+
+/* --- Gardena valve OFF button → themed red glass (parity w/ irr-btn) ---- */
+.lg2-main.lg2-fallback .gardena-valve__btn--off {
+  background: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.16);
+  border: 1px solid rgba(var(--lg2-red-rgb, 255, 93, 87), 0.42);
+  color: var(--lg2-red, #ff5d57);
+}
+.lg2-main.lg2-fallback .gardena-valve__btn--off:hover:not(:disabled) {
+  background: rgba(var(--lg2-red-rgb, 255, 93, 87), 0.26);
+}
+
+/* --- Irrigation timeline block → themed green glass --------------------- */
+.lg2-main.lg2-fallback .irr-tl__block {
+  background: rgba(var(--lg2-green-rgb, 102, 214, 107), 0.22);
+  border-color: rgba(var(--lg2-green-rgb, 102, 214, 107), 0.5);
+}
+
+/* --- Section typography: unified lg2 headings across the reused pages --- */
+.lg2-main.lg2-fallback h1,
+.lg2-main.lg2-fallback .module-panel__head h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--lg2-label-1);
+}
+.lg2-main.lg2-fallback h2,
+.lg2-main.lg2-fallback .module-panel__card h2,
+.lg2-main.lg2-fallback .module-panel__card h3 {
+  font-size: 1.02rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--lg2-label-1);
+}
+.lg2-main.lg2-fallback .module-panel__intro,
+.lg2-main.lg2-fallback .module-panel__hint,
+.lg2-main.lg2-fallback .settings-hub__intro p {
+  color: var(--lg2-label-2);
+}
+.lg2-main.lg2-fallback .module-panel__badge {
+  background: rgba(var(--lg2-accent-rgb), 0.16);
+  border: 1px solid rgba(var(--lg2-accent-rgb), 0.32);
+  color: var(--lg2-accent);
+  border-radius: var(--lg2-r-pill);
+}
+/* KPI-style metrics use tabular numerals for calm alignment. */
+.lg2-main.lg2-fallback .module-panel__metric,
+.lg2-main.lg2-fallback [class*='__value'],
+.lg2-main.lg2-fallback [class*='__count'] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Tables: lg2 header + zebra rows + tabular numbers ------------------ */
+.lg2-main.lg2-fallback table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.lg2-main.lg2-fallback thead th,
+.lg2-main.lg2-fallback table th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lg2-label-3);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--lg2-hairline);
+}
+.lg2-main.lg2-fallback tbody td,
+.lg2-main.lg2-fallback table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--lg2-hairline);
+  color: var(--lg2-label-1);
+  font-size: 13px;
+}
+.lg2-main.lg2-fallback tbody tr:nth-child(even) td {
+  background: rgba(var(--lg2-scrim-rgb, 8, 11, 17), 0.05);
+}
+@media (hover: hover) {
+  .lg2-main.lg2-fallback tbody tr:hover td { background: var(--lg2-hover); }
+}
+/* Wide tables scroll within their card, never the whole page. */
+.lg2-main.lg2-fallback .module-panel__card { overflow-x: auto; }
+
+/* --- Generic buttons in the reused pages → lg2 rectangular button ------- */
+.lg2-main.lg2-fallback button:not(.seg__btn):not(.icon-btn):not(.irr-btn):not(.gardena-valve__btn):not(.automation-lever):not([class*='room-card__']):not([class*='tab-rooms__preset']):not([class*='__profile-btn']):not([class*='__step']) {
+  border-radius: var(--lg2-r-sm);
+  transition: border-color var(--lg2-fast) var(--lg2-ease),
+    background var(--lg2-fast) var(--lg2-ease);
+}
+
+/* --- Segmented controls (seg) inside reused pages adopt lg2 accent ------ */
+.lg2-main.lg2-fallback .seg__btn--active {
+  background: var(--lg2-accent);
+  color: var(--lg2-on-accent);
+}
+
+/* --- Links/anchors follow the accent -------------------------------- */
+.lg2-main.lg2-fallback a:not(.irr-btn):not(.updates-banner__cta) {
+  color: var(--lg2-accent);
+}
+
+/* --- Weather-charts range pill (reused on some pages) -> lg2 accent ----- */
+.lg2-main.lg2-fallback .weather-charts__range--active {
+  background: var(--lg2-accent) !important;
+  color: var(--lg2-on-accent) !important;
+}
+
+/* --- Consistent card rhythm: comfortable inner spacing + gaps ---------- */
+.lg2-main.lg2-fallback .module-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg2-s4, 16px);
+}
+.lg2-main.lg2-fallback .module-panel__card,
+.lg2-main.lg2-fallback .settings-hub__card {
+  padding: clamp(14px, 1.4vw, 20px);
+}
+
+/* ================================================================== *
+ * Mobile bottom nav in the Liquid Glass V2 shell.
+ *
+ * The shared <MobileNav> (Apple-style floating bar + "Mehr" sheet) is now
+ * rendered in v2 too (App adds `app--mobilenav` at phone widths). We:
+ *   1. hide the sidebar's own collapsed mobile bar so there is ONE bottom nav,
+ *   2. re-tint the bar/sheet with the live v2 tokens (mirrored on <body> by
+ *      Lg2Shell) so it matches the amber accent + frosted glass of v2.
+ * Base geometry/animation come from styles.css (`.mobile-nav`/`.mobile-more`).
+ * ================================================================== */
+.app--uiv2.app--mobilenav .lg2-side {
+  display: none !important;
+}
+.app--uiv2.app--mobilenav .lg2-main {
+  padding-bottom: calc(64px + 22px + env(safe-area-inset-bottom, 0px) + 12px) !important;
+}
+
+/* Bar surface: v2 frosted glass. */
+.app--uiv2 .mobile-nav {
+  background: var(--lg2-sheen, none), var(--lg2-sidebar, rgba(16, 32, 49, 0.66));
+  border: 1px solid var(--lg2-hairline, rgba(255, 255, 255, 0.12));
+}
+.app--uiv2 .mobile-nav__item { color: var(--lg2-label-2, #9fb0c2); }
+.app--uiv2 .mobile-nav__item--active { color: var(--lg2-accent, #ff9d2e); }
+.app--uiv2 .mobile-nav__item--active .mobile-nav__ico {
+  background: color-mix(in srgb, var(--lg2-accent, #ff9d2e) 20%, transparent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.app--uiv2 .mobile-nav__label { color: inherit; }
+.app--uiv2 .mobile-nav__badge {
+  background: var(--lg2-red, #ff5d57);
+  color: #fff;
+}
+
+/* "Mehr" sheet: v2 glass + accent. */
+.app--uiv2 .mobile-more__sheet {
+  background: var(--lg2-sheen, none), var(--lg2-panel, rgba(16, 32, 49, 0.92));
+  border: 1px solid var(--lg2-hairline, rgba(255, 255, 255, 0.12));
+}
+.app--uiv2 .mobile-more__title,
+.app--uiv2 .mobile-more__lbl { color: var(--lg2-label-1, #f4f7fb); }
+.app--uiv2 .mobile-more__hint { color: var(--lg2-label-3, #71869b); }
+.app--uiv2 .mobile-more__ico { color: var(--lg2-accent, #ff9d2e); }
+.app--uiv2 .mobile-more__item--active {
+  border-color: color-mix(in srgb, var(--lg2-accent, #ff9d2e) 55%, transparent);
+  background: color-mix(in srgb, var(--lg2-accent, #ff9d2e) 12%, var(--lg2-panel-2, rgba(20, 40, 58, 0.8)));
+}
+.app--uiv2 .mobile-more__item--active .mobile-more__ico {
+  background: var(--lg2-accent, #ff9d2e);
+  color: var(--lg2-on-accent, #1a1205);
+}
+.app--uiv2 .mobile-more__segbtn--on {
+  background: var(--lg2-accent, #ff9d2e);
+  color: var(--lg2-on-accent, #1a1205);
+}
+
+/* Hot-day multi-stage editor (Regeln → Hitzetag-Schutz). */
+.lg2-rules__stages { display: flex; flex-direction: column; gap: var(--lg2-s2, 8px); }
+.lg2-rules__stages-hint { margin: 0 0 2px; font-size: 12px; color: var(--lg2-label-3, #71869b); }
+.lg2-rules__stage {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--lg2-s2, 8px);
+  align-items: end;
+}
+.lg2-rules__stage-del {
+  appearance: none;
+  height: 36px;
+  width: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--lg2-radius-sm, 12px);
+  border: 1px solid var(--lg2-hairline, rgba(255, 255, 255, 0.12));
+  background: var(--lg2-panel-2, rgba(20, 40, 58, 0.8));
+  color: var(--lg2-label-2, #9fb0c2);
+  cursor: pointer;
+  transition: color var(--lg2-fast, 0.15s) var(--lg2-ease), border-color var(--lg2-fast, 0.15s) var(--lg2-ease);
+}
+@media (hover: hover) {
+  .lg2-rules__stage-del:not(:disabled):hover { color: var(--lg2-red, #ff5d57); border-color: var(--lg2-red, #ff5d57); }
+}
+.lg2-rules__stage-del:disabled { opacity: 0.4; cursor: default; }
+.lg2-rules__stage-add {
+  appearance: none;
+  align-self: flex-start;
+  padding: var(--lg2-s2, 8px) var(--lg2-s3, 12px);
+  border-radius: var(--lg2-radius-sm, 12px);
+  border: 1px dashed var(--lg2-hairline, rgba(255, 255, 255, 0.2));
+  background: transparent;
+  color: var(--lg2-accent, #ff9d2e);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--lg2-fast, 0.15s) var(--lg2-ease), border-color var(--lg2-fast, 0.15s) var(--lg2-ease);
+}
+@media (hover: hover) {
+  .lg2-rules__stage-add:hover { background: rgba(var(--lg2-accent-rgb, 255, 157, 46), 0.12); border-color: var(--lg2-accent, #ff9d2e); }
+}

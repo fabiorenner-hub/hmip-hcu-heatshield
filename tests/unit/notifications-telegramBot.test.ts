@@ -233,6 +233,7 @@ describe('buildTelegramCommands', () => {
     setVacation: (on: boolean) => `VAC:${on}`,
     setAutomation: (on: boolean) => `AUTO:${on}`,
     setParam: (k: string, v: string) => `SET:${k}=${v}`,
+    confirmReclose: (yes: boolean) => `RECLOSE:${yes}`,
   };
 
   it('includes a /hilfe command listing all commands', () => {
@@ -262,5 +263,18 @@ describe('buildTelegramCommands', () => {
     const cmds = buildTelegramCommands(ctx);
     const set = cmds.find((c) => c.name === 'set')!;
     expect(await set.run('morgenzeit 07:30', '42')).toBe('SET:morgenzeit=07:30');
+  });
+
+  it('routes /ja and /nein to the re-close confirmation (control commands)', async () => {
+    const cmds = buildTelegramCommands(ctx);
+    const ja = cmds.find((c) => c.name === 'ja')!;
+    const nein = cmds.find((c) => c.name === 'nein')!;
+    expect(ja.control).toBe(true);
+    expect(nein.control).toBe(true);
+    expect(await ja.run('', '42')).toBe('RECLOSE:true');
+    expect(await nein.run('', '42')).toBe('RECLOSE:false');
+    // Aliases resolve too (/yes, /no).
+    expect(ja.aliases).toContain('yes');
+    expect(nein.aliases).toContain('no');
   });
 });

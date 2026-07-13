@@ -32,6 +32,8 @@ import { LiquidGlass2Raeume } from './components/liquidglass2/liquidGlass2Raeume
 import { LiquidGlass2Vorhersage } from './components/liquidglass2/liquidGlass2Vorhersage.js';
 import { LiquidGlass2Garten } from './components/liquidglass2/liquidGlass2Garten.js';
 import { LiquidGlass2Automatik } from './components/liquidglass2/liquidGlass2Automatik.js';
+import { LiquidGlass2Rules } from './components/liquidglass2/liquidGlass2Rules.js';
+import { RulesTab } from './tabs/rules.js';
 import { LiquidGlass2Wizard } from './components/liquidglass2/liquidGlass2Wizard.js';
 import { Icon } from './components/icons.js';
 import { HouseImageUpload } from './components/houseImageUpload.js';
@@ -225,6 +227,7 @@ const PAGE_REGISTRY: Record<string, PageEntry> = {
   '/vorhersage': { v1: VorhersageView, v2: LiquidGlass2Vorhersage },
   '/garten': { v1: GartenView, v2: LiquidGlass2Garten },
   '/automatik': { v1: AutomatikView, v2: LiquidGlass2Automatik },
+  '/rules': { v1: RulesTab, v2: LiquidGlass2Rules },
   '/warnungen': { v1: WarnungenView, v2: LiquidGlass2Warnungen },
   '/einstellungen': { v1: SettingsHub, v2: LiquidGlass2Einstellungen },
   '/system': { v1: SystemView },
@@ -377,6 +380,7 @@ export function App(props: AppProps = {}): JSX.Element {
         <Page path="/vorhersage" route="/vorhersage" />
         <Page path="/garten" route="/garten" />
         <Page path="/automatik" route="/automatik" />
+        <Page path="/rules" route="/rules" />
         <Page path="/warnungen" route="/warnungen" />
         <Page path="/einstellungen" route="/einstellungen" />
         <Page path="/system" route="/system" />
@@ -402,7 +406,6 @@ export function App(props: AppProps = {}): JSX.Element {
         <Redirect path="/history" to="/vorhersage" />
         <Redirect path="/bewaesserung" to="/garten" />
         <Redirect path="/automation" to="/automatik" />
-        <Redirect path="/rules" to="/automatik" />
         {/* Retired demo routes → canonical (ui-v2-release). */}
         <Redirect path="/liquid-glass" to="/uebersicht" />
         <Redirect path="/liquid-glass2" to="/uebersicht" />
@@ -415,10 +418,18 @@ export function App(props: AppProps = {}): JSX.Element {
   );
 
   // v2 (Liquid Glass): the left sidebar shell is the ONLY chrome — no top nav.
+  // On phones (with `mobileUiV2`) the same Apple-style bottom nav as v1 replaces
+  // the collapsed sidebar; `app--mobilenav` hides the sidebar's mobile bar (CSS).
   if (uiVersion.value === 'v2') {
     return (
-      <div class="app app--uiv2" data-testid="app-uiv2">
+      <div
+        class={`app app--uiv2${mobileShell ? ' app--mobilenav' : ''}`}
+        data-testid="app-uiv2"
+      >
         <Lg2Shell currentUrl={currentUrl}>{outlet}</Lg2Shell>
+        {mobileShell && (
+          <MobileNav currentUrl={currentUrl} onNavigate={(url): void => setCurrentUrl(url)} />
+        )}
       </div>
     );
   }

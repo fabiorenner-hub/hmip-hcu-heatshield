@@ -285,6 +285,50 @@ describe('runCycle — hot bedroom roof window', () => {
     expect(recorded.cycleId).toBe(out.decisionRecord.cycleId);
     expect(recorded.payload).toBe(out.decisionRecord);
   });
+
+  // Bug report item 3: gentle-shading opt-in must cap the heat-protection
+  // escalation so the same hot-but-not-heatwave inputs no longer slam the
+  // roof shutter fully shut. The cap is exempt in a real HEATWAVE.
+  it('caps the roof force-close when gentle shading is enabled (vs. full close when off)', async () => {
+    const rooms = [
+      {
+        id: 'schlafzimmer',
+        name: 'Schlafzimmer',
+        priority: 'very_high' as Priority,
+        targets: ROOM_TARGETS,
+        signals: {},
+        occupancyMode: 'always_priority' as const,
+      },
+    ];
+    // Mild-warm, heat-protection (not heatwave) inputs: the §13 roof rules
+    // still escalate, but the base risk stays well below full close.
+    const snapOpts = {
+      rooms: [{ id: 'schlafzimmer', tempC: 23.2, priority: 'very_high' as Priority }],
+      windows: [{ config: bedroomRoofWindow() }],
+      forecastMaxTempC: 26,
+      outdoorTempC: 21,
+      pvSmoothedKw: 2.5,
+      radiationWm2: 350,
+    };
+
+    const offCfg = mkConfig({ rooms, windows: [bedroomRoofWindow()] });
+    const off = mkDeps(offCfg);
+    const outOff = await runCycle(mkSnapshot(snapOpts), off.deps);
+
+    const onCfg = mkConfig({ rooms, windows: [bedroomRoofWindow()] });
+    onCfg.rules.gentleShading = { enabled: true, maxClose01: 0.5 };
+    const on = mkDeps(onCfg);
+    const outOn = await runCycle(mkSnapshot(snapOpts), on.deps);
+
+    expect(outOff.mode).toBe('ACTIVE_HEAT_PROTECTION');
+    expect(outOn.mode).toBe('ACTIVE_HEAT_PROTECTION');
+    const levelOff = off.setShutterLevel.mock.calls[0]![2] as number;
+    const levelOn = on.setShutterLevel.mock.calls[0]![2] as number;
+    // Gentle shading dispatches a strictly gentler (less closed) position.
+    expect(levelOn).toBeLessThan(levelOff);
+    expect(levelOff).toBeGreaterThanOrEqual(0.9); // slammed nearly shut when off
+    expect(levelOn).toBeLessThanOrEqual(0.6); // capped to max(baseRisk, 0.5)
+  });
 });
 
 // ---------------------------------------------------------------------------

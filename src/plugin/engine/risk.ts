@@ -123,6 +123,12 @@ export interface RiskInputs {
   /** Profile selector — controls weight overrides. */
   profile: RiskProfile;
   /**
+   * Editable weights used when `profile === 'custom'` (configurability Phase 5).
+   * Raw ratios — the engine renormalises the present factors to sum to 1, so
+   * only the relative sizes matter. Ignored for the preset profiles.
+   */
+  customWeights?: Readonly<RiskFactors>;
+  /**
    * Optional PV array azimuth (deg). When set, the PV factor is softly
    * weighted around this direction instead of the hard 90°–200° lobe (V1.8).
    */
@@ -373,14 +379,20 @@ const AGGRESSIVE_WEIGHTS: Readonly<RiskFactors> = Object.freeze({
  * behaves like `standard` so the engine never crashes on a partially
  * implemented profile.
  */
-export function profileWeights(profile: RiskProfile): Readonly<RiskFactors> {
+export function profileWeights(
+  profile: RiskProfile,
+  customWeights?: Readonly<RiskFactors>,
+): Readonly<RiskFactors> {
   switch (profile) {
     case 'conservative':
       return CONSERVATIVE_WEIGHTS;
     case 'aggressive':
       return AGGRESSIVE_WEIGHTS;
-    case 'standard':
     case 'custom':
+      // Phase 5 — editable weights. `computeRisk` renormalises present factors,
+      // so any non-negative ratios work; fall back to STANDARD when absent.
+      return customWeights ?? STANDARD_WEIGHTS;
+    case 'standard':
       return STANDARD_WEIGHTS;
   }
 }
@@ -420,7 +432,7 @@ export function computeRisk(inputs: RiskInputs): RiskBreakdown {
     priorityFactor: computePriorityFactor(inputs.windowPriority),
   };
 
-  const baseWeights = profileWeights(inputs.profile);
+  const baseWeights = profileWeights(inputs.profile, inputs.customWeights);
 
   // V1.8 — conservative on missing data: redistribute the weight of factors
   // whose underlying input is absent across the factors that DO have data, so

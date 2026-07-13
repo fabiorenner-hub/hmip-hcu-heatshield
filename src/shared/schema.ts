@@ -168,6 +168,10 @@ export const RoomSchema = z.object({
   // model. The room is still controlled and shown normally — only learning
   // skips it. Default false.
   activeCooling: z.boolean().default(false),
+  // Per-room shading-profile override (configurability Phase 2). When set, it
+  // overrides the global `rules.shadingProfile` for every window in this room
+  // (window-level override still wins). Absent = inherit global.
+  shadingProfile: z.enum(['daylight', 'balanced', 'protection']).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -190,6 +194,9 @@ export const WindowBlockScheduleSchema = MoveBlockScheduleSchema;
 export const WindowSchema = z.object({
   id: z.string().min(1),
   roomId: z.string().min(1),
+  // Human-friendly shutter name (e.g. "Rollladen Terrasse"). Shown in the plan
+  // instead of the generic "Fenster SW". Optional — falls back to type/facade.
+  name: z.string().min(1).max(60).optional(),
   // HMIP WINDOW_COVERING channel id used in HmipSystemRequest setShutterLevel.
   shutterDeviceId: z.string().min(1),
   contactDeviceId: z.string().min(1).optional(),
@@ -219,6 +226,13 @@ export const WindowSchema = z.object({
   // engine dispatches NO automatic move for this shutter while now falls into
   // any entry. STORM force-open always overrides. Empty = never blocked.
   blockSchedules: z.array(WindowBlockScheduleSchema).default([]),
+  // Per-window shading-profile override (configurability Phase 2). Wins over
+  // both the room override and the global `rules.shadingProfile`.
+  shadingProfile: z.enum(['daylight', 'balanced', 'protection']).optional(),
+  // Per-window evening-open threshold override (Phase 2/3): only open once the
+  // window's DIRECT exposure is below this (0..1). Lower = keeps this shutter
+  // shaded longer into the evening (e.g. NW with late sun). Absent = global.
+  eveningOpenExposureBelow: z.number().min(0).max(1).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -413,6 +427,12 @@ export const PlanningRulesSchema = z
       .default(10800),
     // Planned moves allowed per interval (Movement_Budget). Default 1.
     movementBudgetPerInterval: z.number().int().min(1).max(4).default(1),
+    // Hard cap on how many planned moves a single shutter may make per day
+    // (Bewegungs-Deckel). The phased schedule drops further transitions once
+    // this many have been emitted, keeping the "as few moves as possible"
+    // principle (target 2–4/day) even with a fine segment grid. Scaled by the
+    // horizon (e.g. a 12 h horizon allows half the daily budget).
+    maxMovesPerDay: z.number().int().min(1).max(8).default(4),
     // Discrete candidate position grid in [0,1] (0=open .. 1=closed).
     candidateLevels01: z
       .array(z.number().min(0).max(1))
@@ -450,9 +470,24 @@ export const FloorShadingSchema = z
 // power signals real sun. STORM and NIGHT_COOLING are exempt.
 // ---------------------------------------------------------------------------
 
+/**
+ * One hot-day shading stage: at/above `outdoorThresholdC` outdoor, hold the
+ * shutter at least `shadingPercent` closed (0 = may stay fully open … 100 =
+ * fully closed). Multiple stages let the user ramp the baseline shade with the
+ * outdoor temperature, e.g. `{30 °C → 30 %}`, `{35 °C → 50 %}`. The engine picks
+ * the highest threshold whose temperature is reached.
+ */
+export const HotDayStageSchema = z.object({
+  outdoorThresholdC: z.number().min(20).max(50),
+  // Minimum shading (closed fraction) in percent. 0 = no floor … 100 = closed.
+  shadingPercent: z.number().int().min(0).max(100),
+});
+
 export const HotDayRulesSchema = z
   .object({
     enabled: z.boolean().default(true),
+    // Legacy single-stage fields (kept for backward compatibility and as the
+    // fallback when `stages` is empty/absent).
     // Outdoor temperature (°C) at/above which the floor applies.
     outdoorThresholdC: z.number().min(20).max(50).default(35),
     // Maximum allowed openness in percent (0=closed … 100=open). 50 = the
@@ -460,6 +495,193 @@ export const HotDayRulesSchema = z
     maxOpenPercent: z.number().int().min(0).max(100).default(50),
     // Minimum PV power (kW) that counts as "sun is really shining".
     minPvKw: z.number().min(0).max(50).default(0.5),
+    // Multi-stage temperature → shading ramp. When present and non-empty it
+    // REPLACES the single-stage `outdoorThresholdC`/`maxOpenPercent` gate.
+    stages: z.array(HotDayStageSchema).optional(),
+  })
+  .prefault({});
+
+// ---------------------------------------------------------------------------
+// Gentle shading (opt-in) — "shade gradually, then observe".
+//
+// When enabled, the summer heat-protection escalation (§13 roof/SE force-close
+// rules + the roof-under-sun close) is capped to `maxClose01` so the plugin
+// does not slam shutters fully shut on mild-warm days (e.g. 24 °C). The cap
+// never pulls below the risk model's own base target, and a real HEATWAVE (or
+// STORM) is exempt so genuine heat protection is never weakened. Default OFF so
+// existing installs keep their current behaviour until the user opts in.
+// ---------------------------------------------------------------------------
+
+export const GentleShadingSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    // Maximum closed fraction the heat-protection escalation may reach while
+    // gentle shading is on and it is not a real heatwave (0=open … 1=closed).
+    // 0.5 = "at most half closed first, then let the risk model decide".
+    maxClose01: z.number().min(0).max(1).default(0.5),
+  })
+  .prefault({});
+
+// ---------------------------------------------------------------------------
+// Roof-window rules. Roof (skylight) glazing is the single strongest heat
+// entry point — glass overhead, near-normal incidence at midday. Roof windows
+// therefore get dedicated, more aggressive handling than façades:
+//   - they close fully (100 %) rather than to the 95 % heat-trap gap;
+//   - they close EARLIER (already when the sun will reach them soon);
+//   - "gentle shading" only applies to them when it is cooler outside than the
+//     indoor comfort temperature (otherwise a roof window closes fully — its
+//     heat entry is too strong to only half-shade on a hot day);
+//   - their shutters are only OPENED once PV power is low AND the solar
+//     forecast is trending down for the look-ahead (afternoon decline), so
+//     they are not opened while the sun is still strong overhead;
+//   - the open window/sash contact can be ignored (their awnings/shutters may
+//     operate while the roof window is tilted open).
+// ---------------------------------------------------------------------------
+
+export const RoofRulesSchema = z
+  .object({
+    // Close level for roof windows in [0,1] (1 = fully closed). Default 1.0.
+    closeLevel01: z.number().min(0).max(1).default(1),
+    // Pre-shade: close already when the sun WILL reach the roof window soon
+    // (sun-prelook), not only when it is on it now → closes earlier.
+    preShade: z.boolean().default(true),
+    // Gentle shading applies to roof windows ONLY when it is cooler outside
+    // than the indoor (comfort) temperature; otherwise they close fully.
+    gentleOnlyWhenOutdoorBelowIndoor: z.boolean().default(true),
+    // Opening gate: only OPEN a roof window's shutter once PV power is low AND
+    // the solar forecast is falling for the look-ahead.
+    openRequiresPvLowAndFalling: z.boolean().default(true),
+    // "PV low" threshold in kW for the opening gate.
+    openPvLowKw: z.number().min(0).max(50).default(1.5),
+    // Look-ahead (hours) over which the solar forecast must be falling.
+    openFallingHours: z.number().int().min(1).max(6).default(3),
+    // Ignore the open window/sash contact for roof windows: move the shutter
+    // anyway (roof-window awnings/shutters can operate while the sash is open).
+    ignoreOpenContact: z.boolean().default(true),
+  })
+  .prefault({});
+
+// ---------------------------------------------------------------------------
+// Engine tuning (configurability overhaul, Phase 1). Every value here was
+// previously a hard-coded module constant in the engine; exposing it makes the
+// full shading/thermal behaviour tunable. Defaults EXACTLY match the former
+// constants, so a config without a `tuning` block behaves identically.
+// ---------------------------------------------------------------------------
+
+export const ShadingTuningSchema = z
+  .object({
+    // Direct-solar exposure at which a window reaches FULL close (near its
+    // solar peak). Below it the closure ramps up gradually from the mild cap.
+    highExposure: z.number().min(0).max(1).default(0.9),
+    // Exposure at/below which a window is treated as "off-sun" (diffuse only).
+    lowExposure: z.number().min(0).max(1).default(0.15),
+    // Max closure at an off-sun window normally (little/no direct beam).
+    offSunMildClose01: z.number().min(0).max(1).default(0.3),
+    // Max closure at an off-sun window under strong solar load.
+    offSunStressClose01: z.number().min(0).max(1).default(0.7),
+    // Min horizon-peak reduction (K) that makes shading worthwhile.
+    shadeBenefitMinC: z.number().min(0).max(5).default(0.3),
+    // Min closure reduction (percentage points) worth a daylight-open move.
+    lightGainMinPct: z.number().int().min(0).max(100).default(20),
+    // Radiation (W/m²) at/above which the solar/PV load counts as "strong".
+    solarStrongWm2: z.number().min(0).max(1200).default(400),
+    // Phased-plan segment length (h) and per-segment look-ahead (h).
+    segmentHours: z.number().min(1).max(6).default(2),
+    lookaheadHours: z.number().min(1).max(12).default(4),
+  })
+  .prefault({});
+
+export const ThermalTuningSchema = z
+  .object({
+    // Diffuse-radiation share reaching a window regardless of orientation.
+    diffuseFraction: z.number().min(0).max(1).default(0.22),
+    // Extra solar coupling for roof windows (overhead glazing).
+    roofSolarBoost: z.number().min(1).max(3).default(1.3),
+    // Heat-load → temperature gain (°C of forcing at full load).
+    tempGainC: z.number().min(0).max(20).default(8),
+    // Cloud damping: full overcast removes this fraction of the sun.
+    cloudDampingK: z.number().min(0).max(1).default(0.75),
+    // Minimum sun elevation (deg) for any solar contribution.
+    minElevationDeg: z.number().min(0).max(30).default(3),
+  })
+  .prefault({});
+
+export const TuningRulesSchema = z
+  .object({
+    shading: ShadingTuningSchema,
+    thermal: ThermalTuningSchema,
+  })
+  .prefault({});
+
+// ---------------------------------------------------------------------------
+// Custom risk weights (Phase 5). Used when `profile === 'custom'`. The engine
+// renormalises them to sum to 1, so only the RATIOS matter. Defaults mirror the
+// former STANDARD_WEIGHTS.
+// ---------------------------------------------------------------------------
+
+export const RiskWeightsSchema = z
+  .object({
+    sunFactor: z.number().min(0).max(1).default(0.3),
+    roomTempFactor: z.number().min(0).max(1).default(0.25),
+    windowTypeFactor: z.number().min(0).max(1).default(0.1),
+    forecastTempFactor: z.number().min(0).max(1).default(0.1),
+    pvFactor: z.number().min(0).max(1).default(0.1),
+    radiationFactor: z.number().min(0).max(1).default(0.05),
+    outdoorTempFactor: z.number().min(0).max(1).default(0.05),
+    priorityFactor: z.number().min(0).max(1).default(0.05),
+  })
+  .prefault({});
+
+// ---------------------------------------------------------------------------
+// Evening-open gate (Phase 3). Controls how late a shutter opens in the
+// afternoon/evening so it is not opened while (late) direct sun is still on the
+// window (e.g. NW at sunset). `sun` mode follows the real sun (recommended);
+// `time`/`sunset` add a hard clock/sunset floor.
+// ---------------------------------------------------------------------------
+
+export const EveningOpenSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    // Sun-following gate (Variant A): while the solar load is no longer strong
+    // (afternoon/evening) but DIRECT exposure on the window is still at/above
+    // this (0..1), the shutter keeps a mild shade instead of opening fully — so
+    // it is not opened while late direct sun is still on it (e.g. NW at sunset).
+    // Lower = keep shaded longer; 0 = never hold back (open as soon as comfort allows).
+    openWhenExposureBelow: z.number().min(0).max(1).default(0.12),
+  })
+  .prefault({});
+
+// ---------------------------------------------------------------------------
+// Shading profile (Phase 4). A single high-level dial that biases the shading
+// tuning toward more daylight or more heat protection. `balanced` = defaults;
+// `daylight` opens more/earlier; `protection` shades more/earlier. The engine
+// derives the effective tuning from this + any explicit `tuning` overrides.
+// ---------------------------------------------------------------------------
+
+export const ShadingProfileSchema = z
+  .enum(['daylight', 'balanced', 'protection'])
+  .default('balanced');
+
+// ---------------------------------------------------------------------------
+// PV-boost shading. When the PV array delivers a lot of power (clear sky, sun
+// on the array), windows facing roughly the same direction as the array are
+// closed harder (up to full) and kept closed while the PV stays high. The
+// array azimuth defaults to the FusionSolar orientation hint / learned azimuth.
+// ---------------------------------------------------------------------------
+
+export const PvShadingSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    // PV array azimuth (deg, N=0/E=90/S=180/W=270). Absent → derived from the
+    // FusionSolar orientation hint or the learned array azimuth.
+    arrayAzimuthDeg: z.number().min(0).max(359).optional(),
+    // PV output fraction (0..1 of the clear-sky array potential) at/above which
+    // "PV is very high" and array-aligned windows get closed harder.
+    highPvFraction: z.number().min(0).max(1).default(0.6),
+    // How close (deg) to the array azimuth a window must face to be boosted.
+    lobeWidthDeg: z.number().min(10).max(180).default(90),
+    // Maximum extra closure floor this rule may impose (0..1).
+    maxClose01: z.number().min(0).max(1).default(1),
   })
   .prefault({});
 
@@ -479,6 +701,16 @@ export const RulesSchema = z
     planning: PlanningRulesSchema.optional(),
     floorShading: FloorShadingSchema,
     hotDay: HotDayRulesSchema,
+    gentleShading: GentleShadingSchema,
+    roof: RoofRulesSchema,
+    // Configurability overhaul (Phases 1/3/4/5). Optional so existing configs
+    // and hand-written Config literals stay valid; the engine applies defaults.
+    tuning: TuningRulesSchema.optional(),
+    shadingProfile: z.enum(['daylight', 'balanced', 'protection']).optional(),
+    eveningOpen: EveningOpenSchema.optional(),
+    pvShading: PvShadingSchema.optional(),
+    // Editable risk weights used when `profile === 'custom'`.
+    customWeights: RiskWeightsSchema.optional(),
     // Pause window after detected manual operation of a shutter (7.4).
     manualOverrideMinutes: z.number().int().min(0).default(60),
   })

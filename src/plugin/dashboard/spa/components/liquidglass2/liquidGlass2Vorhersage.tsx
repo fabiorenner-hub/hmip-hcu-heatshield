@@ -22,12 +22,13 @@ import { snapshot } from '../../store.js';
 import { expertMode } from '../../expertMode.js';
 import { useConfig } from '../../hooks/useConfig.js';
 import { Icon } from '../icons.js';
-import { SunPolarPlot } from '../sunPolarPlot.js';
+import { SunPolarPlot, getSunPosition } from '../sunPolarPlot.js';
 import { RadarMap } from '../dashboard/radarMap.js';
 import { WeatherCharts } from '../dashboard/weatherCharts.js';
 import { WindRose } from '../dashboard/windRose.js';
 import { WindOutlook } from '../dashboard/windOutlook.js';
 import { ExpertSection, hms, fx } from './shell/lg2Expert.js';
+import { RoomPlan24h } from './roomPlan24h.js';
 import type { DashboardSnapshot, ForecastTimelineCard, RoomDetail } from '../../types.js';
 
 interface RoutableProps { path?: string }
@@ -39,6 +40,17 @@ function n1(v: number | null | undefined): string {
     : fmtNum(Math.round(v * 10) / 10, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 function ms(ts: string): number { return Date.parse(ts); }
+/** Coarse 8-point compass label (DE uses O for East). */
+function compass8(deg: number): string {
+  const dirs = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+  return dirs[Math.round((((deg % 360) + 360) % 360) / 45) % 8]!;
+}
+/** Which facade the sun is on at `tsMs` (compass label), or null when it is down/low. */
+function sunFacade(tsMs: number, lat: number, lon: number): string | null {
+  const s = getSunPosition(new Date(tsMs), lat, lon);
+  if (!Number.isFinite(s.elevationDeg) || s.elevationDeg < 5) return null;
+  return compass8(s.azimuthDeg);
+}
 /** Nearest sample value to a target timestamp within a tolerance (±90 min). */
 function nearest<T extends { ts: string }>(arr: T[] | undefined, target: number): T | null {
   if (arr === undefined || arr.length === 0) return null;
@@ -97,6 +109,9 @@ interface Col {
 
 function FcBody(props: { snap: DashboardSnapshot }): JSX.Element {
   const { snap } = props;
+  const { config } = useConfig();
+  const lat = config.value?.location?.latitude ?? 52.52;
+  const lon = config.value?.location?.longitude ?? 13.41;
   const [horizon, setHorizon] = useState<Horizon>(24);
   const [compact, setCompact] = useState(false);
   const rooms = snap.roomsDetail ?? [];
@@ -157,6 +172,8 @@ function FcBody(props: { snap: DashboardSnapshot }): JSX.Element {
 
       <RiskBanner snap={snap} riskWin={riskWin} cols={cols} />
 
+      <RoomPlan24h snap={snap} />
+
       {shortCoverage && (
         <p class="lg2-fc__coverage" data-testid="lg2-fc-coverage">
           {t(`Prognose reicht aktuell ${coverageH} h voraus — der ${horizon}-h-Horizont zeigt alle verfügbaren Daten.`,
@@ -193,6 +210,10 @@ function FcBody(props: { snap: DashboardSnapshot }): JSX.Element {
           <Row icon={<Icon name="sonne" size={18} />} name={['Solarstrahlung', 'Solar radiation']} sub={['W/m²', 'W/m²']}
             cols={cols} curve={{ pick: (c) => c.card.radiationWm2, color: '#ff9f0a' }}
             cell={(c) => <b>{Math.round(c.card.radiationWm2)}</b>} />
+
+          <Row icon={<Icon name="sonne" size={18} />} name={['Sonne auf Fassade', 'Sun on facade']} sub={['Himmelsrichtung', 'Direction']}
+            cols={cols}
+            cell={(c) => { const f = sunFacade(ms(c.ts), lat, lon); return f === null ? <b class="lg2-fc__facade lg2-fc__facade--none">–</b> : <b class="lg2-fc__facade">{f}</b>; }} />
 
           <Row icon={<Icon name="automation" size={18} />} name={['PV-Erzeugung', 'PV yield']} sub={['Nowcast · kW', 'Nowcast · kW']}
             cols={cols} curve={{ pick: (c) => c.card.pvForecastKw ?? null, color: '#30d158' }}
@@ -353,10 +374,10 @@ function NowcastTable(props: { snap: DashboardSnapshot }): JSX.Element | null {
       hint={[`Summe der nächsten ~2 h: ${fx(total)} mm.`, `Sum over the next ~2 h: ${fx(total)} mm.`]}>
       <div class="lg2-exp-nowcast">
         {nc.slice(0, 12).map((p) => {
-          const h = Math.min(100, Math.round(p.precipMm * 40));
+          const barH = Math.min(100, Math.round(p.precipMm * 40));
           return (
             <div class="lg2-exp-nowcast__col" key={p.ts} title={`${hms(p.ts)} · ${fx(p.precipMm)} mm`}>
-              <span class="lg2-exp-nowcast__bar" style={{ height: `${Math.max(2, h)}%` }} />
+              <span class="lg2-exp-nowcast__bar" style={{ height: `${Math.max(2, barH)}%` }} />
               <span class="lg2-exp-nowcast__lbl">{new Date(p.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
             </div>
           );

@@ -109,6 +109,16 @@ const FIXTURE_CONFIG: Config = {
     manualOverrideMinutes: 60,
     floorShading: { enabled: true, leadByFloor: {} },
     hotDay: { enabled: true, outdoorThresholdC: 35, maxOpenPercent: 50, minPvKw: 0.5 },
+    gentleShading: { enabled: false, maxClose01: 0.5 },
+    roof: {
+      closeLevel01: 1,
+      preShade: true,
+      gentleOnlyWhenOutdoorBelowIndoor: true,
+      openRequiresPvLowAndFalling: true,
+      openPvLowKw: 1.5,
+      openFallingHours: 3,
+      ignoreOpenContact: true,
+    },
   },
   dashboard: { port: 8089, enabled: true },
   notifications: {

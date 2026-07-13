@@ -87,6 +87,7 @@ import {
   type RiskBreakdown,
 } from './risk.js';
 import { applySafety } from './safety.js';
+import { hotDayShadingPercent } from './hotDayFloor.js';
 import { applySpecialRules } from './specialRules.js';
 import * as sunModule from './sun.js';
 import {
@@ -558,6 +559,42 @@ export async function runCycle(
   const sunDay = sun.getSunDay(snapshot.now, deps.config.location);
   const sunPos = sun.getSunPosition(snapshot.now, deps.config.location);
 
+  // Roof-window handling (skylights) — the single strongest heat entry point.
+  // Read the roof rules once and pre-compute the cycle-level "solar is falling"
+  // flag used by the roof opening gate (only open a roof shutter once the sun
+  // is clearly past its peak). Prefers the radiation forecast; falls back to
+  // the sun-elevation trend when no forecast series is present.
+  const roofRules = deps.config.rules.roof;
+  const solarFalling = ((): boolean => {
+    const lookaheadH = roofRules?.openFallingHours ?? 3;
+    const nowMs = snapshot.now.getTime();
+    const series = snapshot.forecastSeries;
+    const nearestRad = (targetMs: number): number | null => {
+      if (series === undefined || series.length === 0) return null;
+      let best: number | null = null;
+      let bestD = Infinity;
+      for (const p of series) {
+        if (p.radiationWm2 === null) continue;
+        const d = Math.abs(Date.parse(p.ts) - targetMs);
+        if (d < bestD) {
+          bestD = d;
+          best = p.radiationWm2;
+        }
+      }
+      return best;
+    };
+    const rNow = nearestRad(nowMs);
+    const rFut = nearestRad(nowMs + lookaheadH * 3_600_000);
+    if (rNow !== null && rFut !== null) {
+      return rFut < rNow - 1;
+    }
+    const e1 = sun.getSunPosition(
+      new Date(nowMs + lookaheadH * 3_600_000),
+      deps.config.location,
+    ).elevationDeg;
+    return e1 < sunPos.elevationDeg;
+  })();
+
   // -------------------------------------------------------------------------
   // 1a. User intent → effective switch state (Task 9.1).
   //
@@ -749,6 +786,9 @@ export async function runCycle(
       pvPeakKwp: deps.config.fusionSolar.pvPeakKwp,
       radiationWm2: snapshot.radiationWm2,
       profile: deps.config.rules.profile,
+      ...(deps.config.rules.customWeights !== undefined
+        ? { customWeights: deps.config.rules.customWeights }
+        : {}),
       pvLobeCenterDeg: pvLobeCenterFor(deps.config.fusionSolar.orientationHint),
     });
     const rawTarget = mapRiskToShutter01(risk.riskTotal);
@@ -786,9 +826,43 @@ export async function runCycle(
       modeDecision.mode === 'ACTIVE_HEAT_PROTECTION' ||
       modeDecision.mode === 'HEATWAVE';
     let specialTarget = special.target01;
-    if (winCfg.type === 'roof_window' && sunOnWindowNow && heatModeActive) {
-      const roofClose = winCfg.maxHeatProtectionLevel01 ?? 1;
+    // Roof windows: strongest heat entry → close fully and EARLIER. Fire on
+    // sun-on-window now OR (pre-shade) sun reaching it soon, while in heat mode.
+    const roofSunTrigger =
+      sunOnWindowNow || (roofRules?.preShade === true && sunOnWindowSoon);
+    if (winCfg.type === 'roof_window' && roofSunTrigger && heatModeActive) {
+      const roofClose = winCfg.maxHeatProtectionLevel01 ?? roofRules?.closeLevel01 ?? 1;
       specialTarget = Math.max(specialTarget, roofClose);
+    }
+
+    // --- Step 3b⅞: gentle-shading cap (opt-in) ---------------------------
+    // "Shade gradually, then observe." When enabled, cap the summer heat-
+    // protection escalation (the §13 force-close rules + the roof-under-sun
+    // close above) to a partial level so the plugin does not slam shutters
+    // fully shut on mild-warm days. Never pulls below the risk model's own
+    // base target, and a real HEATWAVE / STORM is exempt (safety wins).
+    const gentle = deps.config.rules.gentleShading;
+    if (
+      gentle?.enabled === true &&
+      modeDecision.mode !== 'HEATWAVE' &&
+      modeDecision.mode !== 'STORM'
+    ) {
+      // Roof windows are only "gently" shaded when it is cooler outside than
+      // indoors; otherwise their heat entry is too strong to only half-close,
+      // so they close fully (the gentle cap is skipped for them).
+      const isRoofWin = winCfg.type === 'roof_window';
+      const roofGentleAllowed =
+        !isRoofWin ||
+        roofRules?.gentleOnlyWhenOutdoorBelowIndoor !== true ||
+        (snapshot.outdoorTempC !== null &&
+          roomTempC !== null &&
+          snapshot.outdoorTempC < roomTempC);
+      if (roofGentleAllowed && specialTarget > gentle.maxClose01) {
+        // Hard cap: "shade partially first (e.g. 50 %), then observe" — do not
+        // slam fully shut on a mild-warm day, even if more closure would hold
+        // comfort better. A real HEATWAVE/STORM is exempt (guarded above).
+        specialTarget = gentle.maxClose01;
+      }
     }
 
     // --- Step 3b¾: winter insulation -------------------------------------
@@ -807,6 +881,15 @@ export async function runCycle(
       specialTarget = Math.max(specialTarget, insulation.level01);
     }
 
+    // Roof windows may ignore the open sash contact (their awnings/shutters can
+    // operate while the roof window is tilted open) — treat as closed so the
+    // ventilation open-cap and the venting lockout do not suppress the move.
+    const roofIgnoreOpen =
+      winCfg.type === 'roof_window' && roofRules?.ignoreOpenContact === true;
+    const effectiveContactState: ContactState = roofIgnoreOpen
+      ? 'closed'
+      : window.contactState;
+
     // --- Step 3c: ventilation §14 ----------------------------------------
     const ventilation = applyVentilation({
       window: {
@@ -816,7 +899,7 @@ export async function runCycle(
         lockoutProtection: winCfg.lockoutProtection,
         type: winCfg.type,
       },
-      contactState: window.contactState,
+      contactState: effectiveContactState,
       roomTempC,
       outdoorTempC: snapshot.outdoorTempC,
       sunOnWindowNow,
@@ -853,7 +936,7 @@ export async function runCycle(
     // `maxHeatProtectionLevel01` overrides the type-based default.
     const heatCap =
       winCfg.maxHeatProtectionLevel01 ??
-      (winCfg.type === 'roof_window' ? 1 : 0.95);
+      (winCfg.type === 'roof_window' ? (roofRules?.closeLevel01 ?? 1) : 0.95);
     let cappedTarget01 =
       modeDecision.mode !== 'NIGHT_COOLING' && safety.target01 > heatCap
         ? heatCap
@@ -865,20 +948,48 @@ export async function runCycle(
     // room does not bake. Gated on outdoor ≥ threshold AND real PV power (sun
     // actually shining). STORM (safety force-open) and NIGHT_COOLING are
     // exempt. Only ever raises the target (more closed).
+    // Supports a single legacy stage OR a freely configurable multi-stage
+    // temperature→shading ramp (e.g. 30 °C → 30 %, 35 °C → 50 %); the pure
+    // `hotDayShadingPercent` picks the highest reached stage.
     const hotDay = deps.config.rules.hotDay;
     if (
       hotDay?.enabled === true &&
       modeDecision.mode !== 'STORM' &&
       modeDecision.mode !== 'NIGHT_COOLING' &&
       snapshot.outdoorTempC !== null &&
-      snapshot.outdoorTempC >= hotDay.outdoorThresholdC &&
       snapshot.pvSmoothedKw !== null &&
       snapshot.pvSmoothedKw >= hotDay.minPvKw
     ) {
-      const floor01 = (100 - hotDay.maxOpenPercent) / 100;
-      const cap = Math.min(floor01, heatCap); // never exceed the heat-stau cap
-      if (cappedTarget01 < cap) {
-        cappedTarget01 = cap;
+      const shadePercent = hotDayShadingPercent(hotDay, snapshot.outdoorTempC);
+      if (shadePercent !== null) {
+        const floor01 = shadePercent / 100;
+        const cap = Math.min(floor01, heatCap); // never exceed the heat-stau cap
+        if (cappedTarget01 < cap) {
+          cappedTarget01 = cap;
+        }
+      }
+    }
+
+    // --- Step 3d⅞: roof-window opening gate ------------------------------
+    // Roof (skylight) windows are the strongest heat entry, so their shutter is
+    // only OPENED once PV power is low AND the solar forecast is clearly falling
+    // (afternoon decline) — or the sun is already down. Until then, hold the
+    // current (more closed) position rather than opening into strong overhead
+    // sun. STORM (safety force-open) and NIGHT_COOLING are exempt.
+    if (
+      winCfg.type === 'roof_window' &&
+      roofRules?.openRequiresPvLowAndFalling === true &&
+      modeDecision.mode !== 'STORM' &&
+      modeDecision.mode !== 'NIGHT_COOLING' &&
+      window.currentLevel01 !== null &&
+      cappedTarget01 < window.currentLevel01 - 0.01
+    ) {
+      const pvLow =
+        snapshot.pvSmoothedKw === null ||
+        snapshot.pvSmoothedKw <= (roofRules.openPvLowKw ?? 1.5);
+      const mayOpen = !sunPos.isUp || (pvLow && solarFalling);
+      if (!mayOpen) {
+        cappedTarget01 = window.currentLevel01;
       }
     }
 
@@ -917,7 +1028,7 @@ export async function runCycle(
           windowId: winCfg.id,
         });
       }
-    } else if (isVentingLockout(window.contactState, modeDecision.mode)) {
+    } else if (isVentingLockout(effectiveContactState, modeDecision.mode)) {
       // Lüften-Lockout (Requirement 7): the sash is open, so the
       // resident is airing the room. Suppress all movement for this
       // window until it closes. STORM is exempt (handled inside

@@ -26,6 +26,24 @@ import { AutomationTechnical } from '../components/dashboard/automationTechnical
 import { snapshot } from '../store.js';
 import { t } from '../i18n.js';
 
+/**
+ * Resolve the editable hot-day stage list from the rules, migrating the legacy
+ * single-stage pair (`outdoorThresholdC` + `maxOpenPercent`) into one stage so
+ * older configs render as a single editable row (shading = 100 − maxOpen).
+ */
+function resolveHotDayStages(
+  hotDay: Rules['hotDay'] | undefined,
+): Array<{ outdoorThresholdC: number; shadingPercent: number }> {
+  const stages = hotDay?.stages;
+  if (stages !== undefined && stages.length > 0) {
+    return stages.map((s) => ({ outdoorThresholdC: s.outdoorThresholdC, shadingPercent: s.shadingPercent }));
+  }
+  return [{
+    outdoorThresholdC: hotDay?.outdoorThresholdC ?? 30,
+    shadingPercent: Math.max(0, Math.min(100, 100 - (hotDay?.maxOpenPercent ?? 50))),
+  }];
+}
+
 interface SliderSpec {
   /** Dot-separated path into `Rules`, e.g. `comfort.maxIndoorTempC`. */
   path: string;
@@ -632,62 +650,65 @@ export function RulesTab(): JSX.Element {
             )}
           </span>
         </label>
-        <label class="tab-rules__field">
-          <span>{t('Aktiv ab Außentemperatur ≥ … °C', 'Active from outdoor temperature ≥ … °C')}</span>
-          <input
-            type="number"
-            min={20}
-            max={50}
-            step={1}
-            data-testid="rules-hotday-temp"
-            value={draftConfig.rules.hotDay?.outdoorThresholdC ?? 35}
-            onInput={(e): void => {
-              const v = Number.parseFloat((e.currentTarget as HTMLInputElement).value);
-              if (!Number.isFinite(v)) return;
-              setDraftConfig((prev) =>
-                prev === null
-                  ? prev
-                  : {
-                      ...prev,
-                      rules: {
-                        ...prev.rules,
-                        hotDay: { ...prev.rules.hotDay, outdoorThresholdC: Math.min(50, Math.max(20, v)) },
-                      },
-                    },
-              );
-            }}
-          />
-        </label>
-        <label class="tab-rules__field">
-          <span>{t('Maximal öffnen auf … %', 'Open at most … %')}</span>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={5}
-            data-testid="rules-hotday-maxopen"
-            value={draftConfig.rules.hotDay?.maxOpenPercent ?? 50}
-            onInput={(e): void => {
-              const v = Number.parseInt((e.currentTarget as HTMLInputElement).value, 10);
-              if (!Number.isFinite(v)) return;
-              setDraftConfig((prev) =>
-                prev === null
-                  ? prev
-                  : {
-                      ...prev,
-                      rules: {
-                        ...prev.rules,
-                        hotDay: { ...prev.rules.hotDay, maxOpenPercent: Math.min(100, Math.max(0, v)) },
-                      },
-                    },
-              );
-            }}
-          />
-        </label>
+        {(draftConfig.rules.hotDay?.enabled ?? true) && (() => {
+          const stages = resolveHotDayStages(draftConfig.rules.hotDay);
+          const writeStages = (next: Array<{ outdoorThresholdC: number; shadingPercent: number }>): void => {
+            const sorted = [...next].sort((a, b) => a.outdoorThresholdC - b.outdoorThresholdC);
+            setDraftConfig((prev) =>
+              prev === null
+                ? prev
+                : { ...prev, rules: { ...prev.rules, hotDay: { ...prev.rules.hotDay, stages: sorted } } },
+            );
+          };
+          const clampTemp = (v: number): number => Math.min(50, Math.max(20, Math.round(v)));
+          const clampPct = (v: number): number => Math.min(100, Math.max(0, Math.round(v)));
+          return (
+            <div class="tab-rules__stages" data-testid="rules-hotday-stages">
+              {stages.map((st, i) => (
+                <div class="tab-rules__stage" key={`hotday-stage-${i}`} data-testid={`rules-hotday-stage-${i}`}>
+                  <label class="tab-rules__field">
+                    <span>{t('ab Außentemperatur ≥ … °C', 'from outdoor temp ≥ … °C')}</span>
+                    <input type="number" min={20} max={50} step={1} data-testid={`rules-hotday-temp-${i}`}
+                      value={st.outdoorThresholdC}
+                      onInput={(e): void => {
+                        const v = Number.parseFloat((e.currentTarget as HTMLInputElement).value);
+                        if (Number.isFinite(v)) writeStages(stages.map((s, j) => (j === i ? { ...s, outdoorThresholdC: clampTemp(v) } : s)));
+                      }} />
+                  </label>
+                  <label class="tab-rules__field">
+                    <span>{t('Beschattung mindestens … %', 'shading at least … %')}</span>
+                    <input type="number" min={0} max={100} step={5} data-testid={`rules-hotday-shade-${i}`}
+                      value={st.shadingPercent}
+                      onInput={(e): void => {
+                        const v = Number.parseInt((e.currentTarget as HTMLInputElement).value, 10);
+                        if (Number.isFinite(v)) writeStages(stages.map((s, j) => (j === i ? { ...s, shadingPercent: clampPct(v) } : s)));
+                      }} />
+                  </label>
+                  <button type="button" class="tab-rules__stage-del" data-testid={`rules-hotday-del-${i}`}
+                    disabled={stages.length <= 1}
+                    aria-label={t('Stufe entfernen', 'Remove stage')}
+                    onClick={(): void => writeStages(stages.filter((_, j) => j !== i))}>
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button type="button" class="tab-rules__stage-add" data-testid="rules-hotday-add"
+                onClick={(): void => {
+                  const last = stages[stages.length - 1];
+                  writeStages([...stages, {
+                    outdoorThresholdC: clampTemp((last?.outdoorThresholdC ?? 30) + 5),
+                    shadingPercent: clampPct((last?.shadingPercent ?? 30) + 20),
+                  }]);
+                }}>
+                + {t('Stufe hinzufügen', 'Add stage')}
+              </button>
+            </div>
+          );
+        })()}
         <p class="tab-rules__hint">
           {t(
-            'Wenn es draußen so heiß ist und PV-Leistung anliegt (Sonne da), fährt kein Rollladen weiter als hier erlaubt auf. Sturm und Nachtauskühlung sind ausgenommen.',
-            'When it is this hot outside and PV power is present (sun), no shutter opens further than allowed here. Storm and night cooling are exempt.',
+            'Stufen: ab welcher Außentemperatur mindestens wie stark beschattet wird (z. B. ab 30 °C → 30 %, ab 35 °C → 50 %). Es gilt die höchste erreichte Stufe — aber nur, wenn PV-Leistung anliegt (Sonne da). Sturm und Nachtauskühlung sind ausgenommen.',
+            'Stages: from which outdoor temperature to hold at least this much shading (e.g. from 30 °C → 30 %, from 35 °C → 50 %). The highest reached stage wins — but only while PV power is present (sun). Storm and night cooling are exempt.',
           )}
         </p>
 

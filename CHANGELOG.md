@@ -3,6 +3,91 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.20
+
+- **Mobile-Navigationsleiste auch in der neuen Oberfläche (v2).** Die Apple-Style-Liquid-Glass-Leiste unten (vier Haupt-Tabs + „Mehr"-Sheet, Basis/Experte-Umschalter) wird jetzt auch in v2 gerendert (bisher nur v1). Die kollabierte Sidebar-Bottom-Bar von v2 wird dabei ausgeblendet, die Leiste ist im v2-Amber-/Glas-Theme eingefärbt. Aktivierung wie gehabt über Darstellung → „Mobile Touch-Navigation".
+- **Weniger Telegram-Spam bei „Manuelle Bedienung erkannt".** Native Rollläden senden ihren Stand wiederholt; bisher löste jede dieser Wiederholungen eine neue Benachrichtigung aus. Jetzt gibt es pro manueller Episode (bzw. pro deutlich veränderter Position) nur **eine** Meldung; das Halten der Position wird still verlängert (kein Log-/Nachrichten-Spam mehr).
+- **Hitzetag-Schutz mehrstufig & frei konfigurierbar.** Statt einer einzelnen Schwelle lassen sich jetzt beliebig viele Stufen anlegen — z. B. **ab 30 °C → 30 % Beschattung, ab 35 °C → 50 %**. Es gilt immer die höchste erreichte Stufe (nur bei anliegender PV-Leistung/Sonne; Sturm & Nachtauskühlung ausgenommen). Bestehende Ein-Stufen-Konfigurationen werden automatisch als eine Stufe übernommen. Editierbar in beiden Oberflächen (Regeln → Hitzetag-Schutz).
+
+## 2.0.18
+
+- **PV-Boost: Fenster in Anlagen-Richtung bei hoher PV-Leistung stärker schließen — und geschlossen halten.** Zur Wunschbeschreibung „wenn die PV-Leistung sehr hoch ist, sollte SW stärker geschlossen werden und ggf. auch bleiben; die PV-Anlage schaut selbst nach SW". Fenster, deren Ausrichtung in der **Anlagen-Lobe** liegt, bekommen bei hoher PV-Erzeugung einen **Schließ-Boden**, der proportional zur PV-Leistung bis **voll** hochläuft und gehalten wird, solange die Anlage viel liefert. Der Boden respektiert immer den fensterspezifischen **Wärme-Deckel** (`heatCap01`) und wird von Sturm/Sicherheit übersteuert.
+- **Konfigurierbar** unter Regeln → Beschattungs-Strategie: PV-Boost ein/aus, **Anlagen-Ausrichtung** (° — 225 = SW) und die Schwelle **„PV sehr hoch ab %"**. Ist keine Ausrichtung gesetzt, wird sie aus der gelernten/gehinteten Anlagen-Orientierung abgeleitet. Standard: aus (keine Regression).
+- Regressionstests (`tests/unit/pv-boost-shading.test.ts`) decken den Boost, das Aus-/Off-Array-Verhalten und den Wärme-Deckel ab. *(Engine-Verhalten bitte auf der HCU gegenprüfen.)*
+
+## 2.0.17
+
+- **Verschattung fährt graduell hoch statt direkt auf 95 % zu springen.** Bugfix zur Meldung „das Rollo geht direkt auf 95 %": die Rollladen-Stellung folgt jetzt der **tatsächlichen direkten Sonne** auf dem jeweiligen Fenster (momentaner Einfallswinkel × Höhe) und steigt **schrittweise** (z. B. 30 → 50 → 75 %), **voll geschlossen erst nahe dem Sonnen-Peak** des Fensters. Ursache war eine harte Kappe, die ab wenig Direktsonne sofort „voll zu" erlaubte, plus ein Vorausblick, der den Mittags-Peak schon Stunden früher „sah". Ein sonniges Fenster bleibt bei kühlem Raum weiterhin für Tageslicht offen (kein Verschatten ohne Wärmebedarf).
+
+## 2.0.16
+
+- **Prognoseverlauf & Tagesplan aufgeräumt und korrigiert.**
+  - **Rollläden-Zeile reicht wieder über den ganzen Tag** — keine leeren Werte („–") mehr ab 08:00. Die 12-h-Vorschau wird auf ein volles 24-h-Stundenraster gehoben (hält die letzte geplante Position über das Plan-Ende hinaus).
+  - **Neue Zeile „Sonne auf Fassade"** zeigt, auf welcher Himmelsrichtung die Sonne im Tagesverlauf steht (NO → O → SO → S → SW → W …), so werden die Übergänge sichtbar.
+  - **Geplante Bewegungen und die Diagramm-Skala liegen auf vollen Stunden** (kein „08:20" mehr) — die Segmentzeiten werden auf die Stunde eingerastet, die x-Achse tickt auf :00.
+  - **Interaktives Tagesplan-Diagramm:** Fadenkreuz mit Uhrzeit + Prognosetemperatur beim Überfahren, anklickbare/hervorhebbare Aktionspunkte, native Tooltips (Zeit · Fenster · Ziel · Begründung).
+  - **Rollladen-Name:** Fenster können einen eigenen Namen tragen (statt nur „Fenster SW"); der Plan zeigt ihn. Identische Doppel-Einträge (mehrere gleich ausgerichtete Rollläden) werden zu einer Zeile zusammengefasst.
+  - **Kein zu frühes Öffnen mehr:** ein Fenster wird nicht geöffnet, solange **direkte** Sonne darauf liegt (gilt ganztägig, nicht nur abends) — behebt „SO öffnet um 10:20 obwohl noch Sonne".
+  - **Passenderes Symbol** bei „Alle Aktionen anzeigen".
+
+## 2.0.15
+
+- **Engine durchgängig konfigurierbar (Phasen 1–5).**
+  - **Neue Beschattungs-Strategie** als ein High-Level-Regler: **Tageslicht / Ausgewogen / Wärmeschutz** (Regeln → Beschattungs-Strategie). Biegt die Verschattungs-Kennwerte gebündelt in die gewählte Richtung; „Ausgewogen" = bisheriges Verhalten.
+  - **Abend-Öffnen-Gate:** Fenster öffnen abends erst, wenn keine nennenswerte **direkte** Sonne mehr auf dem Fenster liegt (folgt der echten Sonne, kein fixer Zeitpunkt) — behebt „NW öffnet um 18 Uhr zu früh". Schwelle einstellbar, ein-/ausschaltbar.
+  - **Alle bisher fest verdrahteten Engine-Konstanten sind jetzt Config** (`rules.tuning`): Verschattungs-Exposé-Schwellen, Off-Sun-Caps (30 %/70 %), „Solar stark"-Schwelle, Segment-/Vorausblick-Länge sowie das Thermomodell (Diffusanteil, Dach-Boost, Temperatur-Gain, Wolken-Dämpfung, Mindesthöhe). Defaults = bisheriges Verhalten (keine Regression).
+  - **Override-Hierarchie global → Raum → Fenster** für die Beschattungs-Strategie und das Abend-Öffnen (pro Fenster/Raum überschreibbar).
+  - **Profil „Benutzerdefiniert" hat jetzt echte, editierbare Risikogewichte** (`rules.customWeights`) statt eines Alias auf „Standard".
+- **UI „Regeln & Grenzwerte" aufgeräumt:** Karten haben jetzt **Innenabstand** — nichts wird mehr an der (abgerundeten) Kartenkante abgeschnitten. Die Schwellwerte sind in **Gruppen** sortiert (Komfort · Automatik & Bewegungen · Sonne, Sturm & Nacht · Wärmelast & Beschattung).
+
+## 2.0.14
+
+- **Großer Engine-Overhaul der Verschattungslogik** — Ziel: die beste Balance aus Tageslicht und Wärmeschutz bei **so wenigen Fahrten wie möglich (2–4/Tag)**, und der 24-h-Plan zeigt genau das schon vorab. Validiert mit einer Tagessimulation (30-°C-Tag, Haus mit SO/SW/NO/NW + Dachfenster).
+  - **Direktsonnen-bewusste, graduierte Verschattung.** Ein Fenster wird nur so stark verschattet, wie tatsächlich **direkte** Sonne darauf steht. Nebenfassaden ohne direkten Sonneneinfall (z. B. NW am Nachmittag) werden nur noch **mild** beschattet (bis 30 %, bei starker Solarlast bis 70 %) statt fälschlich auf 95 % — und **nie** voll geschlossen. Fassaden mit direkter Sonne fahren wie gehabt bis 95 %.
+  - **Dachfenster** (stärkster Wärmeeintrag) bleiben an Hitzetagen **ganztags geschlossen** und öffnen erst, wenn Sonne **und** PV klar nachlassen (bzw. die Sonne unter dem Horizont ist).
+  - **24-h-Plan = tatsächliches Verhalten.** Die Dachfenster-/Graduierungs-Logik steckt jetzt im vorausschauenden Planer, sodass der Prognoseverlauf/Tagesplan zeigt, was die Engine wirklich tut (kein morgendliches Öffnen der Dachfenster mehr im Plan).
+  - **Bewegungs-Deckel.** Der gestaffelte Plan gibt höchstens 2–4 Fahrten pro Rollladen und Tag aus (Mindest-Positionsdelta + Mindestabstand + Tages-Cap).
+  - **Reaktion auf Forecast-Abweichung.** Läuft ein Raum wärmer als vorhergesagt, verschattet die Engine über den ganzen Tag **früher** (nicht nur am Startpunkt der Trajektorie).
+  - **Sanftes Beschatten** ist jetzt ein **harter Teil-Deckel** (z. B. 50 %) statt eines Boden-Maximums — schließt an milden Tagen nicht mehr voll, auch wenn der Planer mehr wollte. Hitzewelle/Sturm bleiben ausgenommen.
+
+## 2.0.13
+
+- **Neue Mobil-Navigation im Apple-Stil (Liquid Glass).** Die Touch-Navigation auf Smartphone-Breite wurde komplett neu gestaltet: eine **schwebende, frostige Glasleiste** unten (Backdrop-Blur + Sättigung + Transparenz, abgerundet, vom Rand abgesetzt) statt einer flachen, vollflächigen Balken-Leiste.
+  - **Vier Haupt-Tabs** (Übersicht, Räume, Vorhersage, Garten) + ein **„Mehr"-Tab**, der ein Bottom-Sheet öffnet.
+  - **Animierter Aktiv-Indikator:** hinter dem aktiven Icon springt eine Akzent-Pille ein (spring-easing), Label wird kräftiger.
+  - **„Mehr"-Sheet** im Glas-Look mit Griff, Titel, Kachel-Grid (Automatik, Einstellungen, Nachrichten mit Ungelesen-Badge, Hilfe, Darstellung, Updates, Warnungen bei aktiver Wetterwarnung) und einem **Basis/Experte-Umschalter** (das mobile Pendant zum Seitenleisten-Schalter).
+  - Große Touch-Ziele (≥52 px), Ungelesen-Badge auf dem „Mehr"-Tab, Safe-Area-Insets, `prefers-reduced-motion` respektiert, voll zweisprachig (DE/EN), scheme-aware (Hell/Dunkel).
+  - Aktivierbar unter **Darstellung → „Mobile Touch-Navigation"** (greift nur auf Smartphone-Breite).
+
+## 2.0.12
+
+- **Vorhersage & Aktionsplanung grundlegend korrigiert.** Drei zusammenhängende Fehler behoben, die der Nutzer im Prognoseverlauf/Tagesplan gemeldet hat:
+  - **Rollläden hingen auf 95 % fest, obwohl keine Sonne am Fenster lag.** Ursache: der Forecast-Planner (`selectPosition`) hielt die veraltete geschlossene Position, wenn Beschatten dem Fenster keinen Kühl-Nutzen bringt (kein direkter Sonneneintrag). Jetzt wird in diesem Fall **für Tageslicht geöffnet** statt sinnlos geschlossen zu halten — ein geschlossener Rollo kühlt einen warmen Raum ohne Sonne nicht. Betraf u. a. Küche/Gaderobe (N/NW/NE) am Nachmittag. Das erklärte auch die konstanten 64 % im „Alle Räume"-Mittel.
+  - **Tagesplan ist jetzt ein echter, zeitlich gestaffelter 24-Stunden-Fahrplan.** Der Planner arbeitet mit gleitendem Horizont (2-h-Segmente) und gibt eine Fahrt an jedem Punkt aus, an dem sich die bewegungsminimale Position ändert („jetzt offen → 11:00 schließen, wenn die Sonne kommt → 19:00 wieder öffnen"), statt nur einer Aktion „jetzt".
+  - **Rollläden-Zeile im Prognoseverlauf reicht über den ganzen Planungshorizont** (nicht mehr hart nach 12 h „–"): `shutterForecast` ist an das Ende der Trajektorie gekoppelt.
+- **Tagesplan-Karte:** fehlender Innenabstand ergänzt — der Inhalt wird oben links nicht mehr von der Kartenecke abgeschnitten.
+
+## 2.0.11
+
+- **Tagesplan (24-Stunden-Plan) lädt wieder:** Der Fehler „O.find is not a function" beim Öffnen des Tagesplans ist behoben. Ursache war ein Vertrags-Mismatch — der Server liefert `GET /api/forecast` als Objekt `{ forecasts: [...] }`, der Client behandelte die Antwort aber als Array und rief `.find` darauf auf. Der Client liest jetzt korrekt `forecasts` (und akzeptiert defensiv auch ein reines Array). Regressionstest ergänzt.
+
+## 2.0.10
+
+- **Alle Seiten durchgängig in der neuen Liquid-Glass-Optik:** Die zuletzt noch im klassischen Design verbliebenen Seiten (System, Räume, Quellen, Diagnose, Benachrichtigungen, Bewässerung-Einstellungen, Nachrichten, Updates, Hilfe, Logs & Debug, Gebäude-Studio) sind jetzt vollständig auf das lg2-Design umgestellt: einheitliche Glas-Karten, Akzentfarben, Tabellen (lg2-Kopf, Zebra-Zeilen, tabellarische Ziffern), Typografie, Formulare, Buttons, Status-Punkte in der lg2-Semantikpalette und konsistente Abstände/Hover — komplett ohne Funktionsverlust (reines CSS-Re-Skin der wiederverwendeten Seiten).
+
+## 2.0.9
+
+- **Regeln & Grenzwerte in v2 erreichbar und neu gestaltet:** Die Buttons „Regeln & Grenzwerte bearbeiten" und „Simulation öffnen" liefen bisher ins Leere (Route `/rules` war nicht registriert). Es gibt jetzt eine eigene lg2-native Seite unter `/rules` mit Profil-Umschalter, allen 16 Schwellwert-Reglern (identische Grenzen wie v1), den Automatik-Erweiterungen (Sturmschutz, Kühl-Soll, Nachts-inaktiv, Ruhezeiten, Winter-Isolierung, Lern-Auto-Übernahme, Hitzetag-Schutz, Stockwerk-Beschattung), **Live-Vorschau** (Modus + Zielposition je Fenster) und **echtem Probelauf/Simulation** (`/api/probe/run`, fährt garantiert keinen Rollladen).
+- **Entscheidungsverlauf zeigt den echten Verlauf:** statt nur geplanter Aktionen jetzt der historische Entscheidungs-Log aus `/api/decisions` (Zeit, Modus, gefahren/blockiert, Blockade-Ursache), mit Leer-/Fehler-Zustand; im Experten-Modus Anzahl-Wahl, Filter (Modus/Blockade) und JSON-Export.
+
+## 2.0.8
+
+- **Vorhersage-Tab-Absturz behoben:** Im Experten-Modus stürzte der Vorhersage-Tab mit „l is not a function" ab, sobald Niederschlags-Nowcast-Daten vorlagen (eine lokale Variable überschattete den Preact-JSX-Pragma). Behoben inkl. Regressionstest.
+- **Sturmschutz-Toggle in der v2-Oberfläche:** In der Automatik lässt sich der Sturmschutz jetzt direkt umschalten (bisher nur in der klassischen Regeln-Seite). Beim Deaktivieren wird eine hängende Sturm-Haltezeit sofort aufgehoben.
+- **Manueller Override wird respektiert:** Verstellt man einen Rollladen manuell in der App/WebApp, hält die Automatik die Position (fährt nicht mehr kurz danach zurück). Optional fragt das Plugin per Telegram nach (`/ja` oder `/nein`), ob wieder geschlossen werden soll.
+- **24-Stunden-Plan pro Raum (Vorhersage):** neues Diagramm mit erwarteter Temperaturkurve, Komfortgrenze und jeder geplanten Rollladen-Fahrt (Ziel + Begründung). Planungshorizont 12/24/48 h wählbar.
+- **Sanftes Beschatten (optional):** beschattet erst teilweise (30/50/70 %) und beobachtet, statt bei milder Wärme voll zu schließen. Echte Hitzewelle und Sturm bleiben ausgenommen (Sicherheit). Standard: aus.
+
 ## 2.0.7
 
 - **Sturmschutz deaktivierbar:** In den Einstellungen (Regeln → Automatik-Erweiterungen) lässt sich der Sturmschutz-Zwangsöffner abschalten. Standard bleibt **an** (Sicherheit).

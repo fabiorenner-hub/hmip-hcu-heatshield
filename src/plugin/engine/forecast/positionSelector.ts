@@ -133,9 +133,18 @@ export function selectPosition(
     const mostOpen = ctx.candidateLevels01.reduce((a, b) => (b < a ? b : a));
     if (mostOpen < ctx.currentLevel01) {
       const openTraj = trajectoryForLevel(mostOpen);
+      const mostClosed = ctx.candidateLevels01.reduce((a, b) => (b > a ? b : a));
       const maxLoadOpen = openTraj.points.reduce((m, p) => (p.heatLoad01 > m ? p.heatLoad01 : m), 0);
       const gainPct = level01ToPercent(ctx.currentLevel01) - level01ToPercent(mostOpen);
-      if (maxLoadOpen <= NO_HEAT_EPS && holdsComfort(openTraj, bounds) && gainPct >= LIGHT_GAIN_MIN_PCT) {
+      // Shading is pointless at THIS window when either there is no heat load at
+      // all, OR closing it does not meaningfully lower the horizon peak (no
+      // solar gain to block here — e.g. a north/off-sun facade in the
+      // afternoon). In both cases a closed shutter only darkens the room, so we
+      // open it for daylight as long as the fully-open trajectory still holds
+      // comfort across the whole horizon.
+      const shadeBenefitC = peakTempC(openTraj) - peakTempC(trajectoryForLevel(mostClosed));
+      const shadingPointless = maxLoadOpen <= NO_HEAT_EPS || shadeBenefitC < SHADE_BENEFIT_MIN_C;
+      if (shadingPointless && holdsComfort(openTraj, bounds) && gainPct >= LIGHT_GAIN_MIN_PCT) {
         return {
           windowId: ctx.windowId,
           target01: mostOpen,
@@ -144,7 +153,7 @@ export function selectPosition(
               windowId: ctx.windowId,
               scheduledTs: firstBreachTs(currentTraj, bounds, now),
               targetPercent: Math.round(level01ToPercent(mostOpen)),
-              reason: 'Öffnen für Tageslicht – keine Wärmelast erwartet',
+              reason: 'Öffnen für Tageslicht – Beschattung an diesem Fenster ohne Wirkung',
               state: 'scheduled',
             },
           ],
@@ -179,19 +188,29 @@ export function selectPosition(
   // hysteresis / min-interval, so this only changes *where* a needed move
   // lands, never adds moves.
   let chosen: number;
+  let noHoldReason: string;
   if (admissible.length > 0) {
     chosen = admissible.reduce((best, lvl) => (lvl < best ? lvl : best));
+    noHoldReason = 'Vorausschauende Position hält Komfort über den Horizont';
   } else {
     // No single position holds comfort over the whole horizon → the room is
     // hot. Shade only if it actually helps: compare the horizon PEAK of a
     // fully-open vs a fully-closed shutter. A meaningful reduction means there
     // is solar gain (direct OR diffuse) to block → close hard. If open and
-    // closed are ~equal (overcast / night — nothing to block), closing would
-    // only darken the room, so hold the current position instead of churning.
+    // closed are ~equal (overcast / night, or the sun is not on THIS window —
+    // nothing to block), closing would only darken the room without cooling
+    // it, so OPEN for daylight instead of pointlessly holding a stale closed
+    // position. Windows that DO have sun close via their own evaluation.
     const mostOpen = ctx.candidateLevels01.reduce((a, b) => (b < a ? b : a));
     const mostClosed = ctx.candidateLevels01.reduce((a, b) => (b > a ? b : a));
     const benefitC = peakTempC(trajectoryForLevel(mostOpen)) - peakTempC(trajectoryForLevel(mostClosed));
-    chosen = benefitC >= SHADE_BENEFIT_MIN_C ? mostClosed : ctx.currentLevel01;
+    if (benefitC >= SHADE_BENEFIT_MIN_C) {
+      chosen = mostClosed;
+      noHoldReason = 'Stärkstes Schließen, da keine Halteposition den Komfort wahrt';
+    } else {
+      chosen = mostOpen;
+      noHoldReason = 'Öffnen für Tageslicht – Beschattung an diesem Fenster ohne Wirkung';
+    }
   }
 
   // No redundant move: if the chosen position equals the current one (in whole
@@ -212,10 +231,7 @@ export function selectPosition(
     windowId: ctx.windowId,
     scheduledTs,
     targetPercent: Math.round(level01ToPercent(chosen)),
-    reason:
-      admissible.length > 0
-        ? 'Vorausschauende Position hält Komfort über den Horizont'
-        : 'Stärkstes Schließen, da keine Halteposition den Komfort wahrt',
+    reason: noHoldReason,
     state: 'scheduled',
   };
 
@@ -224,5 +240,393 @@ export function selectPosition(
     target01: chosen,
     plannedActions: [action],
     noMoveNeeded: false,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phased (receding-horizon) schedule                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Simulate the room trajectory for `hoursAhead` starting at `startT` with the
+ * given room start temperature and this window held at `level01`. Returns the
+ * trajectory whose `points[0]` is `startT`. Injected so the planner can supply
+ * the forecast sampler; the property tests pass a synthetic sim.
+ */
+export type SimFrom = (
+  startT: Date,
+  startTempC: number,
+  level01: number,
+  hoursAhead: number,
+) => RoomTrajectory;
+
+export interface PhasedPlanContext {
+  readonly windowId: string;
+  readonly currentLevel01: number;
+  readonly candidateLevels01: ReadonlyArray<number>;
+  /** Measured room temperature now, or null when unknown (→ no phased plan). */
+  readonly startTempC: number | null;
+  /** Full planning horizon in hours (the plan is emitted across this span). */
+  readonly horizonHours: number;
+  /** Segment length in hours; the plan re-decides the position each segment. */
+  readonly segmentHours?: number;
+  /** Look-ahead per segment decision (must cover imminent heat). */
+  readonly lookaheadHours?: number;
+  /**
+   * Movement budget — keeps "as few moves as possible" (target 2–4/day) even
+   * with a fine segment grid. A scheduled transition is only emitted when it
+   * clears all three gates.
+   */
+  /** Minimum |Δ| in percent to bother emitting a planned move. */
+  readonly minPositionDeltaPct?: number;
+  /** Minimum seconds between two emitted planned moves. */
+  readonly minSecondsBetweenMoves?: number;
+  /** Hard cap on emitted moves across the whole horizon. */
+  readonly maxMoves?: number;
+
+  /* --- Direct-solar-aware graduated shading (engine overhaul) ------------ */
+  /**
+   * Per-window DIRECT-solar exposure at time `t`, in [0,1]. 1 = sun straight
+   * on the window and high; ~0 = no direct beam (only diffuse). Drives the
+   * per-window closure cap so an off-sun facade (e.g. NW in the afternoon) is
+   * only mildly shaded instead of slammed to 95 %.
+   */
+  readonly exposureAt?: (t: Date) => number;
+  /** True when the solar/PV load is strong at `t` (clear-sky, high radiation). */
+  readonly solarStrongAt?: (t: Date) => boolean;
+  /** Full close cap for this window (0.95 façade / 1.0 roof). */
+  readonly heatCap01?: number;
+  /** Whether this window is a roof window (skylight) — dedicated handling. */
+  readonly isRoof?: boolean;
+  /** Tunable shading constants (Phase 1); defaults preserve behaviour. */
+  readonly tuning?: ShadingTuning;
+  /** Evening-open gate threshold (Phase 3); `null`/absent disables it. */
+  readonly eveningOpenExposureBelow?: number | null;
+  /**
+   * PV-boost close floor (0..1) at time `t`: a minimum closure imposed on a
+   * window facing the PV array while the array delivers a lot of power. Absent
+   * → no PV boost.
+   */
+  readonly pvCloseFloorAt?: (t: Date) => number;
+}
+
+/**
+ * Tunable shading constants (configurability Phase 1). Every field was a
+ * hard-coded module constant; defaults preserve the former behaviour.
+ */
+export interface ShadingTuning {
+  readonly highExposure: number;
+  readonly lowExposure: number;
+  readonly offSunMildClose01: number;
+  readonly offSunStressClose01: number;
+  readonly shadeBenefitMinC: number;
+  readonly lightGainMinPct: number;
+}
+
+export const DEFAULT_SHADING_TUNING: ShadingTuning = {
+  // Exposure at which a window reaches FULL close (near its solar peak). High
+  // so the closure ramps up gradually (30→50→75→95 %) instead of jumping.
+  highExposure: 0.9,
+  lowExposure: 0.15,
+  offSunMildClose01: 0.3,
+  offSunStressClose01: 0.7,
+  shadeBenefitMinC: SHADE_BENEFIT_MIN_C,
+  lightGainMinPct: LIGHT_GAIN_MIN_PCT,
+};
+
+/**
+ * Derive effective shading tuning from a base + a high-level profile (Phase 4).
+ * `balanced` = base unchanged; `daylight` biases toward more light (harder to
+ * fully close, milder off-sun caps, only shade when clearly beneficial);
+ * `protection` biases toward more shade (easier full close, stronger off-sun
+ * caps, shade sooner). Explicit `tuning` overrides in the base are preserved as
+ * the starting point.
+ */
+export function deriveShadingTuning(
+  base: ShadingTuning,
+  profile: 'daylight' | 'balanced' | 'protection',
+): ShadingTuning {
+  const c01 = (x: number): number => Math.max(0, Math.min(1, x));
+  if (profile === 'daylight') {
+    return {
+      ...base,
+      highExposure: c01(base.highExposure + 0.1),
+      lowExposure: c01(base.lowExposure + 0.05),
+      offSunMildClose01: c01(base.offSunMildClose01 - 0.1),
+      offSunStressClose01: c01(base.offSunStressClose01 - 0.2),
+      shadeBenefitMinC: base.shadeBenefitMinC + 0.2,
+    };
+  }
+  if (profile === 'protection') {
+    return {
+      ...base,
+      highExposure: c01(base.highExposure - 0.15),
+      lowExposure: c01(base.lowExposure - 0.05),
+      offSunMildClose01: c01(base.offSunMildClose01 + 0.1),
+      offSunStressClose01: c01(base.offSunStressClose01 + 0.1),
+      shadeBenefitMinC: Math.max(0, base.shadeBenefitMinC - 0.15),
+    };
+  }
+  return base;
+}
+
+/**
+ * Maximum closure (0..1) allowed for one window given its DIRECT-solar
+ * exposure. Reserves a full 95/100 % close for windows the sun is actually on;
+ * an off-sun facade is capped mild, rising to at most the stress cap only when
+ * the solar load is strong — never fully closed. Roof windows may always close
+ * fully (handled by the caller).
+ */
+export function closureCapForExposure(
+  exposure: number,
+  solarStrong: boolean,
+  fullCap: number,
+  tun: ShadingTuning = DEFAULT_SHADING_TUNING,
+): number {
+  // Off-sun window (only diffuse light): mild shade, up to the stress cap under
+  // strong solar load — never full close.
+  if (exposure <= tun.lowExposure) {
+    return solarStrong ? tun.offSunStressClose01 : tun.offSunMildClose01;
+  }
+  // On-sun window: a GRADUATED ramp from a mild first-shade at `lowExposure` up
+  // to the full close only near the window's solar PEAK (`highExposure`). This
+  // gives 30 → 50 → 75 → 95 % as the sun intensifies over the day, instead of
+  // slamming straight to 95 % the moment any direct sun appears.
+  if (exposure >= tun.highExposure) {
+    return fullCap;
+  }
+  const span = Math.max(1e-6, tun.highExposure - tun.lowExposure);
+  const tt = (exposure - tun.lowExposure) / span;
+  return Math.min(fullCap, tun.offSunMildClose01 + (fullCap - tun.offSunMildClose01) * tt);
+}
+
+/** Pick the most-open (numerically smallest) level. */
+function mostOpenOf(levels: ReadonlyArray<number>): number {
+  return levels.reduce((a, b) => (b < a ? b : a));
+}
+/** Pick the most-closed (numerically largest) level. */
+function mostClosedOf(levels: ReadonlyArray<number>): number {
+  return levels.reduce((a, b) => (b > a ? b : a));
+}
+
+interface SegmentDeps {
+  readonly exposureAt: (t: Date) => number;
+  readonly solarStrongAt: (t: Date) => boolean;
+  readonly heatCap01: number;
+  readonly isRoof: boolean;
+  readonly tuning: ShadingTuning;
+  /**
+   * Evening-open gate (Phase 3): while the solar load is no longer strong but
+   * DIRECT exposure is still at/above this, keep at least a mild shade instead
+   * of opening fully. `null` disables the gate.
+   */
+  readonly eveningOpenExposureBelow: number | null;
+  readonly pvCloseFloorAt: (t: Date) => number;
+}
+
+/** Snap a target level to the most-closed candidate that does not exceed the cap. */
+function levelAtCap(candidates: ReadonlyArray<number>, cap: number): number {
+  const allowed = candidates.filter((l) => l <= cap + 1e-9);
+  return mostClosedOf(allowed.length > 0 ? allowed : [mostOpenOf(candidates)]);
+}
+
+/**
+ * Decide the DIRECT-solar-aware level for a single segment starting at `startT`
+ * with room temp `startTempC`. Uses the INSTANTANEOUS sun on the window at the
+ * segment start (natural tracking — no anticipatory jump from a look-ahead peak):
+ *
+ *   1. Roof windows: closed (heat cap) while the sun is on them; open only once
+ *      the sun is gone (evening) and comfort holds open.
+ *   2. Facade WITH sun + heat expected: shade PROPORTIONALLY to how much direct
+ *      sun is on the window — a graduated 30 → 50 → 75 → 95 % as the sun builds,
+ *      never a jump straight to 95 %.
+ *   3. Facade off-sun / cool room: maximise daylight; shade only mildly if it
+ *      actually helps hold comfort. A sun-on-window floor stops a full open
+ *      while direct sun is still on the glass.
+ */
+function levelForSegment(
+  startT: Date,
+  startTempC: number,
+  candidates: ReadonlyArray<number>,
+  simFrom: SimFrom,
+  bounds: ComfortBounds,
+  lookaheadHours: number,
+  seg: SegmentDeps,
+): number {
+  const exposure = seg.exposureAt(startT);
+  const solarStrong = seg.solarStrongAt(startT);
+
+  // Roof windows: strongest heat entry — closed while any sun/PV, open at dusk.
+  if (seg.isRoof) {
+    const sunPresent = exposure > 0.05 || solarStrong;
+    if (sunPresent) {
+      return seg.heatCap01;
+    }
+    const openTraj = simFrom(startT, startTempC, mostOpenOf(candidates), lookaheadHours);
+    return holdsComfort(openTraj, bounds) ? mostOpenOf(candidates) : seg.heatCap01;
+  }
+
+  const cap = closureCapForExposure(exposure, solarStrong, seg.heatCap01, seg.tuning);
+  // Would the room get too warm over the look-ahead if this window stayed fully
+  // open? If not (winter / cool day) there is no reason to shade — keep it open
+  // for daylight even though the sun is on it.
+  const openPeak = peakTempC(simFrom(startT, startTempC, mostOpenOf(candidates), lookaheadHours));
+  const heatExpected = openPeak > bounds.upperC;
+
+  let chosen: number;
+  if (exposure > seg.tuning.lowExposure && heatExpected) {
+    // Sun ON the window and heat expected → shade PROPORTIONALLY to the sun
+    // (graduated cap), so it ramps up over the day instead of jumping to full.
+    chosen = levelAtCap(candidates, cap);
+  } else {
+    // Off-sun, or the room stays comfortable even fully open → maximise
+    // daylight; shade only mildly if it clearly helps.
+    const pool = candidates.filter((l) => l <= cap + 1e-9);
+    const usePool = pool.length > 0 ? pool : [mostOpenOf(candidates)];
+    const holding = usePool.filter((l) =>
+      holdsComfort(simFrom(startT, startTempC, l, lookaheadHours), bounds),
+    );
+    if (holding.length > 0) {
+      chosen = mostOpenOf(holding);
+    } else {
+      const mo = mostOpenOf(usePool);
+      const mc = mostClosedOf(usePool);
+      const benefitC =
+        peakTempC(simFrom(startT, startTempC, mo, lookaheadHours)) -
+        peakTempC(simFrom(startT, startTempC, mc, lookaheadHours));
+      chosen = benefitC >= seg.tuning.shadeBenefitMinC ? mc : mo;
+    }
+  }
+
+  // Sun-on-window floor: never fully open while meaningful DIRECT sun is still
+  // on the glass (hold a mild shade until the sun moves off).
+  if (seg.eveningOpenExposureBelow !== null && exposure >= seg.eveningOpenExposureBelow) {
+    const mildFloor = Math.min(seg.tuning.offSunMildClose01, cap);
+    if (chosen < mildFloor) {
+      chosen = mildFloor;
+    }
+  }
+
+  // PV-boost floor: while the PV array (which this window faces) delivers a lot
+  // of power, close this window harder — up to full — and keep it there.
+  const pvFloor = Math.min(seg.pvCloseFloorAt(startT), seg.heatCap01);
+  if (chosen < pvFloor) {
+    chosen = pvFloor;
+  }
+  return chosen;
+}
+
+/**
+ * Receding-horizon phased plan for one window (bug report: "show the next 24 h
+ * — when does which shutter do what"). Instead of a single hold position for
+ * the whole horizon, this walks the horizon in `segmentHours` steps, decides
+ * the movement-minimizing position for each segment from the room state
+ * predicted at that segment's start, and emits a PlannedAction at each point
+ * where the position CHANGES. The result is an honest day-ahead schedule
+ * ("open now → close 11:00 when the sun arrives → open 19:00 as it cools").
+ *
+ * Pure. Falls back to a single-position plan (`selectPosition` semantics) when
+ * the room start temperature is unknown, since the forward simulation needs a
+ * numeric starting point.
+ */
+export function planWindowSchedule(
+  ctx: PhasedPlanContext,
+  simFrom: SimFrom,
+  bounds: ComfortBounds,
+  now: Date,
+): PositionPlan {
+  const seg = Math.max(1, ctx.segmentHours ?? 2);
+  const look = Math.max(seg, ctx.lookaheadHours ?? 4);
+  const horizon = Math.max(seg, ctx.horizonHours);
+  const nSeg = Math.max(1, Math.ceil(horizon / seg));
+
+  // Without a numeric start temperature we cannot roll the state forward.
+  if (ctx.startTempC === null || !Number.isFinite(ctx.startTempC)) {
+    return { windowId: ctx.windowId, target01: ctx.currentLevel01, plannedActions: [], noMoveNeeded: true };
+  }
+
+  // Segment deps for the direct-solar-aware graduated shading. Defaults keep
+  // the legacy behaviour (full sun everywhere → no extra cap) when the caller
+  // does not supply exposure info, so existing callers/tests are unaffected.
+  const segDeps: SegmentDeps = {
+    exposureAt: ctx.exposureAt ?? ((): number => 1),
+    solarStrongAt: ctx.solarStrongAt ?? ((): boolean => true),
+    heatCap01: ctx.heatCap01 ?? mostClosedOf(ctx.candidateLevels01),
+    isRoof: ctx.isRoof ?? false,
+    tuning: ctx.tuning ?? DEFAULT_SHADING_TUNING,
+    eveningOpenExposureBelow: ctx.eveningOpenExposureBelow ?? null,
+    pvCloseFloorAt: ctx.pvCloseFloorAt ?? ((): number => 0),
+  };
+
+  // Align the segment grid to full clock hours so planned moves land on sane
+  // times (08:00, not the arbitrary 08:20 cycle minute). The forward
+  // simulation from a rounded start shifts by <=30 min — negligible for the
+  // sun/thermal forecast.
+  const originMs = Math.round(now.getTime() / 3600_000) * 3600_000;
+  const schedule: Array<{ ms: number; level: number }> = [];
+  let tempCarry = ctx.startTempC;
+  for (let i = 0; i < nSeg; i += 1) {
+    const startMs = originMs + i * seg * 3600_000;
+    const startT = new Date(startMs);
+    const remainingH = horizon - i * seg;
+    const lookH = Math.min(look, Math.max(seg, remainingH));
+    const level = levelForSegment(startT, tempCarry, ctx.candidateLevels01, simFrom, bounds, lookH, segDeps);
+    schedule.push({ ms: startMs, level });
+    // Advance the carried room temperature to the end of this segment under
+    // the chosen level, so the next segment decides from the real predicted
+    // state rather than a frozen "now".
+    const advTraj = simFrom(startT, tempCarry, level, seg);
+    const lastPt = advTraj.points[advTraj.points.length - 1];
+    if (lastPt !== undefined && Number.isFinite(lastPt.indoorTempC)) {
+      tempCarry = lastPt.indoorTempC;
+    }
+  }
+
+  const target01 = schedule[0]?.level ?? ctx.currentLevel01;
+  const currentPct = Math.round(level01ToPercent(ctx.currentLevel01));
+
+  // Movement budget: keep "as few moves as possible" (target 2–4/day). A
+  // transition is only emitted when it changes the position by at least
+  // `minPositionDeltaPct`, is at least `minSecondsBetweenMoves` after the last
+  // emitted move, and the per-horizon `maxMoves` cap is not yet reached.
+  const minDeltaPct = Math.max(0, ctx.minPositionDeltaPct ?? 0);
+  const minSpacingMs = Math.max(0, ctx.minSecondsBetweenMoves ?? 0) * 1000;
+  const maxMoves = Math.max(0, ctx.maxMoves ?? Number.POSITIVE_INFINITY);
+
+  // Emit a transition whenever the scheduled position changes enough from the
+  // previously-commanded one. The first segment is compared against the
+  // CURRENT position so an immediate move is captured too.
+  const actions: PlannedAction[] = [];
+  let prevPct = currentPct;
+  let lastMoveMs = Number.NEGATIVE_INFINITY;
+  for (const s of schedule) {
+    if (actions.length >= maxMoves) {
+      break;
+    }
+    const pct = Math.round(level01ToPercent(s.level));
+    const delta = Math.abs(pct - prevPct);
+    const spacingOk = s.ms - lastMoveMs >= minSpacingMs;
+    if (delta >= Math.max(1, minDeltaPct) && spacingOk) {
+      actions.push({
+        windowId: ctx.windowId,
+        scheduledTs: new Date(s.ms).toISOString(),
+        targetPercent: pct,
+        reason:
+          pct > prevPct
+            ? 'Vorausschauendes Schließen gegen Sonnenlast'
+            : 'Öffnen für Tageslicht – keine Sonnenlast an diesem Fenster',
+        state: 'scheduled',
+      });
+      prevPct = pct;
+      lastMoveMs = s.ms;
+    }
+  }
+
+  const firstPct = Math.round(level01ToPercent(target01));
+  return {
+    windowId: ctx.windowId,
+    target01,
+    plannedActions: actions,
+    noMoveNeeded: firstPct === currentPct,
   };
 }

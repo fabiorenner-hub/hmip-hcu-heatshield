@@ -9,13 +9,13 @@
  */
 
 import { h, Fragment, type JSX } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 
 import { t, fmtTime, fmtNum } from '../../i18n.js';
 import { snapshot, riskBreakdowns } from '../../store.js';
 import { expertMode } from '../../expertMode.js';
-import { useConfig } from '../../hooks/useConfig.js';
+import { useConfig, scheduleSave } from '../../hooks/useConfig.js';
 import { Lg2AutoLever } from './shell/lg2Shell.js';
 import { ExpertSection, ExpertMetrics, M, RiskBreakdownDetail, hms, relAge } from './shell/lg2Expert.js';
 import { Icon, type IconName } from '../icons.js';
@@ -118,7 +118,7 @@ function AutoBody(props: { snap: DashboardSnapshot }): JSX.Element {
       {tab === 'status' && <StatusTab snap={snap} future={future} />}
       {tab === 'strategie' && <StrategieTab snap={snap} />}
       {tab === 'simulation' && <SimulationTab />}
-      {tab === 'verlauf' && <VerlaufTab snap={snap} actions={[...future, ...past]} />}
+      {tab === 'verlauf' && <VerlaufTab />}
 
       {tab === 'status' && <LastActions snap={snap} past={past.length > 0 ? past : future} />}
     </Fragment>
@@ -169,6 +169,9 @@ function StatusTab(props: { snap: DashboardSnapshot; future: PlannedAction[] }):
               <em style={{ color: storm ? '#ff5d57' : '#30d158' }}>{storm ? t('Sturmschutz aktiv', 'Storm protection active') : t('Alles im grünen Bereich', 'All clear')}</em></span>
           </div>
         </div>
+
+        <StormControl snap={snap} config={config.value} />
+        <GentleShadeControl config={config.value} />
 
         <div class="lg2-auto__big lg2-auto__big--sm">
           <span class="lg2-auto__biglabel">{t('Automatik', 'Automation')}</span>
@@ -305,6 +308,133 @@ function StatusTab(props: { snap: DashboardSnapshot; future: PlannedAction[] }):
   );
 }
 
+/**
+ * Editable storm-protection control (v2 UI). Lets the user enable/disable the
+ * storm safety force-open directly from the Automatik status column — the same
+ * `config.rules.storm.enabled` flag the classic Regeln tab exposes. Disabling
+ * it also asks the engine to release any stale storm hold (via the config PUT,
+ * see index.ts `applyConfigChange`). Uses optimistic debounced auto-save.
+ */
+function StormControl(props: { snap: DashboardSnapshot; config: Config | null }): JSX.Element {
+  const { snap, config } = props;
+  if (config === null) return <Fragment />;
+  const storm = config.rules?.storm;
+  const enabled = storm?.enabled !== false;
+  const holdUntil = snap.storm?.holdUntil ?? null;
+  const holdActive = holdUntil !== null && Date.parse(holdUntil) > Date.now();
+
+  const toggle = (): void => {
+    const next: Config = {
+      ...config,
+      rules: { ...config.rules, storm: { ...config.rules.storm, enabled: !enabled } },
+    };
+    scheduleSave(next, 300);
+  };
+
+  return (
+    <div class="lg2-auto__stormctl" data-testid="lg2-storm-control">
+      <div class="lg2-auto__stormctl-row">
+        <span class="lg2-auto__stormctl-icon"><Icon name="wind" size={16} /></span>
+        <span class="lg2-auto__stormctl-label">
+          <b>{t('Sturmschutz', 'Storm protection')}</b>
+          <em>
+            {enabled
+              ? t(`Auffahren ab ${fmtNum(Math.round((storm?.thresholdMs ?? 13.9) * 10) / 10, { maximumFractionDigits: 1 })} m/s`,
+                  `Force-open at ${fmtNum(Math.round((storm?.thresholdMs ?? 13.9) * 10) / 10, { maximumFractionDigits: 1 })} m/s`)
+              : t('Deaktiviert — kein automatisches Auffahren bei Wind', 'Disabled — no automatic force-open on wind')}
+          </em>
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label={t('Sturmschutz umschalten', 'Toggle storm protection')}
+          class={`lg2-toggle${enabled ? ' lg2-toggle--on' : ''}`}
+          data-testid="lg2-storm-toggle"
+          onClick={toggle}
+        />
+      </div>
+      {holdActive && (
+        <p class="lg2-auto__stormctl-hold" data-testid="lg2-storm-hold">
+          {enabled
+            ? t(`Sturm-Haltezeit aktiv bis ${fmtTime(holdUntil)} Uhr.`, `Storm hold active until ${fmtTime(holdUntil)}.`)
+            : t('Sturm-Haltezeit wird beim Deaktivieren aufgehoben.', 'Storm hold is released when disabling.')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Editable "gentle shading" control (v2 UI). Wires `config.rules.gentleShading`
+ * so the user can ask the plugin to shade gradually (cap the summer heat-
+ * protection escalation at a partial level, e.g. 50 %) instead of slamming
+ * shutters fully shut on mild-warm days. A real heatwave / storm is always
+ * exempt (safety wins) — see orchestrator step 3b⅞.
+ */
+function GentleShadeControl(props: { config: Config | null }): JSX.Element {
+  const { config } = props;
+  if (config === null) return <Fragment />;
+  const gs = config.rules?.gentleShading;
+  const enabled = gs?.enabled === true;
+  const maxPct = Math.round((gs?.maxClose01 ?? 0.5) * 100);
+
+  const patch = (next: { enabled?: boolean; maxClose01?: number }): void => {
+    const nextCfg: Config = {
+      ...config,
+      rules: {
+        ...config.rules,
+        gentleShading: {
+          enabled: next.enabled ?? enabled,
+          maxClose01: next.maxClose01 ?? (gs?.maxClose01 ?? 0.5),
+        },
+      },
+    };
+    scheduleSave(nextCfg, 300);
+  };
+
+  return (
+    <div class="lg2-auto__stormctl" data-testid="lg2-gentle-control">
+      <div class="lg2-auto__stormctl-row">
+        <span class="lg2-auto__stormctl-icon" style={{ color: 'var(--lg2-amber, #ff9d2e)', background: 'rgba(255,157,46,0.14)', borderColor: 'rgba(255,157,46,0.28)' }}>
+          <Icon name="beschattung" size={16} />
+        </span>
+        <span class="lg2-auto__stormctl-label">
+          <b>{t('Sanftes Beschatten', 'Gentle shading')}</b>
+          <em>
+            {enabled
+              ? t(`Erst teilweise (max. ${maxPct} %) beschatten, dann beobachten — außer bei echter Hitzewelle.`,
+                  `Shade partially first (max. ${maxPct} %), then observe — except in a real heatwave.`)
+              : t('Aus — Hitzeschutz schließt bei Bedarf voll.', 'Off — heat protection closes fully when needed.')}
+          </em>
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label={t('Sanftes Beschatten umschalten', 'Toggle gentle shading')}
+          class={`lg2-toggle${enabled ? ' lg2-toggle--on' : ''}`}
+          data-testid="lg2-gentle-toggle"
+          onClick={(): void => patch({ enabled: !enabled })}
+        />
+      </div>
+      {enabled && (
+        <div class="lg2-auto__stormctl-row" style={{ paddingLeft: '36px' }}>
+          <span class="lg2-auto__stormctl-label"><em>{t('Obergrenze zuerst', 'Initial cap')}</em></span>
+          <div class="lg2-seg" role="tablist">
+            {[0.3, 0.5, 0.7].map((v) => (
+              <button key={v} type="button" role="tab" aria-selected={Math.round((gs?.maxClose01 ?? 0.5) * 100) === Math.round(v * 100)}
+                class={`lg2-seg__btn${Math.round((gs?.maxClose01 ?? 0.5) * 100) === Math.round(v * 100) ? ' lg2-seg__btn--on' : ''}`}
+                data-testid={`lg2-gentle-cap-${Math.round(v * 100)}`}
+                onClick={(): void => patch({ maxClose01: v })}>{Math.round(v * 100)}%</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReasonBlock(props: { icon: IconName; title: string; body: string }): JSX.Element {
   return (
     <div class="lg2-auto__reasonrow">
@@ -429,22 +559,150 @@ function SimulationTab(): JSX.Element {
     </div>
   );
 }
-function VerlaufTab(props: { snap: DashboardSnapshot; actions: PlannedAction[] }): JSX.Element {
-  const { snap, actions } = props;
-  if (actions.length === 0) return <div class="lg2-card lg2-auto__panel"><p class="lg2-auto__empty">{t('Noch keine Entscheidungen protokolliert.', 'No decisions logged yet.')}</p></div>;
+/** One window's decision inside a historical record. */
+interface DecisionWindowEntry {
+  windowId: string;
+  finalTarget: number;
+  moved: boolean;
+  blockedBy?: string;
+}
+interface DecisionRecord {
+  cycleId: string;
+  ts: string;
+  mode: string;
+  windowDecisions: DecisionWindowEntry[];
+}
+interface DecisionRow { ts: string; cycleId: string; payload: DecisionRecord }
+
+/**
+ * Entscheidungsverlauf — the REAL historical decision log from
+ * `GET /api/decisions` (ui-v2-release Runde 12, Requirement 15). Basic view
+ * shows the most recent records; Expert mode adds a count selector (10–500),
+ * filters (mode / window / blockedBy) and a JSON export. Honest empty and
+ * error states; missing single values render as „–".
+ */
+function VerlaufTab(): JSX.Element {
+  const expert = expertMode.value;
+  const [n, setN] = useState<number>(50);
+  const [rows, setRows] = useState<DecisionRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [fMode, setFMode] = useState<string>('ALL');
+  const [fBlocked, setFBlocked] = useState<string>('ALL');
+
+  const reload = useCallback((): void => {
+    setLoading(true);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5_000);
+    void (async (): Promise<void> => {
+      try {
+        const res = await fetch(`/api/decisions?n=${n}`, { signal: ctrl.signal });
+        if (!res.ok) { setError(`HTTP ${res.status}`); return; }
+        const json = (await res.json()) as { records?: DecisionRow[] };
+        setRows(json.records ?? []);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error && err.name === 'AbortError'
+          ? t('Zeitüberschreitung beim Laden', 'Loading timed out')
+          : err instanceof Error ? err.message : t('Unbekannter Fehler', 'Unknown error'));
+      } finally {
+        clearTimeout(timer);
+        setLoading(false);
+      }
+    })();
+  }, [n]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const filtered = (rows ?? []).filter((r) => {
+    if (fMode !== 'ALL' && r.payload.mode !== fMode) return false;
+    if (fBlocked !== 'ALL') {
+      const has = r.payload.windowDecisions.some((w) => (w.blockedBy ?? '') === fBlocked);
+      if (!has) return false;
+    }
+    return true;
+  });
+
+  const exportJson = (): void => {
+    try {
+      const blob = new Blob([JSON.stringify(filtered, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `heatshield-decisions-${Date.now()}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch { /* ignore */ }
+  };
+
+  const modes = [...new Set((rows ?? []).map((r) => r.payload.mode))];
+  const blockeds = [...new Set((rows ?? []).flatMap((r) => r.payload.windowDecisions.map((w) => w.blockedBy).filter((b): b is string => !!b)))];
+
   return (
-    <div class="lg2-card lg2-auto__panel">
-      <h3 class="lg2-card__title">{t('Entscheidungsverlauf', 'Decision log')}</h3>
-      <div class="lg2-auto__log">
-        {actions.slice(0, 14).map((a) => (
-          <div key={`${a.windowId}-${a.scheduledTs}`} class="lg2-auto__logrow">
-            <span class="lg2-auto__logtime">{fmtTime(a.scheduledTs)}</span>
-            <span class="lg2-auto__logzone">{roomForWindow(snap, a.windowId)}</span>
-            <span class="lg2-auto__logact">{t('auf', 'to')} {Math.round(a.targetPercent)} %</span>
-            <span class="lg2-auto__logreason">{a.reason}</span>
-          </div>
-        ))}
+    <div class="lg2-card lg2-auto__panel" data-testid="lg2-verlauf">
+      <div class="lg2-auto__lasthead">
+        <h3 class="lg2-card__title">{t('Entscheidungsverlauf', 'Decision log')}</h3>
+        <button type="button" class="lg2-auto__lastlink" data-testid="lg2-verlauf-reload" onClick={reload}>
+          {t('Neu laden', 'Reload')} <Icon name="forecast" size={14} />
+        </button>
       </div>
+
+      {expert && (
+        <div class="lg2-verlauf__filters" data-testid="lg2-verlauf-filters">
+          <label class="lg2-fc__ctl"><span>{t('Anzahl', 'Count')}</span>
+            <input type="number" class="lg2-cfg__select" min={10} max={500} step={10} value={n}
+              data-testid="lg2-verlauf-n"
+              onChange={(e): void => { const v = Number((e.currentTarget as HTMLInputElement).value); if (Number.isFinite(v)) setN(Math.min(500, Math.max(10, Math.round(v)))); }} />
+          </label>
+          <label class="lg2-fc__ctl"><span>{t('Modus', 'Mode')}</span>
+            <select class="lg2-cfg__select" value={fMode} onChange={(e): void => setFMode((e.currentTarget as HTMLSelectElement).value)}>
+              <option value="ALL">{t('Alle', 'All')}</option>
+              {modes.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </label>
+          <label class="lg2-fc__ctl"><span>{t('Blockade', 'Blocked by')}</span>
+            <select class="lg2-cfg__select" value={fBlocked} onChange={(e): void => setFBlocked((e.currentTarget as HTMLSelectElement).value)}>
+              <option value="ALL">{t('Alle', 'All')}</option>
+              {blockeds.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </label>
+          <button type="button" class="lg2-btn" data-testid="lg2-verlauf-export" onClick={exportJson}>{t('JSON-Export', 'JSON export')}</button>
+        </div>
+      )}
+
+      {error !== null ? (
+        <div class="lg2-verlauf__state lg2-verlauf__state--err" data-testid="lg2-verlauf-error">
+          <span>{t('Fehler beim Laden:', 'Error loading:')} {error}</span>
+          <button type="button" class="lg2-btn" onClick={reload}>{t('Erneut laden', 'Retry')}</button>
+        </div>
+      ) : loading && rows === null ? (
+        <p class="lg2-auto__empty">{t('Lade Verlauf…', 'Loading log…')}</p>
+      ) : filtered.length === 0 ? (
+        <p class="lg2-auto__empty" data-testid="lg2-verlauf-empty">
+          {t('Noch keine Entscheidungen protokolliert.', 'No decisions logged yet.')}
+        </p>
+      ) : (
+        <div class="lg2-auto__log" data-testid="lg2-verlauf-rows">
+          {filtered.slice(0, expert ? 500 : 20).map((row) => {
+            const rec = row.payload;
+            const moved = rec.windowDecisions.filter((w) => w.moved);
+            const blocked = rec.windowDecisions.filter((w) => !w.moved && w.blockedBy !== undefined);
+            const detail = [
+              moved.length > 0 ? t(`${moved.length} gefahren`, `${moved.length} moved`) : '',
+              blocked.length > 0 ? t(`${blocked.length} blockiert`, `${blocked.length} blocked`) : '',
+            ].filter(Boolean).join(' · ') || t('keine Fahrt', 'no move');
+            const firstBlock = blocked[0]?.blockedBy;
+            return (
+              <div key={`${rec.cycleId}-${rec.ts}`} class="lg2-auto__logrow" data-testid="lg2-verlauf-row">
+                <span class="lg2-auto__logtime">{fmtTime(rec.ts)}</span>
+                <span class="lg2-auto__logzone">{rec.mode || '–'}</span>
+                <span class="lg2-auto__logact">{detail}</span>
+                <span class="lg2-auto__logreason">{firstBlock !== undefined ? `${t('blockiert', 'blocked')}: ${firstBlock}` : `${moved.length}/${rec.windowDecisions.length} ${t('Fenster', 'windows')}`}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -458,7 +716,7 @@ function LastActions(props: { snap: DashboardSnapshot; past: PlannedAction[] }):
     <div class="lg2-card lg2-auto__last">
       <div class="lg2-auto__lasthead">
         <h3 class="lg2-card__title">{t('Letzte Aktionen', 'Recent actions')}</h3>
-        <button type="button" class="lg2-auto__lastlink" onClick={(): void => { route('/rules'); }}>{t('Alle Aktionen anzeigen', 'Show all')} <Icon name="forecast" size={14} /></button>
+        <button type="button" class="lg2-auto__lastlink" onClick={(): void => { route('/rules'); }}>{t('Alle Aktionen anzeigen', 'Show all')} <Icon name="mehr" size={14} /></button>
       </div>
       <div class="lg2-auto__lastgrid">
         {past.slice(0, 5).map((a) => (

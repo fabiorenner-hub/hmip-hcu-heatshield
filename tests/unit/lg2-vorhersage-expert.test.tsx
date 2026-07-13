@@ -31,6 +31,15 @@ function snap(): DashboardSnapshot {
     forecastTimeline: [card(0), card(1), card(2)],
     impact: { comfortShareToday01: 0.82, avgMovesPerDay: 2.1, calibratedRooms: 3, tunedRooms: 1, learnDays: 6, forecastAccuracyC: 0.9 },
     roomsDetail: [],
+    trajectories: {
+      indoorForecastWithShade: [{ ts: new Date(now).toISOString(), tempC: 24 }, { ts: new Date(now + 3600_000).toISOString(), tempC: 25 }],
+      indoorForecastNoShade: [{ ts: new Date(now).toISOString(), tempC: 26 }, { ts: new Date(now + 3600_000).toISOString(), tempC: 27 }],
+      heatLoadForecast: [{ ts: new Date(now).toISOString(), load01: 0.4 }, { ts: new Date(now + 3600_000).toISOString(), load01: 0.5 }],
+    },
+    precipNowcast: [
+      { ts: new Date(now).toISOString(), precipMm: 0.2 },
+      { ts: new Date(now + 900_000).toISOString(), precipMm: 0.5 },
+    ],
   } as unknown as DashboardSnapshot;
 }
 
@@ -56,5 +65,17 @@ describe('LiquidGlass2Vorhersage expert', () => {
     const { container } = render(<LiquidGlass2Vorhersage />);
     expect(container.querySelector('[data-testid="lg2-expert-forecast-quality"]')).toBeNull();
     expect(container.querySelector('[data-testid="lg2-expert-sunpath"]')).toBeNull();
+  });
+
+  // Regression: the precipitation-nowcast table must render in expert mode.
+  // A local `const h` used to shadow the Preact `h` JSX pragma, so as soon as
+  // the snapshot carried precipNowcast data the tab crashed with
+  // "h is not a function" (minified: "l is not a function").
+  it('renders the precipitation nowcast table without crashing in expert mode', () => {
+    snapshot.value = snap();
+    setExpertMode(true);
+    const { container } = render(<LiquidGlass2Vorhersage />);
+    expect(container.querySelector('[data-testid="lg2-expert-nowcast"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="lg2-expert-trajectory"]')).not.toBeNull();
   });
 });

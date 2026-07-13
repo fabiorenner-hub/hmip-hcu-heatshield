@@ -621,6 +621,42 @@ h3 {
   font-size: 0.9rem;
 }
 
+/* Hot-day multi-stage editor (temperature → shading ramp). */
+.tab-rules__stages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+}
+.tab-rules__stage {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+.tab-rules__stage-del {
+  height: 34px;
+  width: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--color-card-border, #cbd5e1);
+  background: var(--color-bg-elev, transparent);
+  color: var(--color-muted, #94a3b8);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.tab-rules__stage-del:disabled { opacity: 0.4; cursor: default; }
+.tab-rules__stage-add {
+  align-self: flex-start;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  border: 1px dashed var(--color-card-border, #cbd5e1);
+  background: transparent;
+  color: var(--color-accent, #f59e0b);
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .tab-rules__event-toggles {
   display: flex;
   flex-wrap: wrap;
@@ -2801,14 +2837,13 @@ input::placeholder {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.room-badge__pct[data-shutter='open'] {
-  color: var(--action-vent);
-}
-.room-badge__pct[data-shutter='mid'] {
-  color: var(--action-shade);
-}
+/* Shutter percentage stays a neutral, readable colour (no open/mid/closed
+   tint) — the coloured left edge already carries the room's heat state. */
+.room-badge__pct,
+.room-badge__pct[data-shutter='open'],
+.room-badge__pct[data-shutter='mid'],
 .room-badge__pct[data-shutter='closed'] {
-  color: var(--color-cyan);
+  color: var(--color-text);
 }
 .room-badge__sep {
   color: var(--color-faint);
@@ -7379,53 +7414,119 @@ textarea {
   z-index: 20;
 }
 
-/* Reserve space so the fixed bottom nav never covers content (+ safe area). */
+/* Reserve space so the floating bottom nav never covers content. The bar is
+ * ~64px tall and floats with a ~14px bottom margin, plus the device safe area. */
 .app--mobile .app__main {
-  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + var(--sp-3));
+  padding-bottom: calc(64px + 22px + env(safe-area-inset-bottom, 0px) + var(--sp-3));
 }
 
+/* -------------------------------------------------------------------------- *
+ * Apple-style Liquid-Glass bottom tab bar. A FLOATING, frosted, translucent
+ * bar detached from the screen edges: backdrop blur + saturation reveal the
+ * (blurred) content behind it, a top sheen + inner highlight give it real
+ * depth, and the active tab carries a springy accent "pill" behind its icon.
+ * Large touch targets, safe-area aware, fully theme- + scheme-aware via tokens.
+ * -------------------------------------------------------------------------- */
 .mobile-nav {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: max(10px, env(safe-area-inset-left, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
+  margin: 0 auto;
+  max-width: 520px;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: var(--sp-1);
-  padding: var(--sp-1) var(--sp-2);
-  padding-bottom: calc(var(--sp-1) + env(safe-area-inset-bottom, 0px));
-  background: var(--color-bg-elev);
-  border-top: 1px solid var(--color-card-border);
-  box-shadow: var(--shadow-3);
+  gap: 2px;
+  padding: 7px 8px;
+  border-radius: 26px;
+  background: var(--glass-sheen), var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 2px 6px rgba(0, 0, 0, 0.28),
+    0 18px 48px rgba(0, 0, 0, 0.46);
 }
 
 .mobile-nav__item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-height: 48px; /* v2 primary touch target */
-  padding: var(--sp-1) 0;
+  gap: 3px;
+  min-height: 52px;
+  padding: 5px 0 4px;
   border: none;
   background: transparent;
   color: var(--color-muted);
-  border-radius: var(--radius-sm);
+  border-radius: 18px;
   cursor: pointer;
   font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.2s ease, transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
 }
+.mobile-nav__item:active { transform: scale(0.93); }
 
-.mobile-nav__item--active {
-  color: var(--color-accent);
+/* Icon sits on a pill that fills with the accent when the tab is active. */
+.mobile-nav__ico {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 30px;
+  border-radius: 999px;
+  background: transparent;
+  transition:
+    background 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease,
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+.mobile-nav__icon { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+.mobile-nav__item--active { color: var(--color-accent); }
+.mobile-nav__item--active .mobile-nav__ico {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 34%, transparent),
+    0 0 14px color-mix(in srgb, var(--color-accent) 26%, transparent);
+  transform: translateY(-1px);
+}
+.mobile-nav__item--active .mobile-nav__icon { transform: scale(1.06); }
 
 .mobile-nav__label {
   font-size: 11px;
   line-height: 1.1;
+  letter-spacing: 0.01em;
+  font-weight: 550;
+}
+.mobile-nav__item--active .mobile-nav__label { font-weight: 680; }
+
+/* Unread / attention badge on the "Mehr" tab. */
+.mobile-nav__badge {
+  position: absolute;
+  top: -3px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--glass-bg-strong);
 }
 
-/* "Mehr" bottom sheet. */
+/* -------------------------------------------------------------------------- *
+ * "Mehr" bottom sheet — a native-feeling modal that springs up from the edge.
+ * -------------------------------------------------------------------------- */
 .mobile-more {
   position: fixed;
   inset: 0;
@@ -7439,53 +7540,202 @@ textarea {
   position: absolute;
   inset: 0;
   border: none;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(3, 6, 12, 0.5);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
   cursor: pointer;
+  animation: mnav-fade 0.2s ease;
 }
 
 .mobile-more__sheet {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
-  padding: var(--sp-3);
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  background: var(--color-card);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-  border-top: 1px solid var(--color-card-border);
+  gap: 12px;
+  margin: 0 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 14px 18px;
+  max-height: 80vh;
+  overflow-y: auto;
+  border-radius: 28px;
+  background: var(--glass-sheen), var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(1.5);
+  backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 -10px 60px rgba(0, 0, 0, 0.5);
+  animation: mnav-sheet-up 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobile-more__handle {
+  width: 40px;
+  height: 5px;
+  margin: 2px auto 0;
+  border-radius: 999px;
+  background: var(--color-faint);
+  opacity: 0.6;
+}
+
+.mobile-more__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mobile-more__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+.mobile-more__close {
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.mobile-more__close:active { transform: scale(0.92); }
+
+.mobile-more__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .mobile-more__item {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  min-height: 48px;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--color-card-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-elev);
+  gap: 12px;
+  min-height: 60px;
+  padding: 11px 13px;
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  background: var(--glass-bg);
   color: var(--color-text);
   cursor: pointer;
   font: inherit;
   text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.mobile-more__item:active { transform: scale(0.97); }
+.mobile-more__item--active {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--glass-bg));
 }
 
-.mobile-more__item--active {
-  border-color: var(--color-accent);
+.mobile-more__ico {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 26%, transparent);
   color: var(--color-accent);
 }
+.mobile-more__item--active .mobile-more__ico {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast, #1a1205);
+  border-color: transparent;
+}
+.mobile-more__badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--glass-bg-strong);
+}
 
-/* A11y (Gate 2 G2.4): honour reduced-motion for the new shells. The shells
- * add no decorative animation, but this guarantees no transition/animation
- * sneaks in via inherited rules. */
+.mobile-more__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mobile-more__lbl { font-size: 14px; font-weight: 640; color: var(--color-text); }
+.mobile-more__hint {
+  font-size: 11.5px;
+  color: var(--color-muted);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Basis/Experte segmented control inside the sheet. */
+.mobile-more__viewrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+  padding: 10px 4px 2px;
+  border-top: 1px solid var(--glass-border);
+}
+.mobile-more__viewlbl { font-size: 13px; font-weight: 620; color: var(--color-muted); }
+.mobile-more__seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+.mobile-more__segbtn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  min-height: 34px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.mobile-more__segbtn--on {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast, #1a1205);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+@keyframes mnav-sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes mnav-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* A11y (Gate 2 G2.4): honour reduced-motion — keep everything functional but
+ * drop the spring/slide/fade so nothing moves for motion-sensitive users. */
 @media (prefers-reduced-motion: reduce) {
   .app--premium .app__header,
   .app--premium .app__module,
   .app--mobile .app__main,
   .mobile-nav,
   .mobile-nav__item,
+  .mobile-nav__ico,
+  .mobile-nav__icon,
   .mobile-more,
+  .mobile-more__backdrop,
   .mobile-more__sheet,
   .mobile-more__item {
     transition: none !important;

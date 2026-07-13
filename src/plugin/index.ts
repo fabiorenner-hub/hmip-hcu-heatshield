@@ -49,6 +49,7 @@ import {
   type ConfigGroupTemplate,
   type ConfigPropertyTemplate,
   type ConnectEnvelope,
+  type ManualOverrideDetection,
   type PluginReadinessStatusValue,
 } from './connect/index.js';
 import { ConnectLogBuffer } from './connect/logBuffer.js';
@@ -170,6 +171,7 @@ import {
 import { newBuildingModel, defaultEditorContext } from '../shared/building-editor.js';
 import type { BuildingModel } from '../shared/building-model.js';
 import {
+  createWindowRuntimeState,
   emptyRuntimeState,
   readState,
   writeState,
@@ -483,6 +485,25 @@ class HeatShieldBoot {
   private readonly lastContactByWindow = new Map<string, ContactState>();
   /** Windows currently flagged by the health watchdog (not reaching target). */
   private readonly healthAlerted = new Set<string>();
+  /** Last `PluginReadinessStatus` pushed to the HCU (convergence guard). */
+  private lastAnnouncedReadiness: PluginReadinessStatusValue | null = null;
+  /**
+   * Windows with an OPEN Telegram "should it re-close after your manual change?"
+   * question (bug report item 5). Keyed by windowId → the target the engine
+   * wanted; cleared when answered (/ja | /nein) or when the re-close desire /
+   * override goes away. At most one question per window per override episode.
+   */
+  private readonly recloseAsk = new Map<string, { desiredTarget01: number; askedAt: number }>();
+  /**
+   * Manual-override notification dedup (bug report: Telegram spam of "Manuelle
+   * Bedienung erkannt"). Native shutters re-broadcast their level repeatedly, so
+   * every broadcast that differs from `lastCommandedLevel01` re-triggers a
+   * `manualOverride` detection. We keep, per window, the level we last NOTIFIED
+   * about; a new message is only sent when a fresh manual episode starts (no
+   * active override yet) OR the observed position moved meaningfully since the
+   * last notice. Refreshing the hold timer stays silent.
+   */
+  private readonly manualNoticeLevel = new Map<string, number>();
   /** Alert dedup: keys already sent on the current local day. */
   private alertsDay = '';
   private readonly alertsSentToday = new Set<string>();
@@ -624,6 +645,23 @@ class HeatShieldBoot {
         pluginId: PLUGIN_ID,
         cache: this.cache,
         logger: this.logBuffer.asLogger,
+      });
+      // Manual-override detection: when the user moves a native shutter in the
+      // HMIP app / WebApp AFTER the plugin has commanded it, the adapter emits
+      // 'manualOverride'. We honor only detections where the plugin previously
+      // commanded this device (lastCommandedLevel !== null) — the
+      // never-commanded branch fires on the first passive state broadcast for a
+      // device and would wrongly freeze windows the plugin never touched. This
+      // sets manualOverrideUntil so the safety layer holds the user's position
+      // instead of driving the shutter back (bug: manual set was overridden).
+      this.hmipSystem.on('manualOverride', (detection) => {
+        try {
+          this.onManualOverride(detection);
+        } catch (err) {
+          this.logBuffer.append('warn', 'manual-override handling failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       });
     }
     this.trendStore = new TrendStore(config.rules.heatLoad.trendWindowHours);
@@ -1089,10 +1127,12 @@ class HeatShieldBoot {
   }
 
   private announceReady(): void {
+    const status = this.computeReadiness();
+    this.lastAnnouncedReadiness = status;
     this.safeSend(
       buildPluginStateResponse({
         pluginId: PLUGIN_ID,
-        status: this.computeReadiness(),
+        status,
       }),
     );
     void this.hmipSystem?.getSystemState().catch((err: unknown) => {
@@ -1100,6 +1140,31 @@ class HeatShieldBoot {
         error: err instanceof Error ? err.message : String(err),
       });
     });
+  }
+
+  /**
+   * Push an unsolicited `PluginStateResponse` to the HCU whenever the computed
+   * readiness has changed since we last announced it. This is the convergence
+   * safety net for the HCU plugin card: readiness flips CONFIG_REQUIRED → READY
+   * as soon as rooms + windows exist, but the user configures those through the
+   * DASHBOARD (`PUT /api/config`), which is not a Connect-API config-update — so
+   * without this, the HCU keeps showing "must be configured" until the next
+   * reconnect. Called every cycle (cheap; only sends on an actual change) and
+   * directly after any config mutation.
+   */
+  private announceReadinessIfChanged(): void {
+    const status = this.computeReadiness();
+    if (status === this.lastAnnouncedReadiness) {
+      return;
+    }
+    this.lastAnnouncedReadiness = status;
+    this.safeSend(
+      buildPluginStateResponse({
+        pluginId: PLUGIN_ID,
+        status,
+      }),
+    );
+    this.logBuffer.append('info', 'plugin readiness re-announced', { status });
   }
 
   /**
@@ -1245,6 +1310,10 @@ class HeatShieldBoot {
     await this.maybeDailySummary(now);
     await this.maybeAutoApplyLearning(now);
     await this.maybeHealthWatchdog(now, snapshot);
+    await this.maybeAskReclose(now, out);
+    // Keep the HCU plugin card's readiness in sync (CONFIG_REQUIRED → READY
+    // once rooms/windows exist), regardless of how the config was changed.
+    this.announceReadinessIfChanged();
     await this.maybeAlerts(now, snapshot);
     await this.maybeDwdWarnings(now);
     await this.maybeStormOpenWindows(now, snapshot);
@@ -1795,6 +1864,160 @@ class HeatShieldBoot {
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  /**
+   * Telegram re-close confirmation (bug report item 5). When a window is under
+   * an active manual override AND the automation now WANTS to close it further
+   * (the sun came back / it warmed up), ask the user via Telegram once whether
+   * the shutter should go back down, instead of silently re-closing when the
+   * override expires. `/ja` releases the override, `/nein` re-arms it — handled
+   * in {@link confirmReclose}. Gated on Telegram being enabled with control
+   * allowed; the pending set is rebuilt each cycle so a vanished desire clears
+   * the question automatically.
+   */
+  private async maybeAskReclose(now: Date, out: CycleOutputs): Promise<void> {
+    const tg = this.config.notifications.telegram;
+    if (!tg.enabled || tg.allowControl !== true) {
+      this.recloseAsk.clear();
+      return;
+    }
+    const RECLOSE_DELTA = 0.15; // wants to close ≥15% more than currently held
+    const nowMs = now.getTime();
+    for (const wd of out.decisionRecord.windowDecisions) {
+      const rs = this.runtime.state.windows.find((w) => w.windowId === wd.windowId);
+      const overrideActive =
+        rs?.manualOverrideUntil != null && Date.parse(rs.manualOverrideUntil) > nowMs;
+      const wantsReclose =
+        wd.blockedBy === 'manual_override' &&
+        overrideActive &&
+        wd.afterSpecialRules - wd.finalTarget >= RECLOSE_DELTA;
+      if (!wantsReclose) {
+        // Desire gone / override lifted → clear any stale question for it.
+        this.recloseAsk.delete(wd.windowId);
+        continue;
+      }
+      if (this.recloseAsk.has(wd.windowId)) {
+        continue; // already asked this episode
+      }
+      this.recloseAsk.set(wd.windowId, { desiredTarget01: wd.afterSpecialRules, askedAt: nowMs });
+      const label = this.windowLabel(wd.windowId) ?? wd.windowId;
+      const targetPct = Math.round(wd.afterSpecialRules * 100);
+      try {
+        const msg = await this.notifications.emit(
+          'info',
+          this.nt('Wieder schließen?', 'Close again?'),
+          this.nt(
+            `${label}: Du hattest manuell geöffnet, jetzt wäre wieder Beschattung sinnvoll (Ziel ${targetPct} %). Soll der Rollladen wieder schließen? Antworte /ja oder /nein.`,
+            `${label}: you opened it manually; shading would help again now (target ${targetPct} %). Should the shutter close again? Reply /ja (yes) or /nein (no).`,
+          ),
+          'open',
+        );
+        this.events.emit('event', {
+          type: 'message.created',
+          payload: { id: msg.id },
+        } satisfies DashboardStreamEvent);
+      } catch (err) {
+        this.logBuffer.append('warn', 'reclose question notify failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
+  /**
+   * Handle a manual-override detection from the HMIP system adapter. Fires when
+   * a native shutter reports a level that differs (beyond snap tolerance and
+   * the grace window) from what the plugin last commanded — i.e. the user moved
+   * the shutter in the HMIP app / WebApp. We record `manualOverrideUntil` so the
+   * safety layer HOLDS the user's position for `rules.manualOverrideMinutes`
+   * instead of driving the shutter back on the next cycle.
+   *
+   * We deliberately ignore the never-commanded branch (`lastCommandedLevel ===
+   * null`): that fires on the first passive state broadcast for any device and
+   * would freeze windows the plugin never touched. Once the plugin has issued
+   * at least one move for a window, subsequent manual moves are honored.
+   */
+  private onManualOverride(detection: ManualOverrideDetection): void {
+    if (detection.lastCommandedLevel === null) {
+      // Never-commanded broadcast — log only, do not freeze automation.
+      this.logBuffer.append('info', 'manual-override ignored (never commanded)', {
+        deviceId: detection.deviceId,
+        observedLevel: detection.observedLevel,
+      });
+      return;
+    }
+    const win = this.config.windows.find((w) => w.shutterDeviceId === detection.deviceId);
+    if (win === undefined) {
+      return;
+    }
+    const now = new Date();
+    const untilMs = now.getTime() + this.config.rules.manualOverrideMinutes * 60_000;
+    const untilIso = new Date(untilMs).toISOString();
+
+    let rs = this.runtime.state.windows.find((w) => w.windowId === win.id);
+    if (rs === undefined) {
+      rs = createWindowRuntimeState(win.id);
+      this.runtime.state.windows.push(rs);
+    }
+    // Was an override ALREADY active before this broadcast? If so, this is the
+    // same manual episode (the shutter is simply re-broadcasting its level) and
+    // must NOT trigger another notification — only a fresh episode or a
+    // meaningfully different position does.
+    const wasActive =
+      rs.manualOverrideUntil != null && Date.parse(rs.manualOverrideUntil) > now.getTime();
+    const prevNoticeLevel = this.manualNoticeLevel.get(win.id);
+    const NOTICE_LEVEL_EPS = 0.05; // 5 percentage points
+    const positionChanged =
+      prevNoticeLevel === undefined ||
+      Math.abs(prevNoticeLevel - detection.observedLevel) > NOTICE_LEVEL_EPS;
+    const shouldNotify = !wasActive || positionChanged;
+    const alreadyHeldSameSpot = wasActive && !positionChanged;
+    rs.manualOverrideUntil = untilIso;
+
+    // Persist so a restart within the override window keeps the hold, and
+    // invalidate the snapshot cache so the dashboard reflects it. When the same
+    // manual episode merely re-broadcasts its unchanged level we still refresh
+    // the timer, but we skip the log + snapshot churn (and, below, the notice).
+    if (!alreadyHeldSameSpot) {
+      this.logBuffer.append('info', 'manual override registered', {
+        windowId: win.id,
+        deviceId: detection.deviceId,
+        observedLevel: detection.observedLevel,
+        lastCommandedLevel: detection.lastCommandedLevel,
+        manualOverrideUntil: untilIso,
+      });
+      this.cachedSnapshot = null;
+    }
+    void writeState(this.runtime.state, { statePath: this.statePath() }).catch(() => undefined);
+
+    // Inform the user (and, per the notification service, optionally Telegram)
+    // that automation is paused for this window because they took manual control
+    // — but only once per episode / per distinct position, to avoid spamming
+    // Telegram every time the shutter re-broadcasts its unchanged level.
+    if (!shouldNotify) {
+      return;
+    }
+    this.manualNoticeLevel.set(win.id, detection.observedLevel);
+    const label = this.windowLabel(win.id) ?? win.id;
+    const mins = Math.round(this.config.rules.manualOverrideMinutes);
+    void this.notifications
+      .emit(
+        'info',
+        this.nt('Manuelle Bedienung erkannt', 'Manual operation detected'),
+        this.nt(
+          `${label}: Position auf ${Math.round(detection.observedLevel * 100)} % gesetzt. Automatik pausiert für ${mins} min.`,
+          `${label}: position set to ${Math.round(detection.observedLevel * 100)} %. Automation paused for ${mins} min.`,
+        ),
+        'open',
+      )
+      .then((msg) => {
+        this.events.emit('event', {
+          type: 'message.created',
+          payload: { id: msg.id },
+        } satisfies DashboardStreamEvent);
+      })
+      .catch(() => undefined);
   }
 
   /**
@@ -2374,7 +2597,56 @@ class HeatShieldBoot {
             );
       },
       setParam: (key, value): string => this.applySetParam(key, value),
+      confirmReclose: (yes): string => this.confirmReclose(yes),
     };
+  }
+
+  /**
+   * Answer the pending "should the shutter re-close after your manual change?"
+   * Telegram question (bug report item 5). `yes` releases the manual override
+   * on every window with a pending question so the next cycle re-closes them;
+   * `no` re-arms the override for another `manualOverrideMinutes` so the user's
+   * position keeps holding. Clears the pending set either way and persists.
+   */
+  private confirmReclose(yes: boolean): string {
+    const pending = [...this.recloseAsk.keys()];
+    if (pending.length === 0) {
+      return this.nt(
+        'Aktuell gibt es keine offene Rückfrage.',
+        'There is no open question right now.',
+      );
+    }
+    const now = Date.now();
+    const names: string[] = [];
+    for (const windowId of pending) {
+      const rs = this.runtime.state.windows.find((w) => w.windowId === windowId);
+      if (rs === undefined) continue;
+      if (yes) {
+        // Release the override → automation resumes and re-closes next cycle.
+        rs.manualOverrideUntil = null;
+      } else {
+        // Keep holding the user's position for another override window.
+        rs.manualOverrideUntil = new Date(
+          now + this.config.rules.manualOverrideMinutes * 60_000,
+        ).toISOString();
+      }
+      names.push(this.windowLabel(windowId) ?? windowId);
+    }
+    this.recloseAsk.clear();
+    void writeState(this.runtime.state, { statePath: this.statePath() }).catch(() => undefined);
+    this.cachedSnapshot = null;
+    if (yes) {
+      this.runCycleNow();
+      return this.nt(
+        `Alles klar — ${names.join(', ')} darf wieder schließen. ✅`,
+        `Got it — ${names.join(', ')} may close again. ✅`,
+      );
+    }
+    const mins = Math.round(this.config.rules.manualOverrideMinutes);
+    return this.nt(
+      `Bleibt offen — ${names.join(', ')} wird für weitere ${mins} min gehalten.`,
+      `Kept open — ${names.join(', ')} held for another ${mins} min.`,
+    );
   }
 
   /** Next local midnight as a Date (for pause-until). */
@@ -2411,6 +2683,7 @@ class HeatShieldBoot {
       () => undefined,
     );
     this.rebuildNotifications();
+    this.announceReadinessIfChanged();
     // Keep the HCU "Automatik" switch in sync with config.automationEnabled
     // regardless of who changed it (dashboard, Telegram, config PUT). Idempotent
     // — confirmFromEngine only emits a STATUS_EVENT on an effective change.
@@ -2813,9 +3086,20 @@ class HeatShieldBoot {
         const validated = parseConfig(next);
         await writeConfig(validated, { configPath: this.configPath() });
         this.config = validated;
+        // When the user disables storm protection, release any lingering storm
+        // hold immediately so the UI stops showing "Sturm-Haltezeit aktiv" and
+        // the next cycle no longer force-holds positions (steering: no stale
+        // storm hold while wind is calm / storm disabled).
+        if (validated.rules.storm.enabled === false && this.runtime.state.stormHoldUntil !== null) {
+          this.runtime.state.stormHoldUntil = null;
+        }
         this.rebuildNotifications();
         this.syncOpenMeteo();
         this.syncGardena();
+        // Configuring via the dashboard can flip readiness CONFIG_REQUIRED →
+        // READY (first rooms/windows). Tell the HCU immediately so the plugin
+        // card stops showing "must be configured".
+        this.announceReadinessIfChanged();
       },
       readState: () => readState({ statePath: this.statePath() }),
       readDecisions: (n) =>
@@ -3774,12 +4058,21 @@ class HeatShieldBoot {
         traj?.points[0]?.heatLoad01 !== undefined
           ? Math.max(0, Math.min(1, traj.points[0].heatLoad01))
           : undefined;
-      const cutoffMs = Date.now() + 12 * 3_600_000;
-      // 12 h shutter preview coupled directly to the planner's scheduled
-      // targets: a step function that holds the current level until each
-      // planned action's time, then jumps to that action's target — i.e. the
-      // position the engine will actually command (matches the "Rollladen-
-      // Steuerung" heatmap). Flat at the current level when no move is planned.
+      // Shutter preview spans the FULL planning horizon (the trajectory's last
+      // point), not a hard-coded 12 h — so the forecast timeline's shutter row
+      // is filled as far as the engine actually planned (24 h / 48 h when the
+      // horizon is raised) instead of cutting to "–" after 12 h.
+      const trajLastMs =
+        traj !== undefined && traj.points.length > 0
+          ? Date.parse(traj.points[traj.points.length - 1]!.ts)
+          : Date.now() + 12 * 3_600_000;
+      const cutoffMs = Number.isFinite(trajLastMs) ? trajLastMs : Date.now() + 12 * 3_600_000;
+      // Shutter preview coupled directly to the planner's scheduled targets: a
+      // step function that holds the current level until each planned action's
+      // time, then jumps to that action's target — i.e. the position the engine
+      // will actually command (matches the "Rollladen-Steuerung" heatmap). With
+      // the phased planner this now steps through the whole day-ahead schedule
+      // instead of staying flat.
       const plannedActionsSorted = (plan?.plannedActions ?? [])
         .slice()
         .sort((a, b) => Date.parse(a.scheduledTs) - Date.parse(b.scheduledTs));
@@ -3802,10 +4095,16 @@ class HeatShieldBoot {
         }
         return pct;
       };
+      // Build the preview on a full 24 h hourly grid (not just the trajectory /
+      // 12 h): the forecast timeline shows up to ~24 h, so the shutter row must
+      // reach that far. Beyond the last planned action `plannedPercentAt` holds
+      // the last commanded position, so the row never cuts off to "–" mid-day.
+      const previewHours = Math.max(24, Math.round((cutoffMs - Date.now()) / 3_600_000));
       const shutterForecast = traj
-        ? traj.points
-            .filter((p) => Date.parse(p.ts) <= cutoffMs)
-            .map((p) => ({ ts: p.ts, percent: plannedPercentAt(Date.parse(p.ts)) }))
+        ? Array.from({ length: previewHours + 1 }, (_v, h) => {
+            const tMs = Date.now() + h * 3_600_000;
+            return { ts: new Date(tMs).toISOString(), percent: plannedPercentAt(tMs) };
+          })
         : undefined;
       return {
         id: r.id,

@@ -381,7 +381,7 @@ function Body(props: { snap: DashboardSnapshot }): JSX.Element {
           )}
           <button type="button" class="lg2-linkrow" onClick={(): void => { route('/automatik'); }} data-testid="lg2-all-actions">
             {t('Alle Aktionen anzeigen', 'Show all actions')}
-            <Icon name="forecast" size={16} />
+            <Icon name="mehr" size={16} />
           </button>
         </section>
 
@@ -399,11 +399,18 @@ function Body(props: { snap: DashboardSnapshot }): JSX.Element {
           ) : (
             <p class="lg2-rooms-empty">{t('Keine Räume konfiguriert', 'No rooms configured')}</p>
           )}
-          <div class="lg2-legend">
-            <span><span class="lg2-dot lg2-dot--ok" /> {t('Gering', 'Low')} &lt; 24 °C</span>
-            <span><span class="lg2-dot lg2-dot--mid" /> {t('Mittel', 'Medium')} 24–26 °C</span>
-            <span><span class="lg2-dot lg2-dot--hot" /> {t('Hoch', 'High')} &gt; 26 °C</span>
+          <div class="lg2-legend" data-testid="lg2-house-legend">
+            <span><span class="lg2-dot" style={{ background: 'var(--color-success)' }} /> {t('Gering', 'Low')} &lt; 24 °C</span>
+            <span><span class="lg2-dot" style={{ background: 'var(--color-info)' }} /> {t('Mittel', 'Medium')} 24–26 °C</span>
+            <span><span class="lg2-dot" style={{ background: 'var(--color-danger)' }} /> {t('Hoch', 'High')} &gt; 26 °C</span>
+            <span><span class="lg2-dot" style={{ background: 'var(--color-card-border)' }} /> {t('Keine Messung', 'No reading')}</span>
           </div>
+          <p class="lg2-legend__note">
+            {t(
+              'Die farbige Kante zeigt die Raumtemperatur. Der kleine Punkt rechts zeigt den Automatik-Status (z. B. geplant, läuft, blockiert) – nicht die Temperatur.',
+              'The coloured edge shows the room temperature. The small dot on the right shows the automation status (e.g. scheduled, running, blocked) — not the temperature.',
+            )}
+          </p>
         </section>
       </div>
 

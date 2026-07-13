@@ -13,13 +13,181 @@ import { useDiscovery } from '../hooks/useDiscovery.js';
 import { useUpdateCheck, GITHUB_URL, GITHUB_RELEASES_URL } from '../hooks/useUpdateCheck.js';
 import { t } from '../i18n.js';
 
-interface ChangelogEntry {
+export interface ChangelogEntry {
   version: string;
   items: string[];
 }
 
-function getChangelog(): ChangelogEntry[] {
+export function getChangelog(): ChangelogEntry[] {
   return [
+  {
+    version: '2.0.20',
+    items: [
+      t(
+        'Mobile-Navigationsleiste jetzt auch in der neuen Oberfläche (v2): die Apple-Style-Leiste unten mit „Mehr"-Menü und Basis/Experte-Umschalter — im v2-Glas-/Amber-Theme. Aktivierung unter Darstellung → „Mobile Touch-Navigation".',
+        'Mobile navigation bar now in the new UI (v2) too: the Apple-style bottom bar with a "More" menu and Basic/Expert switch — themed for v2 glass/amber. Enable under Appearance → "Mobile touch navigation".',
+      ),
+      t(
+        'Weniger Telegram-Spam: „Manuelle Bedienung erkannt" wird pro manueller Verstellung nur noch einmal gemeldet (nicht mehr bei jeder erneuten Statusmeldung des Rollladens); das Halten der Position wird still verlängert.',
+        'Less Telegram spam: "Manual operation detected" is now sent once per manual change (no longer on every repeated shutter status broadcast); holding the position is refreshed silently.',
+      ),
+      t(
+        'Hitzetag-Schutz ist jetzt mehrstufig und frei konfigurierbar: z. B. ab 30 °C → 30 % Beschattung, ab 35 °C → 50 %. Es gilt die höchste erreichte Stufe (nur bei Sonne/PV; Sturm & Nachtauskühlung ausgenommen). Regeln → Hitzetag-Schutz.',
+        'Hot-day protection is now multi-stage and freely configurable: e.g. from 30 °C → 30 % shading, from 35 °C → 50 %. The highest reached stage wins (only with sun/PV; storm & night cooling exempt). Rules → Hot-day protection.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.18',
+    items: [
+      t(
+        'PV-Boost: Fenster in Anlagen-Richtung (z. B. SW) werden bei sehr hoher PV-Leistung stärker geschlossen (bis voll) und bleiben zu, solange die Anlage viel liefert — die PV-Anlage schaut ja selbst in diese Richtung. Anlagen-Ausrichtung und die PV-Schwelle „sehr hoch" sind konfigurierbar (Regeln → Beschattungs-Strategie); nie über den jeweiligen Fenster-Deckel hinaus, Sturm behält Vorrang.',
+        'PV boost: windows facing the PV array (e.g. SW) close harder (up to fully) at very high PV output and stay closed while the array keeps delivering — the array itself faces that way. The array azimuth and the "very high" PV threshold are configurable (Rules → Shading strategy); never beyond each window\u2019s cap, storm keeps priority.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.17',
+    items: [
+      t(
+        'Bugfix „das Rollo geht direkt auf 95 %": die Verschattung fährt jetzt graduell hoch (z. B. 30 → 50 → 75 %) und folgt der tatsächlichen direkten Sonne auf dem jeweiligen Fenster — voll geschlossen erst nahe dem Sonnen-Peak. Ein sonniges Fenster bleibt bei kühlem Raum für Tageslicht offen.',
+        'Fix for "the shutter jumps straight to 95 %": shading now ramps up gradually (e.g. 30 → 50 → 75 %) following the actual direct sun on each window — fully closed only near the window\u2019s solar peak. A sunny window stays open for daylight while the room is cool.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.16',
+    items: [
+      t(
+        'Prognoseverlauf: die Rollläden-Zeile reicht wieder über den ganzen Tag (keine leeren Werte ab 08:00 mehr). Neue Zeile „Sonne auf Fassade" zeigt die Himmelsrichtung der Sonne im Tagesverlauf (NO → O → SO → S → SW → W).',
+        'Forecast timeline: the shutter row spans the whole day again (no more empty values from 08:00). New "Sun on facade" row shows the sun\u2019s direction over the day (NE → E → SE → S → SW → W).',
+      ),
+      t(
+        'Geplante Bewegungen und die Diagramm-Skala liegen jetzt auf vollen Stunden (kein „08:20" mehr). Das Tagesplan-Diagramm ist interaktiv: Fadenkreuz beim Überfahren, anklickbare Punkte, Tooltips. Doppelte Einträge werden zusammengefasst.',
+        'Planned moves and the chart scale are now on full hours (no more "08:20"). The day-plan chart is interactive: hover crosshair, clickable points, tooltips. Duplicate entries are merged.',
+      ),
+      t(
+        'Rollläden können einen eigenen Namen tragen (statt nur „Fenster SW"). Ein Fenster wird nicht mehr geöffnet, solange direkte Sonne darauf liegt (behebt zu frühes Öffnen). Passenderes Symbol bei „Alle Aktionen anzeigen".',
+        'Shutters can carry their own name (instead of just "Window SW"). A window is no longer opened while direct sun is still on it (fixes opening too early). More fitting icon on "Show all actions".',
+      ),
+    ],
+  },
+  {
+    version: '2.0.15',
+    items: [
+      t(
+        'Neue Beschattungs-Strategie als ein Regler (Regeln → Beschattungs-Strategie): Tageslicht / Ausgewogen / Wärmeschutz. Dazu ein Abend-Öffnen-Gate — Fenster öffnen abends erst, wenn keine direkte Sonne mehr auf dem Fenster liegt (behebt „NW öffnet zu früh"). Pro Raum und Fenster überschreibbar.',
+        'New shading strategy as a single dial (Rules → Shading strategy): Daylight / Balanced / Heat protection. Plus an evening-open gate — windows only open in the evening once no direct sun is left on them (fixes "NW opens too early"). Overridable per room and window.',
+      ),
+      t(
+        'Alle bisher fest verdrahteten Engine-Konstanten sind jetzt einstellbar (Verschattungs-Schwellen, Off-Sun-Caps, „Solar stark"-Schwelle, Segment/Vorausblick, Thermomodell); im Profil „Benutzerdefiniert" sind die Risikogewichte frei editierbar. Standardwerte unverändert.',
+        'Every previously hard-coded engine constant is now configurable (shading thresholds, off-sun caps, "strong solar" threshold, segment/look-ahead, thermal model); in the "Custom" profile the risk weights are freely editable. Defaults unchanged.',
+      ),
+      t(
+        'Seite „Regeln & Grenzwerte" aufgeräumt: Karten haben jetzt Innenabstand (nichts wird mehr am Rand abgeschnitten), die Schwellwerte sind in Gruppen sortiert.',
+        'The "Rules & thresholds" page is tidied up: cards now have inner padding (nothing is clipped at the edge), and the thresholds are sorted into groups.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.14',
+    items: [
+      t(
+        'Großer Engine-Overhaul der Verschattung: direktsonnen-bewusst — ein Fenster wird nur so stark verschattet, wie wirklich direkte Sonne darauf steht. Nebenfassaden ohne direkten Sonneneinfall (z. B. NW nachmittags) werden nur mild beschattet (bis 30 %, bei starker Solarlast bis 70 %) statt fälschlich auf 95 % — und nie voll geschlossen.',
+        'Big shading engine overhaul: direct-sun aware — a window is only shaded as much as direct sun actually hits it. Off-sun facades (e.g. NW in the afternoon) are only mildly shaded (up to 30 %, up to 70 % under strong solar load) instead of wrongly 95 % — and never fully closed.',
+      ),
+      t(
+        'Dachfenster (stärkster Wärmeeintrag) bleiben an Hitzetagen ganztags geschlossen und öffnen erst, wenn Sonne und PV klar nachlassen. Der 24-Stunden-Plan zeigt jetzt genau das tatsächliche Verhalten schon vorab.',
+        'Roof windows (strongest heat entry) stay closed all day on hot days and open only once sun and PV clearly decline. The 24-hour plan now shows exactly the real behaviour in advance.',
+      ),
+      t(
+        'Bewegungs-Deckel: höchstens 2–4 Fahrten pro Rollladen und Tag. Reagiert auf Forecast-Abweichung: läuft der Raum wärmer als vorhergesagt, wird früher verschattet. Sanftes Beschatten ist jetzt ein harter Teil-Deckel.',
+        'Movement cap: at most 2–4 moves per shutter per day. Reacts to forecast deviation: if a room runs warmer than predicted it shades earlier. Gentle shading is now a hard partial cap.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.13',
+    items: [
+      t(
+        'Neue Mobil-Navigation im Apple-Stil: eine schwebende Liquid-Glass-Leiste unten (Blur + Transparenz) mit vier Haupt-Tabs und einem animierten Aktiv-Indikator.',
+        'New Apple-style mobile navigation: a floating Liquid-Glass bar at the bottom (blur + transparency) with four primary tabs and an animated active indicator.',
+      ),
+      t(
+        'Das „Mehr"-Menü öffnet ein Glas-Sheet mit Kachel-Grid (Automatik, Einstellungen, Nachrichten mit Ungelesen-Badge, Hilfe, Darstellung, Updates) und einem Basis/Experte-Umschalter. Große Touch-Ziele, Safe-Area und reduzierte Bewegung werden beachtet. Aktivierbar unter Darstellung → „Mobile Touch-Navigation".',
+        'The "More" menu opens a glass sheet with a tile grid (Automation, Settings, Messages with unread badge, Help, Appearance, Updates) and a Basic/Expert toggle. Large touch targets, safe-area insets and reduced motion are respected. Enable it under Appearance → "Mobile touch navigation".',
+      ),
+    ],
+  },
+  {
+    version: '2.0.12',
+    items: [
+      t(
+        'Rollläden hingen fälschlich auf 95 %, obwohl keine Sonne am Fenster lag. Die Vorschau öffnet jetzt für Tageslicht, wenn Beschatten dem Fenster keinen Kühl-Nutzen bringt (ein geschlossener Rollo kühlt einen warmen Raum ohne Sonne nicht) – und schließt automatisch, sobald wieder Sonnenlast auftritt.',
+        'Shutters were wrongly stuck at 95 % although no sun was on the window. The preview now opens for daylight when shading brings no cooling benefit at that window (a closed shutter cannot cool a warm room without sun) — and closes again automatically once solar load returns.',
+      ),
+      t(
+        'Der Tagesplan zeigt jetzt einen echten, zeitlich gestaffelten 24-Stunden-Fahrplan (wann welcher Rollladen schließt und wieder öffnet) statt nur einer Aktion „jetzt".',
+        'The day-ahead plan now shows a real, time-phased 24-hour schedule (when each shutter closes and re-opens) instead of only a single "now" action.',
+      ),
+      t(
+        'Die Rollläden-Zeile im Prognoseverlauf reicht jetzt über den ganzen Planungshorizont statt nach 12 Stunden mit „–" abzubrechen. Tagesplan-Karte: Inhalt wird oben links nicht mehr abgeschnitten.',
+        'The shutter row in the forecast timeline now spans the full planning horizon instead of cutting off with "–" after 12 hours. Day-plan card: content is no longer clipped at the top-left.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.11',
+    items: [
+      t(
+        'Tagesplan (24-Stunden-Plan) im Vorhersage-Tab lädt wieder: der Fehler „O.find is not a function" ist behoben (die Antwort von /api/forecast wird jetzt korrekt als Objekt mit forecasts-Liste gelesen).',
+        'The day-ahead (24h) plan in the Forecast tab loads again: the "O.find is not a function" error is fixed (the /api/forecast response is now correctly read as an object with a forecasts list).',
+      ),
+    ],
+  },
+  {
+    version: '2.0.10',
+    items: [
+      t(
+        'Alle zuletzt noch im klassischen Design verbliebenen Seiten (System, Räume, Quellen, Diagnose, Benachrichtigungen, Bewässerung-Einstellungen, Nachrichten, Updates, Hilfe, Logs & Debug, Gebäude-Studio) sind jetzt durchgängig in der neuen Liquid-Glass-Optik gestaltet: einheitliche Glas-Karten, Akzentfarben, Tabellen, Typografie, Formulare und Buttons — ohne Funktionsverlust.',
+        'Every page that was still in the classic design (System, Rooms, Sources, Diagnostics, Notifications, Irrigation settings, Messages, Updates, Help, Logs & Debug, Building studio) is now consistently styled in the new Liquid Glass look: unified glass cards, accent colours, tables, typography, forms and buttons — with no loss of function.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.9',
+    items: [
+      t(
+        'Regeln & Grenzwerte sind in der neuen Oberfläche (v2) jetzt erreichbar und neu gestaltet: eigene lg2-Seite mit Profil, allen 16 Schwellwert-Reglern und Automatik-Erweiterungen, Live-Vorschau und echtem Probelauf/Simulation (fährt keinen Rollladen).',
+        'Rules & thresholds are now reachable and reworked in the new UI (v2): a dedicated lg2 page with profile, all 16 threshold sliders and automation extensions, live preview and a real dry-run simulation (moves no shutter).',
+      ),
+      t(
+        'Der Entscheidungsverlauf zeigt jetzt den echten historischen Verlauf (Zeit, Modus, gefahren/blockiert, Ursache) statt nur geplanter Aktionen — mit Filter und JSON-Export im Experten-Modus.',
+        'The decision log now shows the real historical log (time, mode, moved/blocked, reason) instead of just planned actions — with filters and JSON export in expert mode.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.8',
+    items: [
+      t(
+        'Vorhersage-Tab-Absturz behoben (im Experten-Modus mit Niederschlags-Nowcast). Sturmschutz jetzt auch in der neuen Oberfläche (Automatik) abschaltbar; eine hängende Sturm-Haltezeit wird beim Deaktivieren sofort aufgehoben.',
+        'Fixed the Forecast tab crash (expert mode with precipitation nowcast). Storm protection can now be toggled in the new UI (Automation) too; a lingering storm hold is released immediately when disabled.',
+      ),
+      t(
+        'Manuelles Verstellen eines Rollladens in App/WebApp wird respektiert – die Automatik fährt nicht mehr kurz danach zurück und fragt optional per Telegram (/ja oder /nein), ob wieder geschlossen werden soll.',
+        'Manually moving a shutter in the app/WebApp is respected — automation no longer drives it back shortly after and optionally asks via Telegram (/ja or /nein) whether to close again.',
+      ),
+      t(
+        'Neuer 24-Stunden-Plan pro Raum im Vorhersage-Tab: erwartete Temperaturkurve plus jede geplante Rollladen-Fahrt mit Ziel und Begründung; Horizont 12/24/48 h wählbar.',
+        'New 24-hour per-room plan on the Forecast tab: expected temperature curve plus every planned shutter move with target and reason; horizon 12/24/48 h selectable.',
+      ),
+      t(
+        'Neues „sanftes Beschatten" (optional): beschattet erst teilweise (30/50/70 %) und beobachtet, statt bei milder Wärme voll zu schließen – echte Hitzewelle und Sturm bleiben ausgenommen.',
+        'New “gentle shading” (optional): shades partially first (30/50/70 %) and observes instead of fully closing on mild-warm days — a real heatwave and storm stay exempt.',
+      ),
+    ],
+  },
   {
     version: '2.0.7',
     items: [

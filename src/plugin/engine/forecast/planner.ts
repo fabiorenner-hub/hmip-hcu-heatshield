@@ -13,15 +13,19 @@
 
 import type { Config } from '../../../shared/types.js';
 import type { CycleSnapshot } from '../orchestrator.js';
-import { getSunPosition, type SunPosition } from '../sun.js';
+import { getSunPosition, circularAngleDiff, type SunPosition } from '../sun.js';
 import type { Location } from '../../../shared/types.js';
 import { detectDeviation, type DeviationResult } from './deviation.js';
 import { computeCloudNowcast, arrayAzimuthFromHint } from './nowcast.js';
 import {
   selectPosition,
+  planWindowSchedule,
+  deriveShadingTuning,
+  DEFAULT_SHADING_TUNING,
   type ComfortBounds,
   type PlannedAction,
   type PositionPlan,
+  type ShadingTuning,
 } from './positionSelector.js';
 import {
   forecastRoom,
@@ -150,6 +154,7 @@ const DEFAULT_PLANNING = {
   deviationToleranceLoad01: 0.15,
   plannedMinSecondsBetweenMoves: 7200,
   movementBudgetPerInterval: 1,
+  maxMovesPerDay: 4,
   candidateLevels01: [0, 0.25, 0.5, 0.75, 0.95, 1],
 } as const;
 
@@ -195,6 +200,38 @@ export function runForecastPlanner(
 ): PlannerResult {
   const { config, baseline, now } = deps;
   const planning = config.rules.planning ?? DEFAULT_PLANNING;
+
+  // Configurability overhaul: resolve the tunable constants (Phase 1), the
+  // high-level shading profile (Phase 4) and the evening-open gate (Phase 3).
+  // All fall back to defaults so a config without these blocks is unchanged.
+  const st = config.rules.tuning?.shading;
+  const shadingBase: ShadingTuning = {
+    highExposure: st?.highExposure ?? DEFAULT_SHADING_TUNING.highExposure,
+    lowExposure: st?.lowExposure ?? DEFAULT_SHADING_TUNING.lowExposure,
+    offSunMildClose01: st?.offSunMildClose01 ?? DEFAULT_SHADING_TUNING.offSunMildClose01,
+    offSunStressClose01: st?.offSunStressClose01 ?? DEFAULT_SHADING_TUNING.offSunStressClose01,
+    shadeBenefitMinC: st?.shadeBenefitMinC ?? DEFAULT_SHADING_TUNING.shadeBenefitMinC,
+    lightGainMinPct: st?.lightGainMinPct ?? DEFAULT_SHADING_TUNING.lightGainMinPct,
+  };
+  const solarStrongWm2 = st?.solarStrongWm2 ?? 400;
+  const segH = st?.segmentHours ?? 2;
+  const lookH = st?.lookaheadHours ?? 4;
+  const thermalTuning = config.rules.tuning?.thermal;
+  const globalShadingProfile = config.rules.shadingProfile ?? 'balanced';
+  const eveningOpenEnabled = config.rules.eveningOpen?.enabled ?? true;
+  const eveningOpenGlobal = config.rules.eveningOpen?.openWhenExposureBelow ?? 0.12;
+  // PV-boost: close windows facing the PV array harder while the array delivers
+  // a lot of power. Array azimuth: explicit config → learned → orientation hint.
+  const pvCfg = config.rules.pvShading;
+  const pvEnabled = pvCfg?.enabled === true;
+  const pvArrayAz =
+    pvCfg?.arrayAzimuthDeg ??
+    deps.pvArrayAzimuthDeg ??
+    arrayAzimuthFromHint(config.fusionSolar.orientationHint);
+  const pvHighFrac = pvCfg?.highPvFraction ?? 0.6;
+  const pvLobe = pvCfg?.lobeWidthDeg ?? 90;
+  const pvMaxClose = pvCfg?.maxClose01 ?? 1;
+
   const trajectories = new Map<string, RoomTrajectory>();
   const shadedTrajectories = new Map<string, RoomTrajectory>();
   const openTrajectories = new Map<string, RoomTrajectory>();
@@ -346,6 +383,7 @@ export function runForecastPlanner(
       staleInputs,
       sunFn: memoSun,
       sampleForecast,
+      tuning: thermalTuning,
     });
 
     if (baseTraj !== null) {
@@ -376,6 +414,7 @@ export function runForecastPlanner(
           staleInputs,
           sunFn: memoSun,
           sampleForecast,
+          tuning: thermalTuning,
         });
       const openTraj = counterfactual(openWindows());
       const shadedTraj = counterfactual(shadedWindows());
@@ -407,11 +446,24 @@ export function runForecastPlanner(
       heatLoad01: firstPoint?.heatLoad01 ?? null,
     };
 
+    // Stage 3 — forecast-vs-actual deviation reaction. When the room is
+    // currently RUNNING HOTTER than the previous cycle predicted for "now",
+    // tighten the upper comfort bound by that overshoot (up to 1 K) so the
+    // planner shades EARLIER across the whole day instead of only correcting
+    // the trajectory's start point. Cool-running rooms get no loosening (we
+    // never relax protection on a stale-optimistic forecast).
+    const forecastNowC = base?.indoorTempC ?? null;
+    const deviationTightenC =
+      roomData.tempC !== null && forecastNowC !== null
+        ? Math.min(1, Math.max(0, roomData.tempC - forecastNowC))
+        : 0;
+
     const bounds = comfortBoundsFor(
       roomData.targets.target_c,
       roomData.targets.warning_c,
       (deps.comfortBiasByRoom?.[roomId] ?? 0) -
-        floorLeadFor(roomCfg?.floor, config.rules.floorShading) +
+        floorLeadFor(roomCfg?.floor, config.rules.floorShading) -
+        deviationTightenC +
         uncertaintyMarginC(baseTraj?.confidence01 ?? 0.9),
     );
 
@@ -442,26 +494,147 @@ export function runForecastPlanner(
           staleInputs,
           sunFn: memoSun,
           sampleForecast,
+          tuning: thermalTuning,
         });
         return t ?? baseTraj;
       };
 
-      const plan = selectPosition(
-        {
-          windowId: w.config.id,
-          roomId,
-          currentLevel01: w.currentLevel01 ?? 0,
-          candidateLevels01: capCandidateLevels(
-            planning.candidateLevels01,
-            heatCapForWindow(w.config),
-          ),
-          minSecondsBetweenMoves: planning.plannedMinSecondsBetweenMoves,
-          movementBudgetPerInterval: planning.movementBudgetPerInterval,
-        },
-        trajectoryForLevel,
-        bounds,
-        now,
+      const candidateLevels01 = capCandidateLevels(
+        planning.candidateLevels01,
+        heatCapForWindow(w.config),
       );
+      const currentLevel01 = w.currentLevel01 ?? 0;
+      const startTempC = roomData.tempC;
+
+      // Receding-horizon phased plan (bug report: show the next 24 h — when
+      // does which shutter do what). Walks the horizon in 2 h segments and
+      // emits a move at each point where the movement-minimizing position
+      // changes, so the plan is a real day-ahead schedule instead of a single
+      // hold position. Needs a numeric room start temperature to roll the
+      // state forward; sensor-less rooms fall back to the single-position
+      // selector (which handles a null temperature via the outdoor fallback).
+      let plan: PositionPlan;
+      if (startTempC !== null && Number.isFinite(startTempC)) {
+        const simFrom = (
+          startT: Date,
+          startTemp: number,
+          level01: number,
+          hoursAhead: number,
+        ): RoomTrajectory =>
+          forecastRoom({
+            now: startT,
+            horizonHours: hoursAhead,
+            timeStepMinutes: planning.timeStepMinutes,
+            location: config.location,
+            room: {
+              id: roomId,
+              thermalInertiaMinutes: inertia,
+              indoorTempC: startTemp,
+              targets: roomData.targets,
+            },
+            windows: baseWindows(w.config.id, level01),
+            outdoorTempC: snapshot.outdoorTempC,
+            forecastMaxTempC: snapshot.forecastMaxTempC,
+            cloudCover01: null,
+            radiationWm2: snapshot.radiationWm2,
+            pvPowerKw: snapshot.pvSmoothedKw,
+            pvPeakKwp: config.fusionSolar.pvPeakKwp,
+            staleInputs,
+            sunFn: memoSun,
+            sampleForecast,
+            tuning: thermalTuning,
+          }) ?? baseTraj;
+        // Bewegungs-Deckel: scale the daily move budget by the horizon so a
+        // 12 h plan gets half the daily budget, a 24 h plan the full budget.
+        const maxMovesPerDay = planning.maxMovesPerDay ?? 4;
+        const maxMoves = Math.max(1, Math.round((maxMovesPerDay * planning.horizonHours) / 24));
+        const isRoof = w.config.type === 'roof_window';
+        // Per-window DIRECT-solar exposure at time t (azimuth incidence ×
+        // elevation; roof windows are elevation-driven since the sun is
+        // overhead). Reserves a full close for windows the sun is actually on.
+        const exposureAt = (t: Date): number => {
+          const s = memoSun(t, config.location);
+          if (!s.isUp || s.elevationDeg < 3) return 0;
+          const elevTerm = Math.max(0, Math.min(1, (s.elevationDeg - 3) / 40));
+          if (isRoof) return elevTerm;
+          const angle = circularAngleDiff(s.azimuthDeg, w.config.orientationDeg);
+          const azTerm = Math.max(0, Math.min(1, 1 - angle / 90));
+          return Math.max(0, Math.min(1, azTerm * elevTerm));
+        };
+        // Strong solar/PV load at t (clear-sky, high radiation) — proxy for
+        // "high PV" that allows an off-sun facade up to 70 % if comfort fails.
+        const solarStrongAt = (t: Date): boolean => {
+          const sample = sampleForecast(t);
+          const rad = sample.radiationWm2 ?? snapshot.radiationWm2;
+          return rad !== null && rad !== undefined && rad >= solarStrongWm2;
+        };
+        // PV-boost close floor for this window: how aligned it is with the PV
+        // array × the array's live output proxy (direct sun on the array ×
+        // clear-sky), scaled to a closure once past the "PV very high" fraction.
+        const pvAlign = pvEnabled
+          ? Math.max(0, Math.min(1, 1 - circularAngleDiff(w.config.orientationDeg, pvArrayAz) / pvLobe))
+          : 0;
+        const pvCloseFloorAt = (t: Date): number => {
+          if (!pvEnabled || pvAlign <= 0) return 0;
+          const s = memoSun(t, config.location);
+          if (!s.isUp || s.elevationDeg < 3) return 0;
+          const elevTerm = Math.max(0, Math.min(1, (s.elevationDeg - 3) / 40));
+          const arrExp = Math.max(0, Math.min(1, 1 - circularAngleDiff(s.azimuthDeg, pvArrayAz) / 90)) * elevTerm;
+          const rad = sampleForecast(t).radiationWm2 ?? snapshot.radiationWm2;
+          const cloud = rad !== null && rad !== undefined ? Math.max(0, Math.min(1, rad / 800)) : 1;
+          const pvFrac = arrExp * cloud;
+          if (pvFrac < pvHighFrac) return 0;
+          // Ramp to a FULL close within ~0.25 above the "very high" threshold so
+          // an array-aligned window really closes hard (and stays) at high PV.
+          const strength = Math.max(0, Math.min(1, (pvFrac - pvHighFrac) / 0.25));
+          return Math.min(pvMaxClose, pvAlign * strength * heatCapForWindow(w.config));
+        };
+        // Phase 2/4 — effective shading profile: window override > room override
+        // > global. Phase 3 — evening-open threshold: window override > global.
+        const effProfile = w.config.shadingProfile ?? roomCfg?.shadingProfile ?? globalShadingProfile;
+        const windowTuning = deriveShadingTuning(shadingBase, effProfile);
+        const eveningThreshold = eveningOpenEnabled
+          ? (w.config.eveningOpenExposureBelow ?? eveningOpenGlobal)
+          : null;
+        plan = planWindowSchedule(
+          {
+            windowId: w.config.id,
+            currentLevel01,
+            candidateLevels01,
+            startTempC,
+            horizonHours: planning.horizonHours,
+            segmentHours: segH,
+            lookaheadHours: lookH,
+            minPositionDeltaPct: config.rules.automation.minPositionDeltaPct,
+            minSecondsBetweenMoves: planning.plannedMinSecondsBetweenMoves,
+            maxMoves,
+            exposureAt,
+            solarStrongAt,
+            heatCap01: heatCapForWindow(w.config),
+            isRoof,
+            tuning: windowTuning,
+            eveningOpenExposureBelow: eveningThreshold,
+            pvCloseFloorAt,
+          },
+          simFrom,
+          bounds,
+          now,
+        );
+      } else {
+        plan = selectPosition(
+          {
+            windowId: w.config.id,
+            roomId,
+            currentLevel01,
+            candidateLevels01,
+            minSecondsBetweenMoves: planning.plannedMinSecondsBetweenMoves,
+            movementBudgetPerInterval: planning.movementBudgetPerInterval,
+          },
+          trajectoryForLevel,
+          bounds,
+          now,
+        );
+      }
       windowsPlan.set(w.config.id, plan);
       for (const a of plan.plannedActions) {
         plannedActions.push(a);

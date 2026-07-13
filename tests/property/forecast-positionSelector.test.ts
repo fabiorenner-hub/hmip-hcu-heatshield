@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 
 import {
   selectPosition,
+  planWindowSchedule,
   type ComfortBounds,
   type PlannerWindowContext,
 } from '../../src/plugin/engine/forecast/positionSelector.js';
@@ -161,17 +162,21 @@ describe('positionSelector — Properties 7–11', () => {
     // All candidates admissible (peak always <= upper): expect closest-to-current.
     fc.assert(
       fc.property(fc.constantFrom(...CANDIDATES), (current) => {
-        // Open overheats so noMoveNeeded only when current already cool;
-        // force a move scenario: base peak high but every candidate cools below upper.
-        const fn = (_level01: number): RoomTrajectory => ({
-          roomId: 'r1',
-          points: [
-            { ts: NOW.toISOString(), indoorTempC: 24, heatLoad01: 0.5 },
-            { ts: new Date(NOW.getTime() + 3600_000).toISOString(), indoorTempC: 24.4, heatLoad01: 0.5 },
-          ],
-          uncertain: false,
-          confidence01: 0.9,
-        });
+        // Every candidate is admissible (all peaks <= upper), but shading DOES
+        // help here (a genuine >=0.3 K benefit from closing), so the daylight-
+        // open rule does not fire and the comfortable current position is held.
+        const fn = (level01: number): RoomTrajectory => {
+          const peak = 24.4 - level01 * 0.5; // open 24.4 → closed 23.9: 0.5 K benefit
+          return {
+            roomId: 'r1',
+            points: [
+              { ts: NOW.toISOString(), indoorTempC: peak - 0.4, heatLoad01: 0.5 },
+              { ts: new Date(NOW.getTime() + 3600_000).toISOString(), indoorTempC: peak, heatLoad01: 0.5 },
+            ],
+            uncertain: false,
+            confidence01: 0.9,
+          };
+        };
         const ctx: PlannerWindowContext = {
           windowId: 'w1', roomId: 'r1', currentLevel01: current,
           candidateLevels01: CANDIDATES, minSecondsBetweenMoves: 7200, movementBudgetPerInterval: 1,
@@ -184,13 +189,15 @@ describe('positionSelector — Properties 7–11', () => {
     );
   });
 
-  // Shade-benefit gate: when the room cannot be held comfortable, the planner
-  // closes only if shading meaningfully lowers the horizon peak. With no gain
-  // to block (open ≈ closed peak: overcast/night) it HOLDS the current
-  // position instead of churning. Mirrors the "40 °C but overcast" case.
-  it('holds the current position when shading gives no benefit', () => {
+  // Shade-benefit gate: when the room cannot be held comfortable AND shading
+  // THIS window does not lower the horizon peak (no solar gain to block here —
+  // e.g. an off-sun facade in the afternoon), keeping it closed only darkens
+  // the room without cooling it. The planner must OPEN it for daylight instead
+  // of holding a stale closed position. (Regression: Küche/Gaderobe stuck at
+  // 95 % with no sun on the window.)
+  it('opens for daylight when the room is warm but shading gives no benefit', () => {
     // Hot room (peak 30 > bound) but open and closed reach the SAME peak →
-    // nothing to block. Must hold the current level, not force a move.
+    // nothing to block at this window. Must open to the most-open level.
     const fn = (_level01: number): RoomTrajectory => ({
       roomId: 'r1',
       points: [
@@ -205,8 +212,34 @@ describe('positionSelector — Properties 7–11', () => {
       candidateLevels01: CANDIDATES, minSecondsBetweenMoves: 7200, movementBudgetPerInterval: 1,
     };
     const plan = selectPosition(ctx, fn, bounds, NOW);
-    expect(plan.target01).toBe(0.95);
-    expect(plan.noMoveNeeded).toBe(true);
+    expect(plan.target01).toBe(0);
+    expect(plan.noMoveNeeded).toBe(false);
+    expect(plan.plannedActions[0]?.reason).toContain('Öffnen für Tageslicht');
+  });
+
+  // Hold-branch twin of the above: the room is currently COMFORTABLE at a
+  // closed position, but the window has no solar gain to block (shading
+  // pointless) and opening keeps comfort → open for daylight rather than hold
+  // the stale closed shutter. (Regression: Gaderobe comfortable yet at 95 %.)
+  it('opens a comfortable but pointlessly-closed shutter for daylight', () => {
+    // Flat, comfortable trajectory regardless of level (no gain to block).
+    const fn = (_level01: number): RoomTrajectory => ({
+      roomId: 'r1',
+      points: [
+        { ts: NOW.toISOString(), indoorTempC: 23.5, heatLoad01: 0.1 },
+        { ts: new Date(NOW.getTime() + 3600_000).toISOString(), indoorTempC: 23.7, heatLoad01: 0.1 },
+      ],
+      uncertain: false,
+      confidence01: 0.9,
+    });
+    const ctx: PlannerWindowContext = {
+      windowId: 'w1', roomId: 'r1', currentLevel01: 0.95,
+      candidateLevels01: CANDIDATES, minSecondsBetweenMoves: 7200, movementBudgetPerInterval: 1,
+    };
+    const plan = selectPosition(ctx, fn, bounds, NOW);
+    expect(plan.target01).toBe(0);
+    expect(plan.noMoveNeeded).toBe(false);
+    expect(plan.plannedActions[0]?.reason).toContain('Öffnen für Tageslicht');
   });
 
   it('closes hard when the room is hot AND shading meaningfully lowers the peak', () => {
@@ -231,5 +264,127 @@ describe('positionSelector — Properties 7–11', () => {
     const plan = selectPosition(ctx, fn, bounds, NOW);
     expect(plan.target01).toBe(1);
     expect(plan.plannedActions[0]?.reason).toContain('Stärkstes Schließen');
+  });
+});
+
+
+describe('planWindowSchedule — phased day-ahead plan', () => {
+  const NOW2 = new Date('2026-07-11T06:00:00.000Z');
+  const CAND = [0, 0.25, 0.5, 0.75, 0.95, 1];
+  const B: ComfortBounds = { lowerC: 17, upperC: 24.5 };
+
+  // Synthetic sim: the sun is on the window only between +6 h and +10 h from
+  // NOW2. While sunny an OPEN shutter overheats the room (23 → 27 °C); a
+  // sufficiently closed shutter blocks it. Outside that window there is no
+  // solar load, so the room stays comfortable fully open.
+  function simFrom(startT: Date, _startTemp: number, level01: number, hoursAhead: number): RoomTrajectory {
+    const stepMin = 30;
+    const n = Math.floor((hoursAhead * 60) / stepMin) + 1;
+    const points = [];
+    for (let k = 0; k < n; k += 1) {
+      const t = new Date(startT.getTime() + k * stepMin * 60000);
+      const elapsedH = (t.getTime() - NOW2.getTime()) / 3600_000;
+      const sunny = elapsedH >= 6 && elapsedH < 10;
+      const openFactor = 1 - level01;
+      points.push({
+        ts: t.toISOString(),
+        indoorTempC: 23 + (sunny ? openFactor * 4 : 0),
+        heatLoad01: sunny ? openFactor : 0,
+      });
+    }
+    return { roomId: 'r1', points, uncertain: false, confidence01: 0.9 };
+  }
+
+  it('emits a future close when the sun arrives and a future open when it leaves', () => {
+    const plan = planWindowSchedule(
+      { windowId: 'w1', currentLevel01: 0, candidateLevels01: CAND, startTempC: 23, horizonHours: 24, segmentHours: 2, lookaheadHours: 3 },
+      simFrom, B, NOW2,
+    );
+    // Not moving right now (comfortable + open), but future moves are planned.
+    expect(plan.target01).toBe(0);
+    expect(plan.noMoveNeeded).toBe(true);
+    expect(plan.plannedActions.length).toBe(2);
+    // First a close (percent rises), later an open (percent falls back).
+    expect(plan.plannedActions[0]!.targetPercent).toBeGreaterThan(0);
+    expect(plan.plannedActions[0]!.reason).toContain('Schließen');
+    expect(plan.plannedActions[1]!.targetPercent).toBeLessThan(plan.plannedActions[0]!.targetPercent);
+    expect(plan.plannedActions[1]!.reason).toContain('Öffnen');
+    // All actions well-formed and in the future.
+    for (const a of plan.plannedActions) {
+      expect(Number.isNaN(Date.parse(a.scheduledTs))).toBe(false);
+      expect(Date.parse(a.scheduledTs)).toBeGreaterThan(NOW2.getTime());
+      expect(a.targetPercent).toBeGreaterThanOrEqual(0);
+      expect(a.targetPercent).toBeLessThanOrEqual(100);
+      expect(a.state).toBe('scheduled');
+    }
+  });
+
+  it('falls back to holding the current position when the room temperature is unknown', () => {
+    const plan = planWindowSchedule(
+      { windowId: 'w1', currentLevel01: 0.95, candidateLevels01: CAND, startTempC: null, horizonHours: 24 },
+      simFrom, B, NOW2,
+    );
+    expect(plan.target01).toBe(0.95);
+    expect(plan.noMoveNeeded).toBe(true);
+    expect(plan.plannedActions).toHaveLength(0);
+  });
+
+  it('plans to open a pointlessly-closed shutter with no solar load ahead', () => {
+    // No sunny window in this sim → room stays comfortable fully open.
+    const flat = (startT: Date, _s: number, _l: number, hoursAhead: number): RoomTrajectory => {
+      const stepMin = 30; const n = Math.floor((hoursAhead * 60) / stepMin) + 1; const points = [];
+      for (let k = 0; k < n; k += 1) points.push({ ts: new Date(startT.getTime() + k * stepMin * 60000).toISOString(), indoorTempC: 23, heatLoad01: 0 });
+      return { roomId: 'r1', points, uncertain: false, confidence01: 0.9 };
+    };
+    const plan = planWindowSchedule(
+      { windowId: 'w1', currentLevel01: 0.95, candidateLevels01: CAND, startTempC: 23, horizonHours: 12, segmentHours: 2, lookaheadHours: 3 },
+      flat, B, NOW2,
+    );
+    expect(plan.target01).toBe(0);
+    expect(plan.noMoveNeeded).toBe(false);
+    expect(plan.plannedActions[0]!.targetPercent).toBe(0);
+    expect(plan.plannedActions[0]!.reason).toContain('Öffnen');
+  });
+});
+
+
+describe('planWindowSchedule — movement budget (2–4 moves/day)', () => {
+  const NOW3 = new Date('2026-07-11T06:00:00.000Z');
+  const CAND = [0, 0.25, 0.5, 0.75, 0.95, 1];
+  const B: ComfortBounds = { lowerC: 17, upperC: 24.5 };
+  // Sun on the window +6..+10 h (same shape as the phased-plan test): an open
+  // shutter overheats while sunny, a closed one holds.
+  function sim(startT: Date, _s: number, level01: number, hoursAhead: number): RoomTrajectory {
+    const stepMin = 30; const n = Math.floor((hoursAhead * 60) / stepMin) + 1; const points = [];
+    for (let k = 0; k < n; k += 1) {
+      const t = new Date(startT.getTime() + k * stepMin * 60000);
+      const elapsedH = (t.getTime() - NOW3.getTime()) / 3600_000;
+      const sunny = elapsedH >= 6 && elapsedH < 10;
+      points.push({ ts: t.toISOString(), indoorTempC: 23 + (sunny ? (1 - level01) * 4 : 0), heatLoad01: sunny ? 1 - level01 : 0 });
+    }
+    return { roomId: 'r1', points, uncertain: false, confidence01: 0.9 };
+  }
+
+  it('caps the number of emitted moves at maxMoves', () => {
+    const plan = planWindowSchedule(
+      { windowId: 'w1', currentLevel01: 0, candidateLevels01: CAND, startTempC: 23, horizonHours: 24, segmentHours: 2, lookaheadHours: 3, maxMoves: 1 },
+      sim, B, NOW3,
+    );
+    expect(plan.plannedActions.length).toBe(1); // the close survives, the later open is dropped by the cap
+    expect(plan.plannedActions[0]!.targetPercent).toBeGreaterThan(0);
+  });
+
+  it('drops moves smaller than minPositionDeltaPct', () => {
+    // Moderate direct-solar exposure caps the closure at a small partial level
+    // (~25 %); an 80 % minimum delta drops those small moves entirely.
+    const plan = planWindowSchedule(
+      {
+        windowId: 'w1', currentLevel01: 0, candidateLevels01: CAND, startTempC: 23,
+        horizonHours: 24, segmentHours: 2, lookaheadHours: 3, minPositionDeltaPct: 80,
+        exposureAt: () => 0.3, solarStrongAt: () => true, heatCap01: 1,
+      },
+      sim, B, NOW3,
+    );
+    expect(plan.plannedActions).toHaveLength(0);
   });
 });

@@ -33,7 +33,11 @@ export type IconName =
   | 'flamme'
   | 'schloss'
   | 'schloss-auf'
-  | 'tropfen';
+  | 'tropfen'
+  | 'glocke'
+  | 'frage'
+  | 'mehr'
+  | 'schliessen';
 
 export interface IconProps {
   name: IconName;
@@ -228,6 +232,40 @@ function paths(name: IconName): JSX.Element {
         <g>
           <path d="M12 3.2c3 4 5 6.6 5 9.3a5 5 0 0 1-10 0c0-2.7 2-5.3 5-9.3Z" />
           <path d="M9.7 12.8a2.3 2.3 0 0 0 2.3 2.4" opacity="0.7" />
+        </g>
+      );
+    case 'glocke':
+      // Notification bell (Nachrichten).
+      return (
+        <g>
+          <path d="M18 8.5a6 6 0 0 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5Z" />
+          <path d="M10.3 19a2 2 0 0 0 3.4 0" />
+        </g>
+      );
+    case 'frage':
+      // Help / question mark in a circle.
+      return (
+        <g>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2-2.4 3.6" />
+          <path d="M12 17.2h.01" />
+        </g>
+      );
+    case 'mehr':
+      // "More" — three horizontal dots.
+      return (
+        <g>
+          <circle cx="5.5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="18.5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+        </g>
+      );
+    case 'schliessen':
+      // Close (X).
+      return (
+        <g>
+          <path d="M6 6l12 12" />
+          <path d="M18 6 6 18" />
         </g>
       );
   }

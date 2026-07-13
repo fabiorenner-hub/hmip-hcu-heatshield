@@ -92,6 +92,8 @@ export interface ThermalForecastInputs {
     radiationWm2?: number | null;
     cloudCover01?: number | null;
   };
+  /** Tunable model constants (configurability Phase 1); defaults preserve behaviour. */
+  readonly tuning?: Partial<ThermalTuning> | undefined;
 }
 
 export interface TrajectoryPoint {
@@ -122,6 +124,23 @@ function allRequiredMissing(inputs: ThermalForecastInputs): boolean {
   );
 }
 
+/** Tunable thermal-model constants (configurability Phase 1). */
+export interface ThermalTuning {
+  readonly diffuseFraction: number;
+  readonly roofSolarBoost: number;
+  readonly tempGainC: number;
+  readonly cloudDampingK: number;
+  readonly minElevationDeg: number;
+}
+
+const DEFAULT_THERMAL_TUNING: ThermalTuning = {
+  diffuseFraction: DIFFUSE_FRACTION,
+  roofSolarBoost: ROOF_SOLAR_BOOST,
+  tempGainC: TEMP_GAIN_C,
+  cloudDampingK: CLOUD_DAMPING_K,
+  minElevationDeg: MIN_ELEVATION_DEG,
+};
+
 /** Per-point weather environment used by the heat-load model. */
 interface HeatLoadEnv {
   readonly cloudCover01: number | null;
@@ -129,11 +148,13 @@ interface HeatLoadEnv {
   readonly pvPowerKw: number | null;
   readonly pvPeakKwp: number;
   readonly windows: ReadonlyArray<ThermalWindowInput>;
+  readonly tuning: ThermalTuning;
 }
 
 /** Normalized solar heat load [0,1] for one sample point. */
 function heatLoadAt(sun: SunPosition, env: HeatLoadEnv): number {
-  if (!sun.isUp || sun.elevationDeg < MIN_ELEVATION_DEG) {
+  const tun = env.tuning;
+  if (!sun.isUp || sun.elevationDeg < tun.minElevationDeg) {
     return 0;
   }
   const cloud = env.cloudCover01 === null ? 0 : clamp01(env.cloudCover01);
@@ -148,18 +169,18 @@ function heatLoadAt(sun: SunPosition, env: HeatLoadEnv): number {
     env.pvPowerKw === null || env.pvPeakKwp <= 0
       ? 1
       : 0.5 + 0.5 * clamp01(env.pvPowerKw / env.pvPeakKwp);
-  const solar = radiationDriver * (1 - CLOUD_DAMPING_K * cloud) * pvSupport;
+  const solar = radiationDriver * (1 - tun.cloudDampingK * cloud) * pvSupport;
 
-  const elevationTerm = clamp01((sun.elevationDeg - MIN_ELEVATION_DEG) / 35);
+  const elevationTerm = clamp01((sun.elevationDeg - tun.minElevationDeg) / 35);
   let weighted = 0;
   let areaSum = 0;
   for (const w of env.windows) {
     const angle = circularAngleDiff(sun.azimuthDeg, w.orientationDeg);
-    const roofBoost = w.type === 'roof_window' ? ROOF_SOLAR_BOOST : 1;
+    const roofBoost = w.type === 'roof_window' ? tun.roofSolarBoost : 1;
     const direct = clamp01(1 - angle / 90) * elevationTerm;
     // Direct beam (facade-dependent) + diffuse sky (all facades). Both scale
     // with sun elevation and get the roof boost (overhead glazing sees more).
-    const gain = clamp01((direct + DIFFUSE_FRACTION * elevationTerm) * roofBoost);
+    const gain = clamp01((direct + tun.diffuseFraction * elevationTerm) * roofBoost);
     const openFactor = 1 - clamp01(w.currentLevel01); // closed shutter blocks
     weighted += w.areaM2 * gain * openFactor;
     areaSum += w.areaM2;
@@ -187,6 +208,7 @@ export function forecastRoom(
   const stepMs = stepMin * 60_000;
   const count = Math.floor((horizonH * 60) / stepMin) + 1;
 
+  const tun: ThermalTuning = { ...DEFAULT_THERMAL_TUNING, ...(inputs.tuning ?? {}) };
   const tau = Math.max(1, inputs.room.thermalInertiaMinutes);
   const dtOverTau = stepMin / tau;
   // Starting indoor temperature: measured, else outdoor, else forecast max.
@@ -225,6 +247,7 @@ export function forecastRoom(
       pvPowerKw: inputs.pvPowerKw,
       pvPeakKwp: inputs.pvPeakKwp,
       windows: inputs.windows,
+      tuning: tun,
     });
     points.push({
       ts: t.toISOString(),
@@ -232,7 +255,7 @@ export function forecastRoom(
       heatLoad01: load,
     });
     // Advance temperature towards outdoor + solar forcing.
-    temp = temp + dtOverTau * (outAtT - temp + TEMP_GAIN_C * load);
+    temp = temp + dtOverTau * (outAtT - temp + tun.tempGainC * load);
   }
 
   const uncertain = inputs.staleInputs.size > 0;
