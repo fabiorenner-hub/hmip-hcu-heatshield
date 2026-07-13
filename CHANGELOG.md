@@ -3,6 +3,28 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.24
+
+- **OTA-taugliche Updates.** Ab dieser Version können Aktualisierungen over-the-air (OTA) bereitgestellt werden.
+
+## 2.0.23
+
+- **OTA-Auto-Update ist jetzt Standard.** `updates.mode` ist per Default **`auto`**: verifizierte, zum Kern passende OTA-Payloads werden ohne Nachfrage geladen, aktiviert und per Neustart übernommen (Prüfung alle `checkIntervalHours`, Default 6 h). Im Tab **Updates** jederzeit auf **Manuell** umstellbar. Die Schutznetze bleiben unverändert: nur **verifizierte** Bundles (sha256, `minCoreVersion ≤ Kernversion`, optionale Signatur) werden aktiv, und ein defektes Bundle wird per **Crash-Loop-Rollback** automatisch durchs Image ersetzt.
+
+## 2.0.22
+
+- **OTA-fähig (Over-the-Air-Updates).** Frontend + reines-JS-Backend können jetzt als verifiziertes Bundle **aus GitHub Releases** geladen werden (Tab **Updates**, automatisch oder manuell), wenn das Dashboard Internet hat — ohne HCUweb-Upload. **Kern-Updates** (Dockerfile, LABEL, native Abhängigkeiten, Port/Healthcheck) laufen weiterhin per **`.tar.gz`** über HCUweb.
+  - **Zwei Versionen** werden geführt und angezeigt: **Kern (Image)** und **OTA (Payload)** plus die neueste verfügbare.
+  - **Bootstrap-Loader** (`dist/bootstrap/loader.js`, neuer `CMD`, image-only, nicht OTA-updatebar) lädt nur ein Bundle aus `/data/ota`, das **sha256** (+ optionale Ed25519-Signatur) UND `minCoreVersion ≤ Kernversion` erfüllt; sonst das Image-Bundle. **Crash-Loop-Schutz** mit automatischem Rollback + Quarantäne.
+  - **Manifest** (`minCoreVersion > Kernversion` → OTA verweigert, Regular-Update-Banner). **Auto/Manuell** ist eine installationsweite Option (Default: manuell).
+  - **Leitplanken:** festes Repo, nur HTTPS, Verifikation **vor** Aktivierung, atomarer Write nach `/data`, keine Secrets im Log, spec-treue Connect-API.
+  - Backend wird zusätzlich per esbuild zu einem self-contained Bundle (`dist/ota/main.js`) gebaut; Release-Skript `build:ota` erzeugt das OTA-Asset-Set. Spec unter `.kiro/specs/ota-updates/`.
+
+## 2.0.21
+
+- **Trend-basierter Hitze-Deckel.** An heißen, sonnenreichen Tagen wird ein Fenster jetzt auch dann **früher/stärker geschlossen**, wenn die direkte Sonne noch nicht bündig auf der Fassade steht (z. B. SW vormittags) — aber **nur**, wenn die Prognose-Trajektorie dadurch den erwarteten Innen-Peak **spürbar senkt** (≥ `shadeBenefitMinC`, profil-einstellbar). Wo stärkeres Schließen den Peak kaum bewegt, bleibt es beim tageslicht-freundlichen Geometrie-Deckel — kein sinnloses Zufahren. Der 2.0.17-Fall („kühler Raum + streifende Sonne → offen fürs Tageslicht") bleibt unberührt, weil der Hitze-Deckel nur greift, wenn der Raum ohne ihn über Komfort liefe.
+- **Bewegungen zur richtigen Zeit statt zur vollen Stunde.** Der Zeitpunkt jeder geplanten Fahrt wird nicht mehr auf `:00` gezwungen, sondern auf den **echten Umschaltpunkt** verfeinert, den die Modelle liefern: innerhalb des Entscheidungssegments wird die Raumtemperatur unter der gehaltenen Stellung vorgerollt und die Entscheidung fein (15-min-Raster) neu ausgewertet; die früheste sinnvolle Zeit wird genommen (auf 5 min gerundet). Das Bewegungsbudget (2–4 Fahrten/Tag) bleibt unverändert.
+
 ## 2.0.20
 
 - **Mobile-Navigationsleiste auch in der neuen Oberfläche (v2).** Die Apple-Style-Liquid-Glass-Leiste unten (vier Haupt-Tabs + „Mehr"-Sheet, Basis/Experte-Umschalter) wird jetzt auch in v2 gerendert (bisher nur v1). Die kollabierte Sidebar-Bottom-Bar von v2 wird dabei ausgeblendet, die Leiste ist im v2-Amber-/Glas-Theme eingefärbt. Aktivierung wie gehabt über Darstellung → „Mobile Touch-Navigation".

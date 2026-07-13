@@ -172,6 +172,8 @@ const FIXTURE_CONFIG: Config = {
     disabledValveIds: [],
     zones: [],
   },
+  updates: { mode: 'manual', checkIntervalHours: 6 },
+  telemetry: { enabled: true },
 };
 
 const FIXTURE_SNAPSHOT_CONFIG_REQUIRED: DashboardSnapshot = {

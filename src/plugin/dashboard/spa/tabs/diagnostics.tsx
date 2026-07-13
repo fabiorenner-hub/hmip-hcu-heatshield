@@ -28,6 +28,7 @@ import { Fragment, h, type JSX } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import type { Mode } from '../types.js';
+import { TelemetryCard } from '../components/TelemetryCard.js';
 import { t } from '../i18n.js';
 
 // ---------------------------------------------------------------------------
@@ -793,6 +794,7 @@ export function DiagnosticsTab(): JSX.Element {
       />
 
       <ProbeSection />
+      <TelemetryCard />
       <SettingsBackup />
     </section>
   );

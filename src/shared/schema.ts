@@ -685,6 +685,24 @@ export const PvShadingSchema = z
   })
   .prefault({});
 
+// ---------------------------------------------------------------------------
+// Heat lockout ("Hitze-Aussperrung"). When it is hotter OUTSIDE than inside,
+// an external shutter reduces conductive/radiative heat ingress even without
+// direct sun — so keep it at least partly closed instead of opening for
+// daylight (a north window on a 30 °C day, room at 25 °C, stays shaded). This
+// captures an effect the solar-only thermal model does not. Opt-in.
+// ---------------------------------------------------------------------------
+
+export const HeatLockoutSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    // Outdoor must exceed indoor by at least this (°C) to keep it shaded.
+    outdoorAboveIndoorC: z.number().min(0).max(15).default(3),
+    // Keep at least this closed (0..1) while it is hotter outside than in.
+    minClose01: z.number().min(0).max(1).default(0.5),
+  })
+  .prefault({});
+
 export const RulesSchema = z
   .object({
     profile: z
@@ -1015,6 +1033,34 @@ export const IrrigationSchema = z
   })
   .prefault({});
 
+// ---------------------------------------------------------------------------
+// Updates (OTA) — installation-wide update behaviour. `manual` (default) only
+// surfaces a hint + button; `auto` lets the server check every
+// `checkIntervalHours` and install a verified, core-compatible OTA payload.
+// ---------------------------------------------------------------------------
+
+export const UpdatesConfigSchema = z
+  .object({
+    // Default AUTO: verified, core-compatible OTA updates install on their own
+    // and restart the plugin. Users can switch to 'manual' in the Updates tab.
+    mode: z.enum(['manual', 'auto']).default('auto'),
+    checkIntervalHours: z.number().int().min(1).max(168).default(6),
+  })
+  .prefault({});
+
+// ---------------------------------------------------------------------------
+// Telemetry (call-home) — one anonymous ping after startup so the maintainer
+// can count installations per version. Identifier is a salted hash of the HCU
+// SGTIN (unique per installation, not reversible). No token/location/devices.
+// Opt-out via `enabled: false`; the endpoint is fixed in code (not here).
+// ---------------------------------------------------------------------------
+
+export const TelemetrySchema = z
+  .object({
+    enabled: z.boolean().default(true),
+  })
+  .prefault({});
+
 export const ConfigSchema = z.object({
   schemaVersion: z.literal(1),
   // Master automation switch. Defaults to **false** so a freshly
@@ -1037,6 +1083,8 @@ export const ConfigSchema = z.object({
   dwd: DwdSchema,
   gardena: GardenaSchema,
   irrigation: IrrigationSchema,
+  updates: UpdatesConfigSchema,
+  telemetry: TelemetrySchema,
 });
 
 // ---------------------------------------------------------------------------

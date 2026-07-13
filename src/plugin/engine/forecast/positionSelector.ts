@@ -475,9 +475,33 @@ function levelForSegment(
 
   let chosen: number;
   if (exposure > seg.tuning.lowExposure && heatExpected) {
-    // Sun ON the window and heat expected → shade PROPORTIONALLY to the sun
-    // (graduated cap), so it ramps up over the day instead of jumping to full.
-    chosen = levelAtCap(candidates, cap);
+    // Sun ON the window and heat expected → start from the graduated geometric
+    // cap (daylight-friendly, ramps with the direct sun over the day).
+    const geo = levelAtCap(candidates, cap);
+    chosen = geo;
+    // TREND-AWARE heat cap: if the room is STILL predicted to exceed comfort at
+    // the geometric position, close FURTHER (up to the heat cap) — but ONLY as
+    // far as the forecast trajectory shows it MEANINGFULLY lowers the predicted
+    // peak ("close early, but only if it actually cools"). On a hot, high-
+    // radiation day this lets a not-yet-square facade (e.g. SW before the sun
+    // swings on) shade early; where extra closing barely moves the peak it
+    // stays at the geometric cap (no pointless over-closing). Uses the same
+    // `shadeBenefitMinC` gate as the off-sun branch (profile-tunable).
+    const geoPeak = peakTempC(simFrom(startT, startTempC, geo, lookaheadHours));
+    if (geoPeak > bounds.upperC) {
+      let bestPeak = geoPeak;
+      const stronger = candidates
+        .filter((l) => l > geo && l <= seg.heatCap01 + 1e-9)
+        .sort((a, b) => a - b);
+      for (const level of stronger) {
+        const peak = peakTempC(simFrom(startT, startTempC, level, lookaheadHours));
+        if (bestPeak - peak >= seg.tuning.shadeBenefitMinC) {
+          chosen = level;
+          bestPeak = peak;
+          if (peak <= bounds.upperC) break; // comfort restored → close no further
+        }
+      }
+    }
   } else {
     // Off-sun, or the room stays comfortable even fully open → maximise
     // daylight; shade only mildly if it clearly helps.
@@ -558,12 +582,12 @@ export function planWindowSchedule(
     pvCloseFloorAt: ctx.pvCloseFloorAt ?? ((): number => 0),
   };
 
-  // Align the segment grid to full clock hours so planned moves land on sane
-  // times (08:00, not the arbitrary 08:20 cycle minute). The forward
-  // simulation from a rounded start shifts by <=30 min — negligible for the
-  // sun/thermal forecast.
-  const originMs = Math.round(now.getTime() / 3600_000) * 3600_000;
-  const schedule: Array<{ ms: number; level: number }> = [];
+  // Walk the horizon on a coarse segment grid for the (cheap) DECISION, but do
+  // NOT force moves onto whole clock hours — the emitted transition time is
+  // refined below to the moment the model actually wants the change. The grid
+  // just starts at `now` (ms noise trimmed to the minute).
+  const originMs = Math.round(now.getTime() / 60_000) * 60_000;
+  const schedule: Array<{ ms: number; level: number; enterTemp: number }> = [];
   let tempCarry = ctx.startTempC;
   for (let i = 0; i < nSeg; i += 1) {
     const startMs = originMs + i * seg * 3600_000;
@@ -571,7 +595,7 @@ export function planWindowSchedule(
     const remainingH = horizon - i * seg;
     const lookH = Math.min(look, Math.max(seg, remainingH));
     const level = levelForSegment(startT, tempCarry, ctx.candidateLevels01, simFrom, bounds, lookH, segDeps);
-    schedule.push({ ms: startMs, level });
+    schedule.push({ ms: startMs, level, enterTemp: tempCarry });
     // Advance the carried room temperature to the end of this segment under
     // the chosen level, so the next segment decides from the real predicted
     // state rather than a frozen "now".
@@ -581,6 +605,38 @@ export function planWindowSchedule(
       tempCarry = lastPt.indoorTempC;
     }
   }
+
+  const REFINE_STEP_MS = 15 * 60_000; // scan resolution within a segment
+  const ROUND_MS = 5 * 60_000; // clean 5-min timestamps (not the cycle minute)
+  /**
+   * Refine a coarse transition (detected at segment index `k`) to the EARLIEST
+   * sub-time inside the preceding segment at which the model already wants the
+   * new position `toPct` — i.e. "move when it makes sense, not on the hour".
+   * Rolls the room temperature forward under the position held until the move
+   * (`schedule[k-1].level`) and re-evaluates the segment decision at fine steps.
+   * Returns the coarse start time when no earlier crossing is found.
+   */
+  const refineMoveMs = (k: number, fromPct: number, toPct: number): number => {
+    const cur = schedule[k];
+    if (cur === undefined) return now.getTime();
+    if (k === 0) return cur.ms; // immediate move — already "now"
+    const prev = schedule[k - 1]!;
+    const closing = toPct > fromPct;
+    for (let tau = prev.ms + REFINE_STEP_MS; tau < cur.ms; tau += REFINE_STEP_MS) {
+      const dtH = (tau - prev.ms) / 3600_000;
+      const roll = simFrom(new Date(prev.ms), prev.enterTemp, prev.level, dtH);
+      const lp = roll.points[roll.points.length - 1];
+      const tempAtTau = lp !== undefined && Number.isFinite(lp.indoorTempC) ? lp.indoorTempC : prev.enterTemp;
+      const remainingH = horizon - (tau - originMs) / 3600_000;
+      const lookTau = Math.min(look, Math.max(seg, remainingH));
+      const lvl = levelForSegment(new Date(tau), tempAtTau, ctx.candidateLevels01, simFrom, bounds, lookTau, segDeps);
+      const pctTau = Math.round(level01ToPercent(lvl));
+      if (closing ? pctTau >= toPct : pctTau <= toPct) {
+        return Math.round(tau / ROUND_MS) * ROUND_MS;
+      }
+    }
+    return cur.ms;
+  };
 
   const target01 = schedule[0]?.level ?? ctx.currentLevel01;
   const currentPct = Math.round(level01ToPercent(ctx.currentLevel01));
@@ -598,18 +654,25 @@ export function planWindowSchedule(
   // CURRENT position so an immediate move is captured too.
   const actions: PlannedAction[] = [];
   let prevPct = currentPct;
-  let lastMoveMs = Number.NEGATIVE_INFINITY;
-  for (const s of schedule) {
+  let lastMoveMs = Number.NEGATIVE_INFINITY; // coarse-grid time (drives the budget)
+  let lastScheduledMs = Number.NEGATIVE_INFINITY; // refined display time (monotone)
+  for (let k = 0; k < schedule.length; k += 1) {
     if (actions.length >= maxMoves) {
       break;
     }
+    const s = schedule[k]!;
     const pct = Math.round(level01ToPercent(s.level));
     const delta = Math.abs(pct - prevPct);
+    // The movement budget (spacing/count) stays on the stable coarse grid; only
+    // the emitted timestamp is refined to the model's real crossing time.
     const spacingOk = s.ms - lastMoveMs >= minSpacingMs;
     if (delta >= Math.max(1, minDeltaPct) && spacingOk) {
+      let scheduledMs = refineMoveMs(k, prevPct, pct);
+      // Keep timestamps ordered and never before "now".
+      scheduledMs = Math.max(scheduledMs, originMs, lastScheduledMs + ROUND_MS);
       actions.push({
         windowId: ctx.windowId,
-        scheduledTs: new Date(s.ms).toISOString(),
+        scheduledTs: new Date(scheduledMs).toISOString(),
         targetPercent: pct,
         reason:
           pct > prevPct
@@ -619,6 +682,7 @@ export function planWindowSchedule(
       });
       prevPct = pct;
       lastMoveMs = s.ms;
+      lastScheduledMs = scheduledMs;
     }
   }
 

@@ -11,6 +11,7 @@ import { Fragment, h, type JSX } from 'preact';
 import { APP_VERSION } from '../version.js';
 import { useDiscovery } from '../hooks/useDiscovery.js';
 import { useUpdateCheck, GITHUB_URL, GITHUB_RELEASES_URL } from '../hooks/useUpdateCheck.js';
+import { OtaPanel } from '../components/OtaPanel.js';
 import { t } from '../i18n.js';
 
 export interface ChangelogEntry {
@@ -20,6 +21,50 @@ export interface ChangelogEntry {
 
 export function getChangelog(): ChangelogEntry[] {
   return [
+  {
+    version: '2.0.24',
+    items: [
+      t(
+        'OTA-taugliche Updates: ab dieser Version können Aktualisierungen over-the-air bereitgestellt werden.',
+        'OTA-capable updates: from this version on, updates can be delivered over the air.',
+      ),
+    ],
+  },
+  {
+    version: '2.0.23',
+    items: [
+      t(
+        'OTA-Updates werden jetzt standardmäßig automatisch installiert: verifizierte, zum Kern passende Payloads werden ohne Nachfrage geladen, aktiviert und per Neustart übernommen. Im Tab „Updates" jederzeit auf „Manuell" umstellbar. Schutznetze unverändert (nur verifizierte Bundles, Crash-Loop-Rollback aufs Image).',
+        'OTA updates now install automatically by default: verified, core-compatible payloads are downloaded, activated and applied via restart without asking. Switchable to "Manual" anytime in the Updates tab. Safety nets unchanged (only verified bundles, crash-loop rollback to the image).',
+      ),
+    ],
+  },
+  {
+    version: '2.0.22',
+    items: [
+      t(
+        'OTA-Updates: Oberfläche und reines-JS-Backend können jetzt over-the-air aus GitHub Releases installiert werden (Tab „Updates", automatisch oder manuell), wenn das Dashboard Internet hat — Kern-Updates (Image/native Abhängigkeiten) laufen weiterhin per .tar.gz über HCUweb.',
+        'OTA updates: the UI and pure-JS backend can now be installed over the air from GitHub Releases (Updates tab, automatic or manual) when the dashboard has internet — core updates (image/native deps) still go via the .tar.gz in HCUweb.',
+      ),
+      t(
+        'Es werden zwei Versionen angezeigt: Kern (Image) und OTA (Payload). Nur verifizierte Bundles (sha256, Mindest-Kernversion) werden aktiviert; bei Problemen fällt das Plugin automatisch auf das Image zurück (Crash-Loop-Schutz).',
+        'Two versions are shown: Core (image) and OTA (payload). Only verified bundles (sha256, minimum core version) are activated; on trouble the plugin automatically rolls back to the image (crash-loop protection).',
+      ),
+    ],
+  },
+  {
+    version: '2.0.21',
+    items: [
+      t(
+        'Trend-basierter Hitze-Schutz: an heißen, sonnigen Tagen schließt ein Fenster jetzt auch dann früher/stärker, wenn die direkte Sonne noch nicht bündig auf der Fassade steht — aber nur, wenn die Prognosekurve dadurch den erwarteten Innen-Peak spürbar senkt (sonst bleibt es beim tageslicht-freundlichen Verhalten).',
+        'Trend-based heat protection: on hot, sunny days a window now closes earlier/harder even before the direct sun is square on the facade — but only when the forecast curve shows it meaningfully lowers the expected indoor peak (otherwise the daylight-friendly behaviour stays).',
+      ),
+      t(
+        'Bewegungen liegen nicht mehr zwangsweise auf der vollen Stunde: der Zeitpunkt jeder Fahrt wird auf den echten Umschaltpunkt verfeinert, den die Modelle liefern (auf 5 Minuten gerundet). Das Bewegungsbudget (2–4 Fahrten/Tag) bleibt gleich.',
+        'Moves are no longer forced onto the full hour: each move time is refined to the real switch point the models indicate (rounded to 5 minutes). The movement budget (2–4 moves/day) stays the same.',
+      ),
+    ],
+  },
   {
     version: '2.0.20',
     items: [
@@ -1101,6 +1146,8 @@ export function UpdatesTab(_props: RoutableProps): JSX.Element {
           </p>
         </article>
       )}
+
+      <OtaPanel />
 
       <ol class="updates-list">
         {getChangelog().map((e) => (

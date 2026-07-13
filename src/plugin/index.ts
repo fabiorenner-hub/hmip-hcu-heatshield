@@ -188,6 +188,8 @@ import {
   type TelegramCommandContext,
 } from './notifications/telegramCommands.js';
 import { runDryProbe } from './runtime/probe.js';
+import { OtaManager } from './ota/manager.js';
+import { buildCallHomePayload, sendCallHome } from './telemetry/callHome.js';
 import { UserInputBridge } from './runtime/userInputBridge.js';
 import { FusionSolarAdapter } from './sources/fusionSolar.js';
 import { HcuSourceCache } from './sources/hcu.js';
@@ -473,6 +475,7 @@ class HeatShieldBoot {
   private readonly ownDevices: OwnDeviceManager;
   private readonly bridge: UserInputBridge;
   private readonly dashboard: DashboardServer;
+  private readonly otaManager: OtaManager;
   private readonly connect: ConnectClient | null;
   private readonly hmipSystem: HmipSystemAdapter | null;
   private readonly trendStore: TrendStore;
@@ -572,6 +575,10 @@ class HeatShieldBoot {
   /** Deviation baseline carried between cycles (predictive-control-dashboard). */
   private forecastBaseline: DeviationBaseline = {};
   private cachedHcuHost: string = 'host.containers.internal';
+  /** HCU SGTIN (read once from /SGTIN) — basis for the pseudonymous install id. */
+  private hcuSgtin: string | null = null;
+  /** One-shot call-home timer (telemetry), cleared on stop. */
+  private telemetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   public constructor(env: BootEnv, config: Config, state: RuntimeState) {
     this.env = env;
@@ -708,6 +715,18 @@ class HeatShieldBoot {
       saveOffset: (o) => this.saveTelegramOffset(o),
       logger: this.logBuffer.asLogger,
     });
+    this.otaManager = new OtaManager({
+      dataDir: env.dataDir,
+      coreVersion: process.env['HEATSHIELD_VERSION'] ?? '0.0.0',
+      getMode: () => this.config.updates.mode,
+      getIntervalHours: () => this.config.updates.checkIntervalHours,
+      // Restart so the bootstrap loader activates the freshly installed bundle.
+      requestRestart: () => {
+        this.logBuffer.append('info', 'OTA restart requested');
+        void this.stop().finally(() => process.exit(0));
+      },
+      logger: this.logBuffer.asLogger,
+    });
     this.dashboard = new DashboardServer(this.buildDashboardDeps(), {
       port: env.port ?? config.dashboard.port,
     });
@@ -805,6 +824,7 @@ class HeatShieldBoot {
       this.connect.start();
     }
     await this.dashboard.start();
+    this.otaManager.start();
     this.scheduleNextCycle();
     // Kick an initial cycle shortly after boot so the dashboard's planner data
     // (12 h forecast, per-room heat load, planned actions, shutter preview)
@@ -815,6 +835,32 @@ class HeatShieldBoot {
     // on a cold boot; the reentrancy + stopping guards keep this safe.
     this.initialCycleTimer = setTimeout(() => this.runCycleNow(), 8_000);
     this.initialCycleTimer.unref?.();
+    // Anonymous call-home: one best-effort ping ~30 s after boot (opt-out via
+    // config.telemetry.enabled). Never blocks startup; failures are swallowed.
+    this.telemetryTimer = setTimeout(() => this.maybeCallHome(), 30_000);
+    this.telemetryTimer.unref?.();
+  }
+
+  /**
+   * Send the one-shot install analytics ping. Only when telemetry is enabled
+   * and a stable SGTIN is available. The payload carries a salted-hash install
+   * id + versions only — no token, location or device data.
+   */
+  private maybeCallHome(): void {
+    if (this.config.telemetry.enabled !== true) return;
+    const coreVersion = process.env['HEATSHIELD_VERSION'] ?? '0.0.0';
+    const payload = buildCallHomePayload({
+      sgtin: this.hcuSgtin,
+      pluginId: PLUGIN_ID,
+      coreVersion,
+      otaVersion: process.env['HEATSHIELD_OTA_VERSION'] ?? coreVersion,
+      buildId: process.env['HEATSHIELD_BUILD'] ?? null,
+      arch: process.arch,
+      lang: this.config.notifications.language ?? 'de',
+      now: new Date(),
+    });
+    if (payload === null) return; // no stable install id (remote-dev / smoke)
+    void sendCallHome(payload, { logger: this.logBuffer.asLogger }).catch(() => undefined);
   }
 
   public async stop(): Promise<void> {
@@ -828,6 +874,11 @@ class HeatShieldBoot {
       clearTimeout(this.initialCycleTimer);
       this.initialCycleTimer = null;
     }
+    if (this.telemetryTimer !== null) {
+      clearTimeout(this.telemetryTimer);
+      this.telemetryTimer = null;
+    }
+    this.otaManager.stop();
     this.bridge.stop();
     this.telegramBot.stop();
     await this.fusionSolar.stop();
@@ -921,6 +972,9 @@ class HeatShieldBoot {
       const sgtinPath = process.env['HEATSHIELD_SGTIN_PATH'] ?? '/SGTIN';
       const raw = await fs.readFile(sgtinPath, 'utf8');
       const sgtin = raw.trim();
+      if (sgtin.length > 0) {
+        this.hcuSgtin = sgtin;
+      }
       if (sgtin.length >= 4) {
         const last4 = sgtin.slice(-4).toLowerCase();
         this.cachedHcuHost = `hcu1-${last4}.local`;
@@ -3143,6 +3197,24 @@ class HeatShieldBoot {
         if (w === undefined) throw new Error(`unknown windowId: ${windowId}`);
         await this.hmipSystem?.setShutterLevel(w.shutterDeviceId, 1, level01);
       },
+      otaStatus: () => this.otaManager.getStatus(),
+      otaCheck: async () => {
+        await this.otaManager.check();
+        return this.otaManager.getStatus();
+      },
+      otaInstall: async () => {
+        const { status, result } = await this.otaManager.install();
+        return {
+          status,
+          result: result.ok
+            ? { ok: true, version: result.version }
+            : {
+                ok: false,
+                detail: result.detail,
+                ...(result.reason != null ? { reason: String(result.reason) } : {}),
+              },
+        };
+      },
       setGardenaValve: async (deviceId, on, channelIndex) => {
         // Prefer the direct cloud adapter when the target is one of its
         // valve services; otherwise fall back to an HCU-bridged SWITCH.
@@ -4838,6 +4910,10 @@ export async function main(): Promise<HeatShieldBoot> {
   const state = (await readState({ statePath })) ?? emptyRuntimeState();
   const boot = new HeatShieldBoot(env, config, state);
   await boot.start();
+  // OTA crash-loop guard: signal the bootstrap loader that this payload started
+  // successfully so it resets the boot-attempt counter. No-op when running the
+  // image bundle directly (the loader did not install the marker).
+  (globalThis as { __otaMarkHealthy?: () => void }).__otaMarkHealthy?.();
   const shutdown = (signal: NodeJS.Signals): void => {
     void boot.stop().finally(() => process.exit(0));
     void signal;

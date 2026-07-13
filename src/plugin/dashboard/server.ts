@@ -594,6 +594,28 @@ export interface DiscoverSourcesResult {
  * everything through the boot module (Task 15); tests pass `vi.fn`
  * stubs and a tiny fixture factory.
  */
+/** OTA status shape surfaced by `GET /api/ota/status` (mirrors OtaManager). */
+export interface OtaStatusView {
+  coreVersion: string;
+  otaVersion: string;
+  otaActive: boolean;
+  latest: string | null;
+  updateAvailable: boolean;
+  requiresCore: boolean;
+  mode: 'manual' | 'auto';
+  checkIntervalHours: number;
+  lastCheck: string | null;
+  lastResult: string | null;
+}
+
+/** Result of `POST /api/ota/install`. */
+export interface OtaInstallResultView {
+  ok: boolean;
+  reason?: string;
+  detail?: string;
+  version?: string;
+}
+
 export interface DashboardServerDeps {
   config: () => Config;
   updateConfig: (c: Config) => Promise<void>;
@@ -607,6 +629,14 @@ export interface DashboardServerDeps {
     overrideConfig?: Config,
   ) => Promise<{ mode: Mode; windowDecisions: WindowDecisionEntry[] }>;
   setShutterManually: (windowId: string, level01: number) => Promise<void>;
+  /**
+   * OTA update manager surface (optional; the boot module wires it). When
+   * undefined the `/api/ota/*` routes return `503` so the SPA can tell
+   * "boot not wired" from a real error.
+   */
+  otaStatus?: () => OtaStatusView;
+  otaCheck?: () => Promise<OtaStatusView>;
+  otaInstall?: () => Promise<{ status: OtaStatusView; result: OtaInstallResultView }>;
   /**
    * Optional Gardena valve control (Bewässerung). Turns a Gardena
    * valve (a plugin-external HMIP `SWITCH`) on or off via the HCU's
@@ -1079,6 +1109,13 @@ const BUILT_IN_INDEX = `<!DOCTYPE html>
  * during tests); both layouts keep `public/` as a sibling.
  */
 function resolvePublicDir(): string {
+  // When the bootstrap loader activated an OTA payload it exports the payload's
+  // own SPA assets via HEATSHIELD_PUBLIC_DIR — serve those so the frontend
+  // matches the running backend bundle. Otherwise use the image's public dir.
+  const otaPublic = process.env['HEATSHIELD_PUBLIC_DIR'];
+  if (otaPublic !== undefined && otaPublic.length > 0 && existsSync(otaPublic)) {
+    return otaPublic;
+  }
   const here = path.dirname(fileURLToPath(import.meta.url));
   return path.join(here, 'public');
 }
@@ -1313,7 +1350,42 @@ export class DashboardServer {
     this.registerMessagesRoutes();
     this.registerWeatherRoutes();
     this.registerBuildingRoutes();
+    this.registerOtaRoutes();
     registerForecastRoutes(this.app, this.deps);
+  }
+
+  /**
+   * OTA update routes. All optional — when the boot module has not wired the
+   * OTA manager (`deps.ota*` undefined) they answer `503` so the SPA can tell
+   * "boot not wired" from a real failure. No secrets are ever returned/logged.
+   */
+  private registerOtaRoutes(): void {
+    const deps = this.deps;
+    const unavailable = (reply: FastifyReply): unknown => {
+      reply.code(503);
+      return { error: { code: 'ota_unavailable', message: 'OTA manager not wired' } };
+    };
+
+    this.app.get('/api/ota/status', async (_req, reply) => {
+      if (deps.otaStatus === undefined) return unavailable(reply);
+      return deps.otaStatus();
+    });
+
+    this.app.post('/api/ota/check', async (_req, reply) => {
+      if (deps.otaCheck === undefined) return unavailable(reply);
+      return deps.otaCheck();
+    });
+
+    this.app.post('/api/ota/install', async (_req, reply) => {
+      if (deps.otaInstall === undefined) return unavailable(reply);
+      const { status, result } = await deps.otaInstall();
+      if (!result.ok) {
+        reply.code(result.reason === 'refused-core' ? 409 : 422);
+        return { error: { code: result.reason ?? 'ota_failed', message: result.detail ?? 'install failed' }, status };
+      }
+      reply.code(202);
+      return { status, result };
+    });
   }
 
   private registerHouseImageRoutes(): void {

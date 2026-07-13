@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { t } from '../../i18n.js';
 import { Icon } from '../icons.js';
+import { TelemetryCard } from '../TelemetryCard.js';
 import type { Mode } from '../../types.js';
 
 interface RoutableProps {
@@ -675,6 +676,7 @@ export function LiquidGlass2Diagnostics(_props: RoutableProps): JSX.Element {
       />
 
       <ProbeSection />
+      <section class="lg2-card lg2-diag-telemetry"><TelemetryCard /></section>
       <SettingsBackup />
     </main>
   );
