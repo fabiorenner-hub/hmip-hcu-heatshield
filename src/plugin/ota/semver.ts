@@ -41,3 +41,31 @@ export function isNewer(a: string, b: string): boolean {
 export function isAtLeast(a: string, b: string): boolean {
   return compareSemver(a, b) >= 0;
 }
+
+/**
+ * The build tail after `+` (e.g. `2.0.30+exp.20260715T1200` → `exp.20260715T1200`),
+ * or `''` when there is none. Used only by the experimental channel, where two
+ * builds can share the same `X.Y.Z` core version and differ solely in the
+ * build stamp.
+ */
+export function buildTail(v: string): string {
+  const plus = v.indexOf('+');
+  return plus >= 0 ? v.slice(plus + 1) : '';
+}
+
+/**
+ * Experimental-channel "is newer" test. First compares the core `X.Y.Z`; when
+ * those are EQUAL it compares the build tails lexicographically (empty tail =
+ * oldest). Build stamps are UTC timestamps (e.g. `exp.20260715T1200Z`), which
+ * sort correctly as plain strings — so a fresh experimental build with the same
+ * version but a later stamp is detected as newer. A build WITH a tail always
+ * beats the same core version WITHOUT one (a stable release re-taken as exp).
+ */
+export function isNewerWithBuild(a: string, b: string): boolean {
+  const core = compareSemver(a, b);
+  if (core !== 0) return core > 0;
+  const ta = buildTail(a);
+  const tb = buildTail(b);
+  if (ta === tb) return false;
+  return ta > tb;
+}

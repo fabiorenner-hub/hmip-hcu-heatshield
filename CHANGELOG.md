@@ -3,6 +3,21 @@
 Alle nennenswerten Änderungen am Heat-Shield-Plugin. Version = Single
 Source of Truth in `package.json`. Build mit `npm run build:image`.
 
+## 2.0.29
+
+- **Kein unnötiges Verschatten an kühlen Tagen (Tages-Höchsttemperatur unter Komfort).** Liegt die für den Tag prognostizierte **maximale Außentemperatur unter der Komfortgrenze**, ist die Außenluft eine Wärme*senke* — ein Raum kann von außen nicht über Komfort steigen, und Restwärme geht am schnellsten per **Lüften** weg. Der Planer verschattet eine Fassade dann nur noch, wenn Schließen den prognostizierten Innen-Peak **spürbar senkt** (echte Direktsonne aufs Fenster, `shadeBenefitMinC`); sonst bleibt sie offen für Tageslicht. Heiße Tage sind unverändert; der Sonnenschutz an **klar-kühlen** Tagen mit echter Solarlast bleibt erhalten.
+- **Verschattung berücksichtigt jetzt die Bewölkung (Fix für unnötiges Schließen an Regentagen).** Der Planer berechnete die Sonne auf der Fassade bisher **rein geometrisch** (nur Sonnenstand/Ausrichtung), **ohne Bewölkung**. An bedeckten/regnerischen Tagen mit praktisch keiner Direktsonne (OpenMeteo-Direktstrahlung ~0 W/m², während die Diffusstrahlung hoch bleibt) wurde dadurch trotzdem vorausschauend verschattet — v. a. NW/W. Ein Rollladen blockiert aber nur den **Direktstrahl**; gegen Diffuslicht bringt Verschatten keine Kühlung, kostet nur Tageslicht. Die Fassaden-Exposition (`exposureAt` im Planer) wird jetzt mit der **Direktstrahl-Verfügbarkeit** aus der echten Bewölkung gedämpft (`directBeamAvailability01`): klarer Himmel unverändert (Faktor 1), Vollbewölkung → ~0. Property-/Regressionstest ergänzt.
+- **Anzeige „Bewölkung/Regen" ehrlicher.** Der Prognoseverlauf zeigte die (oft niedrige) Regen*wahrscheinlichkeit* — an einem 100 %-bedeckten Regentag wirkten „~5 %" wie klarer Himmel. Es wird jetzt der höhere Wert aus tatsächlicher Bewölkung und Regenwahrscheinlichkeit angezeigt.
+- **Großer UI/UX-Feinschliff (v2-Oberfläche).**
+  - **Nichts wird mehr abgeschnitten.** Globale Sicherung: Karten haben durchgängig Innenabstand, und keine Seite quetscht ihre Inhalte mehr unter die Lesbarkeit — reicht der Platz nicht, wird gescrollt statt abgeschnitten (betraf u. a. Automatik, Diagnose, Räume, Updates, Regeln).
+  - **„Räume und Fenster" komplett neu (Premium).** Kompakte, auswählbare Raumliste links + aufgeräumtes Detailpanel rechts mit erklärten Sektionen (Zieltemperaturen mit Kurzbeschreibung je Schwelle, Sensor, Ruhezeiten, Rollläden), Schnell-Anlegen und ausklappbarer Geräte-Zuordnung — deutlich platzsparender und intuitiver.
+  - **Diagnose neu gestaltet** (Tabellen, Toolbar, Connect-Log, Backup) mit sauberem Layout und Abständen.
+  - **Basis-Ansicht entschlackt:** Live-Vorschau, Simulation und OTA-Kachel erscheinen nur noch im Experten-Modus.
+  - **Wetter-Kachel zeigt die Umgebungstemperatur** (Wetterdienst) statt des sonnenbeschienenen Fassadensensors — passend zur angezeigten Luftfeuchte.
+  - **Garten:** Bewässerungsplan ein-/ausklappbar (Zustand wird gemerkt, Standard: zu).
+  - Räume-Kacheln mit fester Mindesthöhe (nichts abgeschnitten), Updates-Karten mit einheitlicher Glas-Optik, größeres/klareres Einstellungen-Icon.
+- **Experimenteller Update-Kanal (Opt-in).** Im Tab Updates lässt sich zwischen **Stabil** und **Experimentell** wählen; der experimentelle Kanal erhält rollende Test-Builds (GitHub-Vorabversionen) mit gleicher Versionsnummer + Build-Kennung. Andere Nutzer im Kanal „Stabil" erhalten sie nicht.
+
 ## 2.0.28
 
 - **Rückrollung der Räume-Änderungen aus 2.0.27.** Die in 2.0.27 am Räume-Tab vorgenommenen Änderungen (Risiko-Label am Stufen-Badge, Ausblenden der „Nächste Aktion" bei ausgeschalteter Automatik) werden zurückgenommen, weil sie den Räume-Tab gestört haben. Der Räume-Tab entspricht wieder dem bewährten Stand vor 2.0.27. Die übrigen 2.0.27-Verbesserungen bleiben erhalten: Glas-Optik der mobilen Touch-Leiste, Fix der Badge-Überlappung in „Nächste Aktionen" (Übersicht), scrollende Vorhersage-Basisansicht sowie der „Automatik aus"-Hinweis in der Übersicht.

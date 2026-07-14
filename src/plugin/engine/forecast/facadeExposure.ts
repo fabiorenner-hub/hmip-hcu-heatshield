@@ -13,6 +13,20 @@ function clamp01(v: number): number {
 }
 
 /**
+ * Direct-beam availability in [0, 1] from cloud cover: how much DIRECT sun can
+ * reach a facade. A shutter only blocks the direct beam — under a fully
+ * overcast sky the beam is essentially gone (OpenMeteo direct radiation ~0
+ * while diffuse stays high), so shading gives no cooling benefit and only
+ * costs daylight. Clear sky (cloud≈0) → 1; full overcast (cloud≈1) → 0.
+ * The `^0.7` curve keeps meaningful beam on partly-cloudy days (broken sun)
+ * while driving overcast/rainy skies to ~0. Pure, monotone non-increasing.
+ */
+export function directBeamAvailability01(cloudCover01: number | null | undefined): number {
+  const cloud = cloudCover01 === null || cloudCover01 === undefined ? 0 : clamp01(cloudCover01);
+  return Math.pow(clamp01(1 - cloud), 0.7);
+}
+
+/**
  * Solar exposure of a facade in [0, 1]. 0 when the sun is below the
  * horizon. Driven by how squarely the sun hits the facade
  * (circularAngleDiff) and its elevation, damped by cloud cover and

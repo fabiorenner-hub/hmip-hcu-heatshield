@@ -720,6 +720,7 @@ class HeatShieldBoot {
       coreVersion: process.env['HEATSHIELD_VERSION'] ?? '0.0.0',
       getMode: () => this.config.updates.mode,
       getIntervalHours: () => this.config.updates.checkIntervalHours,
+      getChannel: () => this.config.updates.channel,
       // Restart so the bootstrap loader activates the freshly installed bundle.
       requestRestart: () => {
         this.logBuffer.append('info', 'OTA restart requested');
@@ -3061,6 +3062,9 @@ class HeatShieldBoot {
     const radiationWm2 =
       num(gs.radiation) ??
       (omRad !== null && Number.isFinite(omRad.value) ? omRad.value : null);
+    // Global outdoor light sensor (lux) — a house-wide live brightness probe,
+    // resolved like PV. Absent binding → null (no lux nowcast).
+    const illuminanceLux = num(gs.illumination);
 
     // A1/A2: hourly weather curve for the Forecast_Planner so the thermal
     // model follows the diurnal sun/temperature instead of freezing the
@@ -3079,9 +3083,39 @@ class HeatShieldBoot {
 
     const rooms = new Map<string, RoomEntry>();
     for (const room of this.config.rooms) {
+      // Optional (default off): use the room thermostat's live SETPOINT as the
+      // comfort target. Read `setPointTemperature` from the SAME device the
+      // room's indoor-temperature sensor is bound to (a wall thermostat usually
+      // reports both actualTemperature and setPointTemperature). Shift the whole
+      // comfort band so `target_c` becomes the setpoint (warning/strong/critical
+      // ride along, preserving relative margins). Degrades gracefully: no
+      // readable setpoint → configured targets unchanged.
+      let targets = room.targets;
+      const indoorPrimary = room.signals.indoorTemp?.primary;
+      if (
+        room.useThermostatTarget === true &&
+        indoorPrimary !== undefined &&
+        indoorPrimary.kind === 'hmip'
+      ) {
+        const setpoint = num({
+          primary: { kind: 'hmip', deviceId: indoorPrimary.deviceId, feature: 'setPointTemperature' },
+          staleAfterSec: room.signals.indoorTemp?.staleAfterSec ?? 600,
+        });
+        if (setpoint !== null && Number.isFinite(setpoint)) {
+          const shift = setpoint - room.targets.target_c;
+          if (shift !== 0) {
+            targets = {
+              target_c: room.targets.target_c + shift,
+              warning_c: room.targets.warning_c + shift,
+              strong_shade_c: room.targets.strong_shade_c + shift,
+              critical_c: room.targets.critical_c + shift,
+            };
+          }
+        }
+      }
       rooms.set(room.id, {
         tempC: num(room.signals.indoorTemp),
-        targets: room.targets,
+        targets,
         priority: room.priority,
       });
     }
@@ -3114,6 +3148,7 @@ class HeatShieldBoot {
       pvDroppedRecently: false,
       windSpeedMs,
       radiationWm2,
+      illuminanceLux,
       rooms,
       windows,
       forecastSeries,
@@ -3431,6 +3466,7 @@ class HeatShieldBoot {
     temperatureSources: ReturnType<HcuSourceCache['findDevicesWithFeature']>;
     shutterSources: ReturnType<HcuSourceCache['findDevicesWithFeature']>;
     contactSources: ReturnType<HcuSourceCache['findDevicesWithFeature']>;
+    illuminationSources: ReturnType<HcuSourceCache['findDevicesWithFeature']>;
     inventory: ReturnType<HcuSourceCache['listInventory']>;
     rawDeviceCount: number;
     rawDeviceTypeHistogram: ReadonlyArray<{ deviceType: string; count: number }>;
@@ -3484,6 +3520,9 @@ class HeatShieldBoot {
     // HmIP-HDM1 shading modules that report `primaryShadingLevel`.
     const shutterSources = this.cache.findShutterLikeDevices();
     const contactSources = this.cache.findDevicesWithFeature('windowState');
+    // Devices carrying an `illumination` feature = candidate GLOBAL light
+    // sensors (bound via `globalSignals.illumination`, chosen like the PV).
+    const illuminationSources = this.cache.findDevicesWithFeature('illumination');
     const inventory = this.cache.listInventory();
     // Raw histogram off the last getSystemState body, BEFORE the
     // cache's schema filtering. If rawDeviceCount > devices.length,
@@ -3502,6 +3541,7 @@ class HeatShieldBoot {
       temperatureSources,
       shutterSources,
       contactSources,
+      illuminationSources,
       inventory,
       rawDeviceCount,
       rawDeviceTypeHistogram,
@@ -4374,8 +4414,12 @@ class HeatShieldBoot {
         weatherIcon: weatherIconFor(p?.weatherCode ?? null, isDay, cloud01),
         tempC,
         radiationWm2,
-        // Prefer real precipitation probability; fall back to cloud cover.
-        precipitationOrCloud01: p?.precipProb01 ?? cloud01 ?? 0,
+        // Show the more "closed sky" of cloud cover vs precipitation
+        // probability, so an overcast/rainy day reads as high — not a
+        // misleading low precip-probability (OpenMeteo can report 100% cloud +
+        // rain while precip-probability stays a few %). Cloud cover is the
+        // honest sky-state signal for "how sunny/shaded is it".
+        precipitationOrCloud01: Math.max(cloud01 ?? 0, p?.precipProb01 ?? 0),
         pvForecastKw,
       });
     }

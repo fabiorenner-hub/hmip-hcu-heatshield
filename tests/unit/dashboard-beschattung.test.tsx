@@ -119,29 +119,28 @@ afterEach(() => {
   setRiskBreakdowns([]);
 });
 
-describe('App module nav + overview decision surface (uebersicht-rework)', () => {
-  it('renders the primary nav with Übersicht active and a badge', () => {
+describe('App v2 sidebar nav + overview decision surface (uebersicht-rework)', () => {
+  it('renders the v2 sidebar with Übersicht active and surfaces the next actions', () => {
     snapshot.value = v2Snapshot();
     const { container } = render(<App initialUrl="/uebersicht" />);
     const modules = container.querySelectorAll('[data-testid^="nav-module-"]');
     expect(modules.length).toBe(6);
     const uebersicht = container.querySelector('[data-testid="nav-module-uebersicht"]');
-    expect(uebersicht?.className).toContain('app__module--active');
-    expect(container.querySelector('[data-testid="nav-badge"]')).not.toBeNull();
+    expect(uebersicht?.className).toContain('lg2-nav__item--active');
+    // The pending-action affordance moved from the v1 nav badge onto the v2
+    // overview's "Nächste Aktionen" card.
+    expect(container.querySelector('[data-testid="lg2-actions-card"]')).not.toBeNull();
   });
 
-  it('renders the new overview blocks instead of the legacy 3-column grid', () => {
+  it('renders the native v2 overview blocks instead of the legacy 3-column grid', () => {
     snapshot.value = v2Snapshot();
     const { container } = render(<App initialUrl="/uebersicht" />);
-    expect(container.querySelector('[data-testid="uebersicht-view"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="status-banner"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="lagekarte"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="next-action-strip"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="house-twin-compact"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="kpi-row"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="outlook-strip"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="room-status-grid"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="overview-deeplinks"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="liquid-glass2-overview"]')).not.toBeNull();
+    // The v2 overview surfaces the same decision info via its own blocks:
+    expect(container.querySelector('[data-testid="lg2-hero"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="lg2-actions-card"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="lg2-house-card"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="lg2-kpis"]')).not.toBeNull();
     // The legacy three-column grid is gone from the overview.
     expect(container.querySelector('[data-testid="dashboard-grid"]')).toBeNull();
   });

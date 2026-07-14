@@ -335,12 +335,28 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
   z-index: 1;
   min-width: 0;
   height: 100vh;
-  overflow: hidden;
+  /* GLOBAL anti-clip safety net (do NOT revert to `overflow: hidden`):
+     `.lg2-main` is a 100vh flex column. Previously it clipped overflow and
+     relied on children flex-shrinking to fit one screen — which squeezed cards
+     below their content and let `.lg2-card { overflow:hidden }` + the corner
+     radius cut off text on any page that had more content than the viewport.
+     Instead we ALWAYS allow vertical scrolling and never shrink direct children
+     below their natural height (rule below). One-screen dashboards still fit
+     without a scrollbar when they do fit; when they don't, they scroll rather
+     than clip. This makes every current AND future page safe by default. */
+  overflow-y: auto;
+  overflow-x: clip;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   display: flex;
   flex-direction: column;
   gap: var(--lg2-gap);
   padding: clamp(10px, 1vw, 18px) clamp(10px, 0.8vw, 16px);
 }
+/* The global no-squish guarantee (`.lg2-main > * { flex-shrink: 0 }`) lives at
+   the END of this file so it wins — by source order at equal specificity — over
+   the per-component `flex:1 1 auto` fill declarations (hero, two, …). See the
+   "GLOBAL no-squish safety net" block there. */
 
 .lg2-header {
   flex: 0 0 auto;
@@ -382,6 +398,14 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
   -webkit-backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
   backdrop-filter: blur(var(--lg2-blur)) saturate(var(--lg2-sat));
   overflow: hidden;
+  /* GLOBAL inner safety inset: every card keeps a comfortable gap between its
+     rounded frame and its content, so text/controls can never be clipped by the
+     corner radius or sit flush against the edge. Cards that need to be
+     edge-to-edge (hero photo, forecast grid) override this with their own
+     `padding: 0`; cards with a bespoke padding simply override the value. This
+     is the single global rule that prevents the recurring "links/oben/unten
+     abgeschnitten" reports on any current or future page. */
+  padding: 16px 18px;
 }
 /* Specular rim highlight (decorative). */
 .lg2-card::before {
@@ -1165,7 +1189,14 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
    than fit the card height, the card scrolls internally — ONE contained
    scrollbar, never the whole page. The tiles keep a constant, legible size
    (no measuring / auto-shrinking, which caused clipped names and truncation). */
-.lg2-rooms {
+/* `:not(.lg2-main)` is CRITICAL: this grid is the RoomGrid PRIMITIVE
+   (`<div class="lg2-rooms">`). The Rooms-config PAGE root is
+   `<main class="lg2-main lg2-rooms">` and shares the bare `lg2-rooms` class —
+   without the guard this `display:grid; minmax(150px,…)` clobbered the page's
+   flex-column layout and squeezed the whole "Räume und Fenster" tab into narrow
+   columns (the "komplett kaputt" report). The guard keeps the primitive grid
+   while the config page falls back to the standard `.lg2-main` column layout. */
+.lg2-rooms:not(.lg2-main) {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
@@ -1178,12 +1209,12 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
   scrollbar-width: thin;
   scrollbar-color: rgba(var(--lg2-scrim-rgb, 8, 11, 17), 0.35) transparent;
 }
-.lg2-rooms::-webkit-scrollbar { width: 8px; }
-.lg2-rooms::-webkit-scrollbar-thumb {
+.lg2-rooms:not(.lg2-main)::-webkit-scrollbar { width: 8px; }
+.lg2-rooms:not(.lg2-main)::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, var(--lg2-accent), var(--lg2-orange-2, var(--lg2-accent)));
   border-radius: 999px;
 }
-.lg2-rooms::-webkit-scrollbar-track { background: transparent; }
+.lg2-rooms:not(.lg2-main)::-webkit-scrollbar-track { background: transparent; }
 
 .lg2-roomcard {
   min-width: 0;
@@ -1334,8 +1365,14 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
 }
 @media (hover: hover) { .lg2-btn:hover { border-color: var(--lg2-accent); transform: translateY(-1px); } }
 
-/* Master-detail split: room list (left) + detail (right). */
-.lg2-raeume__split { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: clamp(280px, 26vw, 380px) 1fr; gap: var(--lg2-gap); }
+/* Master-detail split: room list (left) + detail (right).
+   `grid-template-rows: minmax(0, 1fr)` pins the single row to the available
+   height (the split is a `flex:1 1 auto` child of the 100vh `.lg2-main`).
+   Without it the implicit row is `auto` and grows with the room list / detail
+   content, overflowing the `overflow:hidden` main → the list bottom is clipped
+   and its internal scroll never engages. The `minmax(0,…)` lets the children's
+   `overflow-y:auto` take over so nothing is cut off at any width. */
+.lg2-raeume__split { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: clamp(280px, 26vw, 380px) 1fr; grid-template-rows: minmax(0, 1fr); gap: var(--lg2-gap); }
 .lg2-raeume__empty { display: grid; place-items: center; color: var(--lg2-label-2); }
 
 /* Left list card. */
@@ -1346,7 +1383,13 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
 
 .lg2-roomrow {
   appearance: none; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%;
-  display: flex; align-items: center; gap: 12px; padding: 12px 13px;
+  /* Minimum tile height so the name + temperature + "Nächste Aktion" line always
+     stay visible — tight, but nothing is cut off. `flex-shrink:0` stops the
+     scroll container from squeezing rows below this height (which clipped the
+     third line); the list scrolls instead. */
+  flex: 0 0 auto;
+  min-height: 60px;
+  display: flex; align-items: center; gap: 12px; padding: 4px 13px 7px;
   border-radius: var(--lg2-r); background: var(--lg2-scrim), var(--lg2-inset); border: 1px solid var(--lg2-hairline);
   transition: border-color var(--lg2-fast) var(--lg2-ease), background var(--lg2-fast) var(--lg2-ease), transform var(--lg2-fast) var(--lg2-ease);
 }
@@ -1427,13 +1470,53 @@ body.lg2-demo-open { background: var(--lg2-frame-base, #05070d) !important; }
 }
 @media (max-width: 1000px) {
   .lg2-raeume { height: auto; overflow: visible; }
-  .lg2-raeume__split { grid-template-columns: 1fr; }
+  /* Stacked single-column: rows flow naturally (page scrolls), so drop the
+     height-pinned row track used by the two-column desktop layout. */
+  .lg2-raeume__split { grid-template-columns: 1fr; grid-template-rows: none; }
   .lg2-raeume__detail { overflow: visible; }
   .lg2-roomkpis { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .lg2-roomstrip { grid-template-columns: 1fr 1fr; }
 }
+
+/* ------------------------------------------------------------------ *
+ * D8 — Räume BASIS view: dynamic, no-clip, fit-to-viewport.
+ *
+ * In the basis (non-expert) view the whole page must fit the 100vh shell
+ * WITHOUT the page scrolling, and no room tile may be cut off. We size the
+ * room-list rows and the detail with clamp() so typical room counts fit, and
+ * the list only falls back to an internal scroll for very many rooms (never a
+ * horizontal clip). Expert view keeps its richer, page-scrolling layout.
+ * ------------------------------------------------------------------ */
+.lg2-demo:not(.lg2-expert-on) .lg2-raeume__split { min-height: 0; }
+
+/* Left list — rows keep a CONSTANT, fully legible size (no vh auto-shrinking).
+   When more rooms than fit are present the list scrolls internally (its own
+   `overflow-y:auto`) instead of squeezing rows until the temperature / "Nächste
+   Aktion" line is clipped. This is the user-specified minimum size — we never go
+   smaller; a scrollbar is offered in Basis too. */
+.lg2-demo:not(.lg2-expert-on) .lg2-roomlist { padding: 10px; min-width: 0; }
+.lg2-demo:not(.lg2-expert-on) .lg2-roomlist__scroll { gap: 8px; overflow-x: clip; }
+.lg2-demo:not(.lg2-expert-on) .lg2-roomrow {
+  padding: 4px 13px 7px;
+  gap: 12px;
+  min-width: 0;
+}
+.lg2-demo:not(.lg2-expert-on) .lg2-roomrow__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+.lg2-demo:not(.lg2-expert-on) .lg2-roomrow__temp { font-size: 1.15rem; }
+.lg2-demo:not(.lg2-expert-on) .lg2-roomrow__name { font-size: 0.95rem; }
+
+/* Right detail — tighter gaps so the column fits without a page scroll on
+   normal screens (the detail card keeps its own internal scroll as a graceful
+   fallback for very long content). */
+.lg2-demo:not(.lg2-expert-on) .lg2-raeume__detail { gap: clamp(8px, 1vh, var(--lg2-gap)); }
+.lg2-demo:not(.lg2-expert-on) .lg2-roomkpi { padding: clamp(10px, 1.2vh, 15px) clamp(12px, 1vw, 17px); }
+.lg2-demo:not(.lg2-expert-on) .lg2-stripcell { padding: clamp(9px, 1.1vh, 13px); }
 
 /* ================================================================== *
  * 18. Header automation lever + expert-view strip
@@ -3129,7 +3212,16 @@ body.ui-v2 .twin-chips .room-badge--selected {
 .lg2-garden__autotext span { font-size: 12.5px; color: var(--lg2-label-2); }
 
 .lg2-garden__planeditor { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; }
+.lg2-garden__planeditor--collapsed { gap: 0; }
 .lg2-garden__plan-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+/* Collapsible watering-plan header toggle. */
+.lg2-garden__plan-toggle { appearance: none; cursor: pointer; border: 0; background: transparent; color: inherit; font: inherit; display: flex; align-items: center; gap: 9px; padding: 2px 0; flex: 1 1 auto; min-width: 0; text-align: left; }
+.lg2-garden__plan-toggle .lg2-card__title { margin: 0; }
+.lg2-garden__plan-toggle:focus-visible { outline: none; box-shadow: var(--lg2-focus); border-radius: var(--lg2-r-sm); }
+@media (hover: hover) { .lg2-garden__plan-toggle:hover .lg2-card__title { color: var(--lg2-accent); } }
+.lg2-garden__plan-chevron { flex: 0 0 auto; color: var(--lg2-label-3); transition: transform var(--lg2-fast) var(--lg2-ease); }
+.lg2-garden__plan-chevron--open { transform: rotate(90deg); }
+.lg2-garden__plan-count { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.16); border-radius: 999px; padding: 1px 8px; font-variant-numeric: tabular-nums; }
 .lg2-garden__planempty { margin: 2px 0; color: var(--lg2-label-2); font-size: 13px; }
 .lg2-garden__planlist { display: flex; flex-direction: column; gap: 6px; }
 .lg2-garden__planrow {
@@ -3825,6 +3917,13 @@ body.lg2-anim-paused .lg2-demo *::after {
 /* Regeln & Grenzwerte (lg2-native, Runde 12)                                 */
 /* -------------------------------------------------------------------------- */
 .lg2-rules { display: flex; flex-direction: column; gap: 16px; }
+/* Rules & thresholds is a long config page (strategy + thresholds + simulation)
+   — it MUST scroll in Basis AND Expert. The base `.lg2-main` is a 100vh flex
+   column with `overflow:hidden`, so without this the cards get squeezed past
+   their min-content and text is clipped. Pin children to natural height and let
+   the page scroll instead of shrinking anything below legibility. */
+.lg2-main.lg2-rules { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+.lg2-main.lg2-rules > * { flex: 0 0 auto; }
 .lg2-rules__autosave { font-size: 12px; color: var(--lg2-label-2); align-self: center; }
 /* Inner spacer so no element touches the (rounded, clipped) card edge. */
 .lg2-rules__card { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
@@ -3836,6 +3935,17 @@ body.lg2-anim-paused .lg2-demo *::after {
 .lg2-rules__empty { color: var(--lg2-label-2); }
 .lg2-rules__error { color: var(--lg2-red, #ff5d57); border: 1px solid rgba(255,93,87,0.4); }
 .lg2-rules__hint { margin: 0; font-size: 12px; color: var(--lg2-label-3); }
+.lg2-rules__field { display: flex; flex-direction: column; gap: 6px; }
+.lg2-rules__field-label { font-size: 12px; font-weight: 650; color: var(--lg2-label-2); }
+.lg2-rules__field select {
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: var(--lg2-r-sm);
+  background: var(--lg2-surface-2, #14283a);
+  color: var(--lg2-label-1, #f4f7fb);
+  border: 1px solid var(--lg2-hairline);
+  font-size: 14px;
+}
 .lg2-rules__profiles { align-self: flex-start; }
 .lg2-rules__preview-err { margin: 0; font-size: 12px; color: var(--lg2-red, #ff5d57); }
 .lg2-rules__preview-mode { margin: 0; font-size: 0.9rem; }
@@ -4133,3 +4243,427 @@ body.lg2-anim-paused .lg2-demo *::after {
 @media (hover: hover) {
   .lg2-rules__stage-add:hover { background: rgba(var(--lg2-accent-rgb, 255, 157, 46), 0.12); border-color: var(--lg2-accent, #ff9d2e); }
 }
+
+/* ================================================================== *
+ * Native v2 settings pages (Sources / Irrigation / Building) — the
+ * lg2 form + table primitives the ported pages use. Long config pages
+ * scroll WITHIN the shell (like .lg2-settings), the one-screen rule
+ * only applies to the dashboard views.
+ * ================================================================== */
+.lg2-main.lg2-sources,
+.lg2-main.lg2-irrigation,
+.lg2-main.lg2-building { overflow-y: auto; }
+
+/* ================================================================== *
+ * Automatik page — safety-net scroll (Basis AND Expert).
+ * The base `.lg2-main` is `height:100vh; overflow:hidden`, so on short
+ * viewports the flex children get squeezed past their min-content and
+ * the tail (storm control / strategy list) is clipped. In Basis the
+ * flex column still tries to fit everything on one screen (we do NOT
+ * pin children to natural height there), but once even the minimally
+ * shrunk content exceeds the viewport the page scrolls instead of
+ * mis-rendering. Expert already keeps children at natural height via
+ * the `.lg2-expert-on .lg2-main > *` rule above. */
+.lg2-main.lg2-auto { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+
+.lg2-sources__body { display: flex; flex-direction: column; gap: var(--lg2-gap); }
+.lg2-sources__actions { display: flex; align-items: center; gap: var(--lg2-s3); }
+.lg2-sources__autosave,
+.lg2-irrigation__autosave { font-size: 12px; color: var(--lg2-label-3); white-space: nowrap; }
+.lg2-sources__card,
+.lg2-irrigation__card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.lg2-sources__group { border-top: 1px solid var(--lg2-hairline); padding-top: 8px; }
+.lg2-sources__group:first-of-type { border-top: 0; padding-top: 0; }
+.lg2-sources__summary { cursor: pointer; font-weight: 640; font-size: 0.98rem; padding: 4px 0; }
+.lg2-sources__list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.lg2-sources__list li { padding: 6px 10px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset-2); border: 1px solid var(--lg2-hairline); }
+.lg2-sources__error,
+.lg2-irrigation__error { color: var(--lg2-red); font-size: 13px; margin: 0; }
+.lg2-sources__save-ok { color: var(--lg2-green); font-size: 13px; margin: 0; }
+.lg2-sources__tablewrap { overflow-x: auto; }
+.lg2-sources__table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lg2-sources__table th,
+.lg2-sources__table td { padding: 6px 8px; border-bottom: 1px solid var(--lg2-hairline); text-align: left; vertical-align: middle; }
+.lg2-sources__table th[scope='row'] { font-weight: 600; }
+.lg2-sources__staleness { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--lg2-label-2); }
+.lg2-sources__probe { color: var(--lg2-label-2); font-variant-numeric: tabular-nums; }
+
+/* Shared lg2 form primitives (used by Sources + Irrigation). */
+.lg2-field,
+.lg2-form__field,
+.lg2-form__num { display: flex; flex-direction: column; gap: 6px; }
+.lg2-field__label,
+.lg2-form__label { font-size: 12px; font-weight: 650; color: var(--lg2-label-2); }
+.lg2-field__input,
+.lg2-form__control {
+  min-height: 38px; padding: 6px 10px; border-radius: var(--lg2-r-sm);
+  background: var(--lg2-inset); color: var(--lg2-label-1);
+  border: 1px solid var(--lg2-hairline); font: inherit; font-size: 14px;
+}
+.lg2-form__row { display: flex; align-items: center; justify-content: space-between; gap: var(--lg2-s3); padding: 6px 0; }
+.lg2-settings__row { display: flex; align-items: center; justify-content: space-between; gap: var(--lg2-s3); padding: 6px 0; }
+.lg2-form__row-text { display: flex; flex-direction: column; }
+.lg2-form__row-label { font-weight: 600; }
+.lg2-form__row-hint { font-size: 12px; color: var(--lg2-label-3); }
+.lg2-form__num-box { display: inline-flex; align-items: center; gap: 6px; }
+.lg2-form__num-box input { width: 110px; min-height: 36px; padding: 6px 10px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset); color: var(--lg2-label-1); border: 1px solid var(--lg2-hairline); font: inherit; }
+.lg2-form__test { display: flex; align-items: center; gap: var(--lg2-s3); flex-wrap: wrap; }
+.lg2-form__status { font-size: 13px; color: var(--lg2-label-2); }
+
+/* Irrigation zones. */
+.lg2-irrigation__zones { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--lg2-gap); }
+.lg2-irrigation__zone { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.lg2-irrigation__zone-head { display: flex; align-items: center; gap: 8px; }
+.lg2-irrigation__zone-name { flex: 1 1 auto; }
+.lg2-irrigation__zone-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.lg2-irrigation__valves { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lg2-irrigation__valve { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lg2-irrigation__valve-zone { font-size: 12px; color: var(--lg2-label-3); }
+.lg2-irrigation__services-list { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--lg2-label-2); display: flex; flex-direction: column; gap: 3px; }
+.lg2-irrigation__add { align-self: flex-start; }
+.lg2-btn--ghost { background: transparent; }
+
+/* Building Studio v2 wrapper: give the reused editor room to breathe. */
+.lg2-building__inner { flex: 1 1 auto; min-height: 0; }
+
+/* ================================================================== *
+ * Updates page (route /updates, LiquidGlass2Updates). Long content
+ * (version + banner + OTA panel + changelog) must scroll within the
+ * shell — otherwise the base `.lg2-main` (overflow:hidden) clips the
+ * top card. Plus the version card's own layout tokens.
+ * ================================================================== */
+.lg2-main.lg2-upd { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+/* Pin children to natural height so the version/banner/OTA cards are not
+   squeezed to slivers in Basis (base `.lg2-main` is a 100vh flex column that
+   otherwise shrinks them) — the page scrolls instead. */
+.lg2-main.lg2-upd > * { flex: 0 0 auto; }
+
+.lg2-headbadge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--lg2-r-pill); font-size: 12px; font-weight: 640; border: 1px solid var(--lg2-hairline); background: var(--lg2-inset-2); }
+.lg2-headbadge--ok { color: var(--lg2-green); border-color: rgba(var(--lg2-green-rgb), 0.4); background: rgba(var(--lg2-green-rgb), 0.12); }
+
+.lg2-upd-version { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.lg2-upd-version__main { display: flex; flex-direction: column; gap: 2px; }
+.lg2-upd-version__label { font-size: 12px; font-weight: 600; color: var(--lg2-label-3); }
+.lg2-upd-version__value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.lg2-upd-version__build { font-size: 12px; color: var(--lg2-label-2); }
+.lg2-upd-version__build code { background: var(--lg2-inset-2); padding: 1px 6px; border-radius: var(--lg2-r-sm); }
+.lg2-upd-version__hint { margin: 0; font-size: 12px; color: var(--lg2-label-3); }
+
+.lg2-upd-banner { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.lg2-upd-banner--new { box-shadow: inset 0 0 0 1px rgba(var(--lg2-accent-rgb), 0.35), var(--lg2-shadow); }
+.lg2-upd-banner__title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.02rem; font-weight: 650; }
+.lg2-upd-banner__hint { margin: 0; font-size: 13px; color: var(--lg2-label-2); }
+.lg2-upd-btn { align-self: flex-start; display: inline-flex; align-items: center; padding: 8px 14px; border-radius: var(--lg2-r-sm); background: var(--lg2-accent); color: var(--lg2-on-accent); font-weight: 640; text-decoration: none; }
+
+.lg2-upd-ota { padding: 16px; }
+.lg2-diag-telemetry { padding: 16px; }
+
+/* ================================================================== *
+ * Embedded shared v1 panels (OTA + Telemetry) in NATIVE lg2 pages.
+ * `OtaPanel` and `TelemetryCard` render a v1 `.module-panel__card.ota-card`
+ * (flat `--color-card` surface, own border/shadow). Inside a native lg2 page
+ * they are wrapped in a real `.lg2-card` glass surface → a flat card nested
+ * inside a glass card (the "still looks like v1" report). Strip the inner v1
+ * card chrome so the content sits flush on the lg2 glass surface; the `ota-*`
+ * internals already follow the active theme via the `.lg2-demo` --color-* remap.
+ * (Fallback pages keep their glass treatment — there `.module-panel__card` is
+ * NOT a direct child of an `.lg2-card`, so this rule does not match them.)
+ * ================================================================== */
+.lg2-card > .ota-card {
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.lg2-upd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+/* Changelog entries reuse the real `.lg2-card` glass (sheen+scrim+panel+blur)
+   so they match the OTA/version cards above — previously they used a reduced
+   recipe (no scrim, no backdrop blur) and read as a different, flatter glass. */
+.lg2-upd-entry { padding: 14px 16px; }
+.lg2-upd-entry__ver { margin: 0 0 6px; font-size: 1.02rem; font-weight: 680; }
+.lg2-upd-entry__items { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--lg2-label-2); }
+
+/* ================================================================== *
+ * GLOBAL no-squish safety net (MUST stay at the end of this file).
+ * ------------------------------------------------------------------
+ * `.lg2-main` scrolls vertically (see its base rule). This pins EVERY direct
+ * child to its natural height so the 100vh flex column can never squeeze a card
+ * below its content — the root cause of the recurring "text clipped / cut off
+ * by the card rounding / whole tab looks broken" reports (Übersicht hero,
+ * Automatik "Letzte Aktionen", Räume & Fenster, Diagnose, …).
+ *
+ * Placed last so that, at equal specificity (0,1,0), it wins by source order
+ * over the per-component `flex: 1 1 auto` / `flex: 0 1 auto` fill declarations
+ * (`.lg2-hero`, `.lg2-two`, `.lg2-rooms`, …). Those keep their flex-GROW, so on
+ * a tall enough viewport they still expand to fill one screen (no scrollbar);
+ * when content exceeds the viewport the page scrolls instead of clipping.
+ *
+ * Any NEW page under `.lg2-main` is safe by default — no per-page scroll rule
+ * needed ever again. Only add an exception below if a direct child must shrink
+ * to enable an INTERNAL scroll region (rare; see Räume master-detail). */
+.lg2-main > * { flex-shrink: 0; }
+
+/* Exception: the Räume overview master-detail split intentionally shrinks so
+   its two columns (list + detail) scroll INDEPENDENTLY inside one screen via
+   their own `overflow-y:auto`. Higher specificity (0,2,0) so it beats the rule
+   above in Basis; the expert-mode media block still pins it to `flex:0 0 auto`
+   where the whole page scrolls. */
+.lg2-main > .lg2-raeume__split { flex-shrink: 1; }
+
+/* ================================================================== *
+ * Diagnose (route /diagnostics, LiquidGlass2Diagnostics).
+ * ------------------------------------------------------------------
+ * These `lg2-diag__*` layout classes were never styled — the cards fell back
+ * to browser defaults (no padding, tables overflowing, controls flush to the
+ * left/top edge = the "links und oben abgeschnitten" report). Full token-based
+ * layout below; the page itself scrolls via the global `.lg2-main` rule.
+ * ================================================================== */
+.lg2-diag__card { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.lg2-diag__cardhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.lg2-diag__card .lg2-card__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.02rem; font-weight: 650; }
+.lg2-diag__count { flex: 0 0 auto; font-size: 12px; font-weight: 640; color: var(--lg2-label-2); background: var(--lg2-inset-2); border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-pill); padding: 2px 10px; font-variant-numeric: tabular-nums; }
+
+/* Toolbar: wrapping row of labelled controls + trailing action buttons. */
+.lg2-diag__toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; }
+.lg2-diag__ctl { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.lg2-diag__ctl > span { font-size: 11px; font-weight: 600; color: var(--lg2-label-3); }
+.lg2-diag__ctl--range { min-width: 190px; flex: 1 1 220px; }
+.lg2-diag__range { width: 100%; accent-color: var(--lg2-accent); height: 22px; margin: 0; cursor: pointer; }
+.lg2-diag__select,
+.lg2-diag__input {
+  box-sizing: border-box; min-height: 34px; padding: 6px 10px; font: inherit; font-size: 0.86rem;
+  color: var(--lg2-label-1); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline);
+  border-radius: var(--lg2-r-sm); min-width: 0;
+}
+.lg2-diag__select:focus-visible,
+.lg2-diag__input:focus-visible { outline: none; box-shadow: var(--lg2-focus); border-color: var(--lg2-accent); }
+.lg2-diag__toolbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.lg2-diag__livelabel { font-size: 12px; color: var(--lg2-label-2); align-self: center; white-space: nowrap; }
+
+/* Buttons. */
+.lg2-diag__btn {
+  appearance: none; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 14px; border-radius: var(--lg2-r-sm); font: inherit; font-size: 0.85rem; font-weight: 620;
+  color: var(--lg2-on-accent); background: var(--lg2-accent); border: 1px solid transparent; white-space: nowrap;
+  transition: filter var(--lg2-fast) var(--lg2-ease), border-color var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-diag__btn:hover { filter: brightness(1.08); } }
+.lg2-diag__btn:focus-visible { outline: none; box-shadow: var(--lg2-focus); }
+.lg2-diag__btn:disabled { opacity: 0.5; cursor: default; }
+.lg2-diag__btn--ghost { color: var(--lg2-label-1); background: var(--lg2-inset); border-color: var(--lg2-hairline); }
+@media (hover: hover) { .lg2-diag__btn--ghost:hover { border-color: var(--lg2-accent); filter: none; } }
+.lg2-diag__import { position: relative; overflow: hidden; }
+.lg2-diag__file { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+/* Messages. */
+.lg2-diag__error { margin: 0; font-size: 13px; color: var(--lg2-red, #ff5d57); }
+.lg2-diag__hint { margin: 0; font-size: 13px; color: var(--lg2-label-2); line-height: 1.45; }
+.lg2-diag__empty { color: var(--lg2-label-3); font-style: normal; }
+.lg2-diag__muted { color: var(--lg2-label-3); }
+.lg2-diag__code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); border-radius: 6px; padding: 1px 6px; }
+
+/* Decisions table — horizontal scroll on narrow widths, never a page overflow. */
+.lg2-diag__tablewrap { overflow-x: auto; border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r); scrollbar-width: thin; }
+.lg2-diag__table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.lg2-diag__table th, .lg2-diag__table td { text-align: left; padding: 8px 12px; white-space: nowrap; border-top: 1px solid var(--lg2-hairline); }
+.lg2-diag__table thead th { border-top: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--lg2-label-3); font-weight: 700; background: var(--lg2-inset); position: sticky; top: 0; }
+.lg2-diag__table td { color: var(--lg2-label-2); font-variant-numeric: tabular-nums; }
+.lg2-diag__pill { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: var(--lg2-r-pill); font-size: 11px; font-weight: 650; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.16); }
+.lg2-diag__footer { margin: 0; font-size: 12px; color: var(--lg2-label-3); }
+
+/* Connect log — monospace rows with level colours; scrolls within the card. */
+.lg2-diag__log { display: flex; flex-direction: column; gap: 2px; max-height: 46vh; overflow-y: auto; border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r); padding: 6px; scrollbar-width: thin; }
+.lg2-diag__logrow { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; padding: 4px 6px; border-radius: var(--lg2-r-sm); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; }
+.lg2-diag__logrow:nth-child(odd) { background: rgba(var(--lg2-scrim-rgb, 8, 11, 17), 0.05); }
+.lg2-diag__logtime { color: var(--lg2-label-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lg2-diag__loglevel { font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; white-space: nowrap; }
+.lg2-diag__loglevel--error { color: var(--lg2-red, #ff5d57); }
+.lg2-diag__loglevel--warn { color: var(--lg2-orange, #ff9f0a); }
+.lg2-diag__loglevel--info { color: var(--lg2-blue, #4a8cff); }
+.lg2-diag__loglevel--debug { color: var(--lg2-label-3); }
+.lg2-diag__logmsg { color: var(--lg2-label-1); min-width: 0; word-break: break-word; grid-column: 3; }
+.lg2-diag__logctx { grid-column: 3; color: var(--lg2-label-3); word-break: break-all; }
+.lg2-diag__logrow--error { background: rgba(255, 93, 87, 0.08); }
+.lg2-diag__logrow--warn { background: rgba(255, 159, 10, 0.08); }
+
+/* Dry-run result. */
+.lg2-diag__proberesult { margin: 0; font-size: 0.92rem; color: var(--lg2-label-1); }
+.lg2-diag__probelist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lg2-diag__proberow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset-2); border: 1px solid var(--lg2-hairline); flex-wrap: wrap; }
+.lg2-diag__probeval { margin-left: auto; font-weight: 660; font-variant-numeric: tabular-nums; }
+.lg2-diag__probeblock { font-size: 11px; font-weight: 640; color: var(--lg2-orange, #ff9f0a); background: rgba(255, 159, 10, 0.14); border-radius: var(--lg2-r-pill); padding: 2px 9px; }
+
+/* Backup / restore. */
+.lg2-diag__backup { display: flex; flex-direction: column; gap: 10px; }
+.lg2-diag__backup-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.lg2-diag__status { font-size: 12.5px; color: var(--lg2-green, #30d158); font-weight: 600; }
+
+/* ================================================================== *
+ * Räume und Fenster — premium master-detail config page (/rooms).
+ * Namespace: `.lg2-rcfg` (page) + the reused `.lg2-rooms__*` detail classes.
+ * The page scrolls via the global `.lg2-main`; the room list is pinned while
+ * the detail column scrolls with the page.
+ * ================================================================== */
+.lg2-rcfg__split {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: var(--lg2-gap);
+  align-items: start;
+}
+@media (max-width: 1000px) { .lg2-rcfg__split { grid-template-columns: 1fr; } }
+
+/* --- Left: room list ------------------------------------------------------ */
+.lg2-rcfg__list { position: sticky; top: 0; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 28px); }
+@media (max-width: 1000px) { .lg2-rcfg__list { position: static; max-height: none; } }
+.lg2-rcfg__list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lg2-rcfg__list-title { font-size: 0.86rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--lg2-label-3); }
+.lg2-rcfg__list-count { font-size: 11px; font-weight: 700; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.16); border-radius: var(--lg2-r-pill); padding: 1px 9px; font-variant-numeric: tabular-nums; }
+.lg2-rcfg__list-empty { margin: 0; font-size: 13px; color: var(--lg2-label-2); line-height: 1.5; }
+.lg2-rcfg__roomlist { list-style: none; margin: 0; padding: 2px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
+.lg2-rcfg__roomlist::-webkit-scrollbar { width: 8px; }
+.lg2-rcfg__roomlist::-webkit-scrollbar-thumb { background: var(--lg2-hairline-2); border-radius: 999px; }
+.lg2-rcfg__roomitem {
+  appearance: none; cursor: pointer; width: 100%; text-align: left; font: inherit; color: inherit;
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+  border-radius: var(--lg2-r); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline);
+  transition: border-color var(--lg2-fast) var(--lg2-ease), background var(--lg2-fast) var(--lg2-ease), transform var(--lg2-fast) var(--lg2-ease);
+}
+@media (hover: hover) { .lg2-rcfg__roomitem:hover { border-color: var(--lg2-accent); transform: translateX(1px); } }
+.lg2-rcfg__roomitem:focus-visible { outline: none; box-shadow: var(--lg2-focus); }
+.lg2-rcfg__roomitem--on { background: rgba(var(--lg2-accent-rgb), 0.12); border-color: var(--lg2-accent); box-shadow: inset 0 0 0 1px rgba(var(--lg2-accent-rgb), 0.4); }
+.lg2-rcfg__roomicon { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.14); border: 1px solid rgba(var(--lg2-accent-rgb), 0.26); }
+.lg2-rcfg__roominfo { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lg2-rcfg__roomname { display: flex; align-items: center; gap: 6px; font-weight: 640; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-rcfg__roommeta { font-size: 11px; color: var(--lg2-label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg2-rcfg__roomchev { flex: 0 0 auto; color: var(--lg2-label-3); }
+.lg2-rcfg__issuedot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--lg2-red, #ff5d57); box-shadow: 0 0 6px rgba(255, 93, 87, 0.6); }
+.lg2-rcfg__roomitem--issue .lg2-rcfg__roomname { color: var(--lg2-red, #ff5d57); }
+
+/* Quick-add presets in the list foot. */
+.lg2-rcfg__quickadd { border-top: 1px solid var(--lg2-hairline); padding-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+.lg2-rcfg__quickadd-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--lg2-label-3); }
+.lg2-rcfg__quickadd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lg2-rcfg__preset { appearance: none; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; color: var(--lg2-label-1); background: var(--lg2-inset-2); border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-pill); padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px; }
+.lg2-rcfg__preset small { color: var(--lg2-label-3); font-size: 10.5px; }
+@media (hover: hover) { .lg2-rcfg__preset:hover { border-color: var(--lg2-accent); color: var(--lg2-accent); } }
+
+/* --- Right: detail wrapper + empty state --------------------------------- */
+.lg2-rcfg__detailwrap { min-width: 0; display: flex; flex-direction: column; gap: var(--lg2-gap); }
+.lg2-rcfg__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 48px 24px; min-height: 320px; }
+.lg2-rcfg__empty-icon { width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.12); border: 1px solid rgba(var(--lg2-accent-rgb), 0.24); }
+.lg2-rcfg__empty h2 { margin: 6px 0 0; font-size: 1.15rem; font-weight: 660; }
+.lg2-rcfg__empty p { margin: 0; max-width: 40ch; font-size: 13px; color: var(--lg2-label-2); line-height: 1.55; }
+
+/* Section description text (shared: detail + devices). */
+.lg2-rooms__secdesc,
+.lg2-rcfg__secdesc { margin: -2px 0 4px; font-size: 12px; color: var(--lg2-label-3); line-height: 1.5; }
+
+/* --- Detail card (reused RoomCard `.lg2-rooms__room`) --------------------- */
+.lg2-rooms__room { display: flex; flex-direction: column; gap: 18px; }
+.lg2-rooms__room--issue { box-shadow: var(--lg2-inner), var(--lg2-shadow), inset 0 0 0 1.5px rgba(255, 93, 87, 0.5); }
+.lg2-rooms__room-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--lg2-hairline); }
+.lg2-rooms__room-name {
+  flex: 1 1 180px; min-width: 0; font: inherit; font-size: 1.3rem; font-weight: 680; letter-spacing: -0.01em;
+  color: var(--lg2-label-1); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 2px 2px 4px;
+}
+.lg2-rooms__room-name:hover { border-bottom-color: var(--lg2-hairline-2); }
+.lg2-rooms__room-name:focus-visible { outline: none; border-bottom-color: var(--lg2-accent); }
+.lg2-rooms__room-del { appearance: none; cursor: pointer; flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 15px; color: var(--lg2-label-2); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); }
+@media (hover: hover) { .lg2-rooms__room-del:hover { color: var(--lg2-red, #ff5d57); border-color: rgba(255, 93, 87, 0.5); background: rgba(255, 93, 87, 0.1); } }
+
+/* Field (label + control) — used across the detail + windows. */
+.lg2-rooms__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lg2-rooms__field > span,
+.lg2-rooms__field-label { font-size: 11px; font-weight: 600; color: var(--lg2-label-3); }
+.lg2-rooms__field--inline { flex-direction: row; align-items: center; gap: 8px; }
+.lg2-rooms__field--inline > span { white-space: nowrap; }
+.lg2-rcfg input[type='text'], .lg2-rcfg input[type='number'], .lg2-rcfg input[type='time'], .lg2-rcfg select {
+  box-sizing: border-box; min-height: 34px; padding: 6px 10px; font: inherit; font-size: 0.86rem;
+  color: var(--lg2-label-1); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-sm); min-width: 0;
+}
+.lg2-rcfg input:focus-visible, .lg2-rcfg select:focus-visible { outline: none; border-color: var(--lg2-accent); box-shadow: var(--lg2-focus); }
+.lg2-rooms__room-head .lg2-rooms__field { flex: 0 0 auto; }
+.lg2-rooms__room-head select, .lg2-rooms__room-head input { min-width: 92px; }
+.lg2-rooms__wide-select { width: 100%; }
+
+/* Sections. */
+.lg2-rooms__section { display: flex; flex-direction: column; gap: 8px; }
+.lg2-rooms__section-label { font-size: 0.98rem; font-weight: 650; color: var(--lg2-label-1); }
+
+/* Threshold grid. */
+.lg2-rooms__targets { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.lg2-rooms__target { display: flex; flex-direction: column; gap: 5px; padding: 11px 12px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset-2); border: 1px solid var(--lg2-hairline); }
+.lg2-rooms__target-name { font-size: 12px; font-weight: 640; color: var(--lg2-label-1); }
+.lg2-rooms__target-input { display: flex; align-items: center; gap: 6px; }
+.lg2-rooms__target-input input { width: 100%; font-variant-numeric: tabular-nums; }
+.lg2-rooms__target-input em { font-style: normal; font-size: 12px; color: var(--lg2-label-3); }
+.lg2-rooms__target-hint { font-size: 11px; color: var(--lg2-label-3); line-height: 1.4; }
+
+/* Toggle rows (cooling, thermostat target). */
+.lg2-rooms__cooling { display: flex; align-items: flex-start; gap: 11px; padding: 11px 12px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset-2); border: 1px solid var(--lg2-hairline); cursor: pointer; }
+.lg2-rooms__cooling > span { display: flex; flex-direction: column; gap: 2px; font-size: 0.88rem; font-weight: 560; color: var(--lg2-label-1); }
+.lg2-rooms__hint { margin: 0; font-size: 11.5px; font-weight: 400; color: var(--lg2-label-3); line-height: 1.45; }
+
+/* Windows / shutters. */
+.lg2-rooms__windows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.lg2-rooms__window { padding: 13px 14px; border-radius: var(--lg2-r); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); display: flex; flex-direction: column; gap: 12px; }
+.lg2-rooms__window--issue { border-color: rgba(255, 93, 87, 0.5); }
+.lg2-rooms__window-head { display: flex; flex-direction: column; gap: 2px; }
+.lg2-rooms__window-name { font-size: 0.95rem; font-weight: 640; }
+.lg2-rooms__window-head small { font-size: 11.5px; color: var(--lg2-label-3); }
+.lg2-rooms__window-controls { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 560px) { .lg2-rooms__window-controls { grid-template-columns: 1fr; } }
+.lg2-rooms__window-compass { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.lg2-rooms__window-block { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.86rem; color: var(--lg2-label-1); }
+
+/* Quiet-hours / block-time schedule editor. */
+.lg2-rooms__sched { display: flex; flex-direction: column; gap: 10px; }
+.lg2-rooms__sched-empty { margin: 0; font-size: 12.5px; color: var(--lg2-label-3); }
+.lg2-rooms__sched-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 11px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset-2); border: 1px solid var(--lg2-hairline); }
+.lg2-rooms__sched-days { display: inline-flex; gap: 3px; }
+.lg2-rooms__day { appearance: none; cursor: pointer; font: inherit; font-size: 11px; font-weight: 640; width: 27px; height: 27px; border-radius: 8px; color: var(--lg2-label-2); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); }
+.lg2-rooms__day--on { color: var(--lg2-on-accent); background: var(--lg2-accent); border-color: var(--lg2-accent); }
+.lg2-rooms__sched-presets { display: inline-flex; gap: 5px; flex-wrap: wrap; }
+.lg2-rooms__sched-preset { appearance: none; cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; color: var(--lg2-label-2); background: transparent; border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-pill); padding: 3px 9px; }
+@media (hover: hover) { .lg2-rooms__sched-preset:hover, .lg2-rooms__day:hover { border-color: var(--lg2-accent); } }
+.lg2-rooms__sched-times { display: inline-flex; align-items: center; gap: 8px; }
+.lg2-rooms__sched-dash { color: var(--lg2-label-3); }
+.lg2-rooms__sched-del { appearance: none; cursor: pointer; width: 28px; height: 28px; border-radius: 8px; font-size: 13px; color: var(--lg2-label-2); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); }
+@media (hover: hover) { .lg2-rooms__sched-del:hover { color: var(--lg2-red, #ff5d57); border-color: rgba(255, 93, 87, 0.5); } }
+.lg2-rooms__sched-meta { display: inline-flex; gap: 6px; }
+.lg2-rooms__tag { font-size: 10.5px; font-weight: 640; color: var(--lg2-label-2); background: var(--lg2-inset); border: 1px solid var(--lg2-hairline); border-radius: var(--lg2-r-pill); padding: 2px 8px; }
+.lg2-rooms__tag--active { color: var(--lg2-green); background: rgba(48, 209, 88, 0.14); border-color: rgba(48, 209, 88, 0.3); }
+.lg2-rooms__sched-add { appearance: none; cursor: pointer; align-self: flex-start; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--lg2-accent); background: rgba(var(--lg2-accent-rgb), 0.12); border: 1px solid rgba(var(--lg2-accent-rgb), 0.28); border-radius: var(--lg2-r-sm); padding: 7px 12px; }
+
+/* Header actions + autosave. */
+.lg2-rooms__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lg2-rooms__autosave { font-size: 12px; color: var(--lg2-label-2); white-space: nowrap; }
+
+/* Error / OK banners + add form. */
+.lg2-rooms__error, .lg2-rooms__ok { margin: 0; font-size: 13px; }
+.lg2-rooms__error { color: var(--lg2-red, #ff5d57); }
+.lg2-rooms__ok { color: var(--lg2-green, #30d158); }
+.lg2-rooms__error-card { color: var(--lg2-red, #ff5d57); font-size: 13px; }
+.lg2-rooms__error-card ul { margin: 6px 0 0; padding-left: 18px; }
+.lg2-rooms__add-form { display: flex; flex-direction: column; gap: 12px; }
+.lg2-rooms__add-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.lg2-rooms__add-actions { display: flex; gap: 10px; }
+
+/* --- Devices collapsible -------------------------------------------------- */
+.lg2-rcfg__devices { display: flex; flex-direction: column; gap: 14px; }
+.lg2-rcfg__devices--collapsed { gap: 0; }
+.lg2-rcfg__devices-toggle { appearance: none; cursor: pointer; border: 0; background: transparent; color: inherit; font: inherit; display: flex; align-items: center; gap: 9px; padding: 0; text-align: left; }
+.lg2-rcfg__devices-toggle:focus-visible { outline: none; box-shadow: var(--lg2-focus); border-radius: var(--lg2-r-sm); }
+.lg2-rcfg__devices-chev { flex: 0 0 auto; color: var(--lg2-label-3); transition: transform var(--lg2-fast) var(--lg2-ease); }
+.lg2-rcfg__devices-chev--open { transform: rotate(90deg); }
+.lg2-rcfg__devices-sum { margin-left: auto; font-size: 11.5px; color: var(--lg2-label-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lg2-rcfg__devices-body { display: flex; flex-direction: column; gap: 10px; }
+.lg2-rooms__devices-head { margin: 6px 0 0; font-size: 0.9rem; font-weight: 640; color: var(--lg2-label-2); }
+.lg2-rooms__device-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.lg2-rooms__device { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: var(--lg2-r-sm); background: var(--lg2-inset-2); border: 1px solid var(--lg2-hairline); }
+.lg2-rooms__device strong { font-size: 0.86rem; font-weight: 640; }
+.lg2-rooms__device small { font-size: 11px; color: var(--lg2-label-3); }

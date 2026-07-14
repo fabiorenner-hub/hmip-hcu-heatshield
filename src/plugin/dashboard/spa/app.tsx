@@ -35,6 +35,17 @@ import { LiquidGlass2Automatik } from './components/liquidglass2/liquidGlass2Aut
 import { LiquidGlass2Rules } from './components/liquidglass2/liquidGlass2Rules.js';
 import { RulesTab } from './tabs/rules.js';
 import { LiquidGlass2Wizard } from './components/liquidglass2/liquidGlass2Wizard.js';
+import { LiquidGlass2Updates } from './components/liquidglass2/liquidGlass2Updates.js';
+import { LiquidGlass2Help } from './components/liquidglass2/liquidGlass2Help.js';
+import { LiquidGlass2LogsDebug } from './components/liquidglass2/liquidGlass2LogsDebug.js';
+import { LiquidGlass2Messages } from './components/liquidglass2/liquidGlass2Messages.js';
+import { LiquidGlass2Rooms } from './components/liquidglass2/liquidGlass2Rooms.js';
+import { LiquidGlass2System } from './components/liquidglass2/liquidGlass2System.js';
+import { LiquidGlass2Diagnostics } from './components/liquidglass2/liquidGlass2Diagnostics.js';
+import { LiquidGlass2Notifications } from './components/liquidglass2/liquidGlass2Notifications.js';
+import { LiquidGlass2Sources } from './components/liquidglass2/liquidGlass2Sources.js';
+import { LiquidGlass2Irrigation } from './components/liquidglass2/liquidGlass2Irrigation.js';
+import { LiquidGlass2Building } from './components/liquidglass2/liquidGlass2Building.js';
 import { Icon } from './components/icons.js';
 import { HouseImageUpload } from './components/houseImageUpload.js';
 import { useApiState } from './hooks/useApiState.js';
@@ -61,7 +72,6 @@ import { GartenView } from './tabs/garten.js';
 import { AutomatikView } from './tabs/automatik.js';
 import { SystemView } from './tabs/system.js';
 import { BuildingStudioView } from './tabs/buildingStudio.js';
-import { ShowcaseView } from './tabs/showcase.js';
 import { MessagesTab } from './tabs/messages.js';
 import { NotificationsTab } from './tabs/notifications.js';
 import { IrrigationSettingsTab } from './tabs/irrigationSettings.js';
@@ -144,9 +154,6 @@ function WarnungenView(_props: RoutableProps): JSX.Element {
 function SettingsHub(_props: RoutableProps): JSX.Element {
   const uiV = uiVersion.value;
   const chooseUi = (v: 'v1' | 'v2'): void => {
-    // Persist + apply globally. The AppShell (Task 4) swaps the design on the
-    // CURRENT route reactively — no navigation needed. Until the unified shell
-    // lands, the interim demo route keeps v2 reachable for evaluation.
     setUiVersion(v);
   };
   const links = getFlag('buildingStudioV2')
@@ -230,19 +237,18 @@ const PAGE_REGISTRY: Record<string, PageEntry> = {
   '/rules': { v1: RulesTab, v2: LiquidGlass2Rules },
   '/warnungen': { v1: WarnungenView, v2: LiquidGlass2Warnungen },
   '/einstellungen': { v1: SettingsHub, v2: LiquidGlass2Einstellungen },
-  '/system': { v1: SystemView },
-  '/building': { v1: BuildingStudioView },
-  '/showcase': { v1: ShowcaseView },
-  '/rooms': { v1: RoomsTab },
-  '/sources': { v1: SourcesTab },
+  '/system': { v1: SystemView, v2: LiquidGlass2System },
+  '/building': { v1: BuildingStudioView, v2: LiquidGlass2Building },
+  '/rooms': { v1: RoomsTab, v2: LiquidGlass2Rooms },
+  '/sources': { v1: SourcesTab, v2: LiquidGlass2Sources },
   '/wizard': { v1: WizardTab, v2: LiquidGlass2Wizard },
-  '/diagnostics': { v1: DiagnosticsTab },
-  '/benachrichtigungen': { v1: NotificationsTab },
-  '/bewaesserung-einstellungen': { v1: IrrigationSettingsTab },
-  '/messages': { v1: MessagesTab },
-  '/updates': { v1: UpdatesTab },
-  '/hilfe': { v1: HelpTab },
-  '/logs-debug': { v1: LogsDebugTab },
+  '/diagnostics': { v1: DiagnosticsTab, v2: LiquidGlass2Diagnostics },
+  '/benachrichtigungen': { v1: NotificationsTab, v2: LiquidGlass2Notifications },
+  '/bewaesserung-einstellungen': { v1: IrrigationSettingsTab, v2: LiquidGlass2Irrigation },
+  '/messages': { v1: MessagesTab, v2: LiquidGlass2Messages },
+  '/updates': { v1: UpdatesTab, v2: LiquidGlass2Updates },
+  '/hilfe': { v1: HelpTab, v2: LiquidGlass2Help },
+  '/logs-debug': { v1: LogsDebugTab, v2: LiquidGlass2LogsDebug },
   '/darstellung': { v1: AppearanceTab, v2: LiquidGlass2Darstellung },
 };
 
@@ -388,7 +394,6 @@ export function App(props: AppProps = {}): JSX.Element {
         <Page path="/einstellungen" route="/einstellungen" />
         <Page path="/system" route="/system" />
         <Page path="/building" route="/building" />
-        <Page path="/showcase" route="/showcase" />
         <Page path="/rooms" route="/rooms" />
         <Page path="/sources" route="/sources" />
         <Page path="/wizard" route="/wizard" />

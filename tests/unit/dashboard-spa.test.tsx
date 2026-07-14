@@ -58,17 +58,18 @@ afterEach(() => {
   setRiskBreakdowns([]);
 });
 
-describe('App tab nav (Task 11.1)', () => {
+describe('App tab nav (v2 sidebar)', () => {
   it('renders the primary modules with Übersicht active on /', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
     const { container } = render(<App initialUrl="/" />);
     const modules = container.querySelectorAll('[data-testid^="nav-module-"]');
     // 6 primary; Warnungen only appears when an alert is active.
     expect(modules.length).toBe(6);
+    // The v2 sidebar marks the active module with `lg2-nav__item--active`.
     const uebersicht = container.querySelector('[data-testid="nav-module-uebersicht"]');
-    expect(uebersicht?.className).toContain('app__module--active');
+    expect(uebersicht?.className).toContain('lg2-nav__item--active');
     const raeume = container.querySelector('[data-testid="nav-module-raeume"]');
-    expect(raeume?.className).not.toContain('app__module--active');
+    expect(raeume?.className).not.toContain('lg2-nav__item--active');
   });
 
   it('declares every top-level module', () => {
@@ -88,38 +89,38 @@ describe('App tab nav (Task 11.1)', () => {
   });
 });
 
-describe('App module routing (real content, no dead placeholders)', () => {
+describe('App module routing (native v2 pages, active-module map)', () => {
   it('keeps the primary modules with their icons', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
     const { container } = render(<App initialUrl="/uebersicht" />);
     const modules = container.querySelectorAll('[data-testid^="nav-module-"]');
     expect(modules.length).toBe(6);
-    expect(container.querySelectorAll('.app__module-icon').length).toBe(6);
+    // Each v2 sidebar nav item renders its inline icon (one <svg> per module).
+    expect(container.querySelectorAll('[data-testid^="nav-module-"] svg').length).toBe(6);
   });
 
-  it('routes /vorhersage to the Verlauf/History view and highlights Vorhersage', () => {
+  it('routes /vorhersage to the native v2 forecast page and highlights Vorhersage', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
     const { container } = render(<App initialUrl="/vorhersage" />);
-    expect(container.querySelector('[data-testid="tab-history"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="liquid-glass2-vorhersage"]')).not.toBeNull();
     expect(
       container.querySelector('[data-testid="nav-module-vorhersage"]')?.className,
-    ).toContain('app__module--active');
+    ).toContain('lg2-nav__item--active');
   });
 
-  it('routes /automatik to the Automatik view (Status default) and highlights Automatik', () => {
+  it('routes /automatik to the native v2 Automatik page and highlights Automatik', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
     const { container } = render(<App initialUrl="/automatik" />);
-    expect(container.querySelector('[data-testid="module-automatik"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="automatik-subnav"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="liquid-glass2-automatik"]')).not.toBeNull();
     expect(
       container.querySelector('[data-testid="nav-module-automatik"]')?.className,
-    ).toContain('app__module--active');
+    ).toContain('lg2-nav__item--active');
   });
 
-  it('routes /einstellungen to a settings hub with sub-links', () => {
+  it('routes /einstellungen to the native v2 settings hub with sub-links', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
     const { container } = render(<App initialUrl="/einstellungen" />);
-    expect(container.querySelector('[data-testid="settings-hub"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="liquid-glass2-einstellungen"]')).not.toBeNull();
     for (const id of [
       'settings-link-rooms',
       'settings-link-sources',
@@ -131,30 +132,28 @@ describe('App module routing (real content, no dead placeholders)', () => {
     }
     expect(
       container.querySelector('[data-testid="nav-module-einstellungen"]')?.className,
-    ).toContain('app__module--active');
+    ).toContain('lg2-nav__item--active');
   });
 
   it('keeps the legacy /rooms route working under the Einstellungen highlight', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
     const { container } = render(<App initialUrl="/rooms" />);
-    expect(container.querySelector('[data-testid="tab-rooms"]')).not.toBeNull();
+    // /rooms now renders the native v2 rooms page; the route-map keeps
+    // Einstellungen highlighted.
+    expect(container.querySelector('[data-testid="liquid-glass2-rooms"]')).not.toBeNull();
     expect(
       container.querySelector('[data-testid="nav-module-einstellungen"]')?.className,
-    ).toContain('app__module--active');
+    ).toContain('lg2-nav__item--active');
   });
 
   it('consolidates rooms, ventilation and climate under Räume', () => {
     snapshot.value = FIXTURE_SNAPSHOT;
     const { container } = render(<App initialUrl="/raeume" />);
-    expect(container.querySelector('[data-testid="module-raeume"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="raeume-ventilation"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="raeume-climate"]')).not.toBeNull();
-    // Former Lüftung/Klima content is preserved inside Räume.
-    expect(container.querySelector('[data-testid="lueftung-windows"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="klima-mode"]')).not.toBeNull();
+    // Rooms/ventilation/climate are consolidated into the native v2 Räume page.
+    expect(container.querySelector('[data-testid="liquid-glass2-raeume"]')).not.toBeNull();
     expect(
       container.querySelector('[data-testid="nav-module-raeume"]')?.className,
-    ).toContain('app__module--active');
+    ).toContain('lg2-nav__item--active');
   });
 
   it('keeps legacy routes redirect-compatible (Übersicht active for /beschattung)', () => {
@@ -164,7 +163,7 @@ describe('App module routing (real content, no dead placeholders)', () => {
     // <Redirect> navigates to /uebersicht.
     expect(
       container.querySelector('[data-testid="nav-module-uebersicht"]')?.className,
-    ).toContain('app__module--active');
+    ).toContain('lg2-nav__item--active');
   });
 });
 

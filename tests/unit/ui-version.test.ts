@@ -1,17 +1,22 @@
 // @vitest-environment jsdom
 /**
- * Global UI-version signal (ui-v2-release, Task 1).
+ * Global UI-version signal — RETIRED v1 contract (ui-v2-release).
  *
- * Verifies the persisted design flag: default v2, setUiVersion persists and
- * flips the reactive signal, and localStorage failures fall back to v2.
+ * The classic v1 (1.20) interface is retired: there is now exactly ONE UI, the
+ * "Liquid Glass V2" design. The `uiVersion` signal is therefore permanently
+ * `'v2'`, `setUiVersion` is a no-op that keeps `'v2'`, and `readUiVersion()`
+ * always returns `'v2'`. The export surface is kept only for import
+ * compatibility. These tests pin that retirement contract, including that any
+ * previously persisted `'v1'` choice is ignored and that localStorage failures
+ * are irrelevant (the value never depends on storage anymore).
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const STORAGE_KEY = 'heatshield.uiVersion';
 
-/** Re-import the module fresh so the initial `load()` runs against the current
- *  localStorage state (the signal is a module-singleton). */
+/** Re-import the module fresh so the initial module-load runs against the
+ *  current localStorage state (the signal is a module-singleton). */
 async function freshModule(): Promise<typeof import('../../src/plugin/dashboard/spa/uiVersion.js')> {
   vi.resetModules();
   return import('../../src/plugin/dashboard/spa/uiVersion.js');
@@ -26,36 +31,38 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe('uiVersion signal', () => {
-  it('defaults to v2 when nothing is persisted', async () => {
+describe('uiVersion signal (v1 retired)', () => {
+  it('is v2 by default when nothing is persisted', async () => {
     const { uiVersion, readUiVersion } = await freshModule();
     expect(uiVersion.value).toBe('v2');
     expect(readUiVersion()).toBe('v2');
   });
 
-  it('loads a persisted v1 choice on init', async () => {
+  it('ignores a previously persisted v1 choice and stays v2', async () => {
+    // v1 is retired: an old stored 'v1' must NOT resurrect the classic UI.
     localStorage.setItem(STORAGE_KEY, 'v1');
-    const { uiVersion } = await freshModule();
-    expect(uiVersion.value).toBe('v1');
+    const { uiVersion, readUiVersion } = await freshModule();
+    expect(uiVersion.value).toBe('v2');
+    expect(readUiVersion()).toBe('v2');
   });
 
-  it('treats any non-"v1" persisted value as v2', async () => {
+  it('treats any persisted value (including garbage) as v2', async () => {
     localStorage.setItem(STORAGE_KEY, 'nonsense');
     const { uiVersion } = await freshModule();
     expect(uiVersion.value).toBe('v2');
   });
 
-  it('setUiVersion persists and flips the reactive signal', async () => {
-    const { uiVersion, setUiVersion } = await freshModule();
+  it('setUiVersion is a no-op: requesting v1 keeps v2', async () => {
+    const { uiVersion, setUiVersion, readUiVersion } = await freshModule();
     expect(uiVersion.value).toBe('v2');
 
     setUiVersion('v1');
-    expect(uiVersion.value).toBe('v1');
-    expect(localStorage.getItem(STORAGE_KEY)).toBe('v1');
+    expect(uiVersion.value).toBe('v2');
+    expect(readUiVersion()).toBe('v2');
 
     setUiVersion('v2');
     expect(uiVersion.value).toBe('v2');
-    expect(localStorage.getItem(STORAGE_KEY)).toBe('v2');
+    expect(readUiVersion()).toBe('v2');
   });
 
   it('falls back to v2 when localStorage read throws', async () => {
@@ -73,7 +80,7 @@ describe('uiVersion signal', () => {
       throw new Error('blocked');
     });
     expect(() => setUiVersion('v2')).not.toThrow();
-    // The in-memory signal still updates even if persistence fails.
+    // The signal remains the single retired value regardless of persistence.
     expect(uiVersion.value).toBe('v2');
     spy.mockRestore();
   });

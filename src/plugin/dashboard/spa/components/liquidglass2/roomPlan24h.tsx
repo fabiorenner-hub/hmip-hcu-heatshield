@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 
 import { t, tServer, fmtNum, fmtTime } from '../../i18n.js';
 import { useConfig, scheduleSave } from '../../hooks/useConfig.js';
+import { expertMode } from '../../expertMode.js';
 import { Icon } from '../icons.js';
 import type { Config } from '../../../../../shared/types.js';
 import type { DashboardSnapshot, PlannedAction } from '../../types.js';
@@ -215,9 +216,12 @@ export function RoomPlan24h(props: { snap: DashboardSnapshot }): JSX.Element {
       ) : points === null || points.length < 2 ? (
         <p class="lg2-plan__empty">{t('Für diesen Raum liegt noch kein Prognose-Plan vor (die Engine lernt oder es fehlen Messwerte).',
           'No forecast plan for this room yet (the engine is still learning or measurements are missing).')}</p>
-      ) : (
+      ) : expertMode.value ? (
+        // Basis view stays compact/no-scroll: the temperature/shutter chart is
+        // shown only in the Expert view. The planned moves (DecisionList) below
+        // remain visible in both.
         <PlanChart points={points} decisions={decisions} outdoor={outdoor} comfortHi={comfortHi} horizon={horizon} roomName={roomName} confidence={confidence} />
-      )}
+      ) : null}
 
       <DecisionList decisions={decisions} />
     </section>

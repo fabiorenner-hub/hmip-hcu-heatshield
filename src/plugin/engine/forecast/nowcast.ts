@@ -114,3 +114,48 @@ export function computeCloudNowcast(inputs: {
   const cloudFactor01 = clamp01(actualRatio / expectedFraction01);
   return { cloudFactor01, reliable: true, expectedFraction01 };
 }
+
+/**
+ * Approximate clear-sky GLOBAL horizontal illuminance (lux) at a given sun
+ * elevation. Peak daylight (sun near zenith, clear sky) is ~120 000 lux; the
+ * illuminance scales roughly with the sine of the sun elevation. This is a
+ * deliberately simple model — it only needs to be good enough to tell "clear"
+ * from "overcast", not to be a photometric reference.
+ */
+const CLEAR_SKY_PEAK_LUX = 120_000;
+
+export function clearSkyIlluminanceLux(sun: SunLike): number {
+  if (!sun.isUp || sun.elevationDeg < MIN_ELEVATION_DEG) {
+    return 0;
+  }
+  const elev = Math.sin((sun.elevationDeg * Math.PI) / 180);
+  return CLEAR_SKY_PEAK_LUX * Math.max(0, elev);
+}
+
+/**
+ * Estimate live cloudiness from a dedicated GLOBAL light sensor vs. the
+ * clear-sky illuminance expectation. Analogous to {@link computeCloudNowcast}
+ * but driven by a horizontal lux reading, so it does NOT depend on any array
+ * azimuth — the more reliable cloud probe whenever a light sensor is bound.
+ *
+ * `cloudFactor01 = clamp01(measuredLux / expectedLux)` — 1 = at/above the
+ * clear-sky expectation (no clouds), toward 0 = heavy cloud. Unreliable
+ * (→ factor 1) when the sun is too low to read or no lux is available.
+ */
+export function computeLuxCloudNowcast(inputs: {
+  illuminanceLux: number | null;
+  sun: SunLike;
+}): CloudNowcast {
+  const expectedLux = clearSkyIlluminanceLux(inputs.sun);
+  const expectedFraction01 = clamp01(expectedLux / CLEAR_SKY_PEAK_LUX);
+  if (
+    inputs.illuminanceLux === null ||
+    !Number.isFinite(inputs.illuminanceLux) ||
+    expectedLux <= 0 ||
+    expectedFraction01 < MIN_EXPECTED_FRACTION
+  ) {
+    return { cloudFactor01: 1, reliable: false, expectedFraction01 };
+  }
+  const cloudFactor01 = clamp01(Math.max(0, inputs.illuminanceLux) / expectedLux);
+  return { cloudFactor01, reliable: true, expectedFraction01 };
+}

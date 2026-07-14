@@ -20,6 +20,9 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Config, Rules } from '../../../../../shared/types.js';
 import { applyProfile, type ProfileName, PROFILE_PRESETS } from '../../profiles.js';
 import { useConfig } from '../../hooks/useConfig.js';
+import { runDiscovery, useDiscovery } from '../../hooks/useDiscovery.js';
+import { deviceLabel } from '../../format.js';
+import { expertMode } from '../../expertMode.js';
 import { t } from '../../i18n.js';
 import { Icon } from '../icons.js';
 
@@ -35,6 +38,8 @@ interface SliderSpec {
   unit: string;
   /** DISPLAY-only multiplier (e.g. m/s → km/h). */
   scale?: number;
+  /** Fallback shown when the config value is unset (optional fields). */
+  dflt?: number;
   /** Group key for the arranged threshold sections. */
   group: 'comfort' | 'automation' | 'sun' | 'heat';
 }
@@ -49,14 +54,15 @@ const SLIDER_GROUPS: Array<{ key: SliderSpec['group']; de: string; en: string }>
 
 // 1:1 the v1 slider table (tabs/rules.tsx) — identical min/max/step (R14.3).
 const SLIDERS: SliderSpec[] = [
-  { group: 'comfort', path: 'comfort.maxIndoorTempC', labelDe: 'Max. Innentemperatur', labelEn: 'Max. indoor temperature', min: 22, max: 28, step: 0.5, unit: '°C' },
-  { group: 'comfort', path: 'comfort.preShadeTempC', labelDe: 'Vor-Beschattung ab', labelEn: 'Pre-shading from', min: 21, max: 26, step: 0.5, unit: '°C' },
+  { group: 'comfort', path: 'comfort.maxIndoorTempC', labelDe: 'Max. Innentemperatur (max. tolerierbar)', labelEn: 'Max. indoor temperature (max tolerated)', min: 22, max: 28, step: 0.5, unit: '°C' },
+  { group: 'comfort', path: 'comfort.targetIndoorTempC', labelDe: 'Innenraum-Zieltemperatur (Optimum)', labelEn: 'Indoor target temperature (optimum)', min: 18, max: 26, step: 0.5, unit: '°C', dflt: 23 },
+  { group: 'comfort', path: 'comfort.preShadeTempC', labelDe: 'Vor-Beschattung ab (Innentemperatur)', labelEn: 'Pre-shading from (indoor temp.)', min: 21, max: 26, step: 0.5, unit: '°C' },
   { group: 'comfort', path: 'comfort.vacationOffsetC', labelDe: 'Urlaubs-Absenkung', labelEn: 'Vacation offset', min: 0, max: 2, step: 0.1, unit: '°C' },
   { group: 'automation', path: 'automation.controlIntervalSeconds', labelDe: 'Zyklusintervall', labelEn: 'Cycle interval', min: 180, max: 3600, step: 60, unit: 's' },
   { group: 'automation', path: 'automation.minSecondsBetweenMoves', labelDe: 'Mindestpause zwischen Fahrten', labelEn: 'Cooldown between moves', min: 300, max: 21600, step: 300, unit: 's' },
   { group: 'automation', path: 'automation.minPositionDeltaPct', labelDe: 'Mindest-Positionsänderung', labelEn: 'Min. position change', min: 5, max: 30, step: 1, unit: '%' },
   { group: 'sun', path: 'sun.minElevationDeg', labelDe: 'Sonne · Mindesthöhe', labelEn: 'Sun · minimum elevation', min: 0, max: 15, step: 1, unit: '°' },
-  { group: 'sun', path: 'storm.thresholdMs', labelDe: 'Sturm · Schwelle', labelEn: 'Storm · threshold', min: 10, max: 20, step: 0.1, unit: 'km/h', scale: 3.6 },
+  { group: 'sun', path: 'storm.thresholdMs', labelDe: 'Sturm · Schwelle', labelEn: 'Storm · threshold', min: 10, max: 41.7, step: 0.1, unit: 'km/h', scale: 3.6 },
   { group: 'sun', path: 'nightCooling.deltaC', labelDe: 'Nachtkühlung · Delta', labelEn: 'Night cooling · delta', min: 0.5, max: 3, step: 0.1, unit: '°C' },
   { group: 'heat', path: 'heatLoad.pvWeight', labelDe: 'Wärmelast · PV-Gewicht', labelEn: 'Heat load · PV weight', min: 0, max: 1, step: 0.05, unit: '' },
   { group: 'heat', path: 'heatLoad.tempWeight', labelDe: 'Wärmelast · Temp-Gewicht', labelEn: 'Heat load · temp weight', min: 0, max: 1, step: 0.05, unit: '' },
@@ -80,12 +86,12 @@ function profileLabel(p: ProfileName): string {
   }
 }
 
-function getRulesValue(rules: Rules, path: string): number {
+function getRulesValue(rules: Rules, path: string, dflt = 0): number {
   const [head, tail] = path.split('.');
-  if (head === undefined || tail === undefined) return 0;
+  if (head === undefined || tail === undefined) return dflt;
   const block = (rules as unknown as Record<string, Record<string, unknown>>)[head];
   const v = block?.[tail];
-  return typeof v === 'number' ? v : 0;
+  return typeof v === 'number' ? v : dflt;
 }
 
 function setRulesValue(rules: Rules, path: string, value: number): Rules {
@@ -117,13 +123,41 @@ async function postJson(url: string, body: unknown | undefined, timeoutMs: numbe
 
 export function LiquidGlass2Rules(_props: RoutableProps): JSX.Element {
   const cfg = useConfig();
+  const discovery = useDiscovery();
   const [draft, setDraft] = useState<Config | null>(null);
   const [probe, setProbe] = useState<ProbeResult | null>(null);
   const [probeError, setProbeError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchedRef = useRef<boolean>(false);
 
   useEffect(() => {
-    if (cfg.config.value !== null && draft === null) setDraft(cfg.config.value);
+    if (discovery.inventory.value.length === 0 && !discovery.discovering.value) void runDiscovery();
+  }, []);
+
+  // Bind/clear the GLOBAL light sensor (chosen like the PV source). Writes into
+  // `globalSignals.illumination` (feature `illumination`, lux). Empty = none.
+  const setLightSensor = (deviceId: string): void => {
+    touchedRef.current = true;
+    setDraft((prev) => {
+      if (prev === null) return prev;
+      const globalSignals = { ...prev.globalSignals };
+      if (deviceId === '') delete globalSignals.illumination;
+      else globalSignals.illumination = { primary: { kind: 'hmip', deviceId, feature: 'illumination' }, staleAfterSec: 600 };
+      return { ...prev, globalSignals };
+    });
+  };
+
+  useEffect(() => {
+    const c = cfg.config.value;
+    if (c === null) return;
+    // Hydrate on first load AND re-sync when the config changes EXTERNALLY (e.g.
+    // per-room targets edited in the Rooms tab, or another browser) as long as
+    // the user hasn't started editing THIS tab. This keeps the two tabs in sync
+    // without a reload and stops a stale Rules draft from clobbering edits made
+    // elsewhere on the next auto-save (forum: "changed thresholds not applied").
+    if (draft !== null && touchedRef.current) return;
+    if (draft !== null && JSON.stringify(draft) === JSON.stringify(c)) return;
+    setDraft(c);
   }, [cfg.config.value]);
 
   useEffect(() => {
@@ -154,6 +188,7 @@ export function LiquidGlass2Rules(_props: RoutableProps): JSX.Element {
   };
 
   const patchRules = (mut: (r: Rules) => Rules): void => {
+    touchedRef.current = true;
     setDraft((prev) => {
       if (prev === null) return prev;
       const next: Config = { ...prev, rules: mut(prev.rules) };
@@ -194,7 +229,7 @@ export function LiquidGlass2Rules(_props: RoutableProps): JSX.Element {
   };
 
   const renderSlider = (s: SliderSpec): JSX.Element => {
-    const value = getRulesValue(draft.rules, s.path);
+    const value = getRulesValue(draft.rules, s.path, s.dflt ?? 0);
     const reference = presetReference[s.path];
     return (
       <div class="lg2-rules__slider" key={s.path} data-testid={`lg2-rules-slider-row-${s.path}`}>
@@ -302,27 +337,29 @@ export function LiquidGlass2Rules(_props: RoutableProps): JSX.Element {
         )}
       </section>
 
-      {/* Live preview */}
-      <section class="lg2-card lg2-rules__card" data-testid="lg2-rules-preview">
-        <h2 class="lg2-card__title">{t('Live-Vorschau', 'Live preview')}</h2>
-        {probeError !== null && (
-          <p class="lg2-rules__preview-err" data-testid="lg2-rules-probe-error">{t('Vorschau:', 'Preview:')} {probeError}</p>
-        )}
-        {probe === null ? (
-          <p class="lg2-rules__hint">{t('Ändere einen Wert, um die Auswirkung zu sehen.', 'Change a value to see the impact.')}</p>
-        ) : (
-          <Fragment>
-            <p class="lg2-rules__preview-mode">{t('Modus', 'Mode')}: <b>{probe.mode}</b></p>
-            <div class="lg2-rules__preview-grid">
-              {probe.windows.map((w) => (
-                <span key={w.windowId} class="lg2-rules__preview-cell">
-                  <em>{winName(w.windowId)}</em><b>{Math.round(w.finalTarget * 100)} %</b>
-                </span>
-              ))}
-            </div>
-          </Fragment>
-        )}
-      </section>
+      {/* Live preview — expert only (hidden in Basis). */}
+      {expertMode.value && (
+        <section class="lg2-card lg2-rules__card" data-testid="lg2-rules-preview">
+          <h2 class="lg2-card__title">{t('Live-Vorschau', 'Live preview')}</h2>
+          {probeError !== null && (
+            <p class="lg2-rules__preview-err" data-testid="lg2-rules-probe-error">{t('Vorschau:', 'Preview:')} {probeError}</p>
+          )}
+          {probe === null ? (
+            <p class="lg2-rules__hint">{t('Ändere einen Wert, um die Auswirkung zu sehen.', 'Change a value to see the impact.')}</p>
+          ) : (
+            <Fragment>
+              <p class="lg2-rules__preview-mode">{t('Modus', 'Mode')}: <b>{probe.mode}</b></p>
+              <div class="lg2-rules__preview-grid">
+                {probe.windows.map((w) => (
+                  <span key={w.windowId} class="lg2-rules__preview-cell">
+                    <em>{winName(w.windowId)}</em><b>{Math.round(w.finalTarget * 100)} %</b>
+                  </span>
+                ))}
+              </div>
+            </Fragment>
+          )}
+        </section>
+      )}
 
       {/* Thresholds — arranged into labelled groups. */}
       <section class="lg2-card lg2-rules__card">
@@ -330,6 +367,14 @@ export function LiquidGlass2Rules(_props: RoutableProps): JSX.Element {
         {SLIDER_GROUPS.map((g) => (
           <div class="lg2-rules__group" key={g.key}>
             <h3 class="lg2-rules__group-head">{t(g.de, g.en)}</h3>
+            {g.key === 'comfort' && (
+              <p class="lg2-rules__hint" data-testid="lg2-rules-comfort-scope">
+                {t(
+                  'Diese Werte gelten global. Die eigentlichen Beschattungs-Schwellen (Ziel- und Warntemperatur) legst du PRO RAUM im Tab „Räume" fest — die Automatik nutzt immer die Raum-Werte, nicht diese globalen. Die globale Max.-Innentemperatur dient als übergeordnete Obergrenze (z. B. für die Kühl-Tag-Logik).',
+                  'These values are global. The actual shading thresholds (target and warning temperature) are set PER ROOM in the "Rooms" tab — the automation always uses the room values, not these global ones. The global max indoor temperature acts as an overall ceiling (e.g. for the cool-day logic).',
+                )}
+              </p>
+            )}
             <div class="lg2-rules__sliders">
               {SLIDERS.filter((s) => s.group === g.key).map((s) => renderSlider(s))}
             </div>
@@ -357,6 +402,20 @@ export function LiquidGlass2Rules(_props: RoutableProps): JSX.Element {
             min={16} max={30} step={0.5} value={comfort.coolTargetC}
             onChange={(v): void => patchRules((r) => ({ ...r, comfort: { ...r.comfort, coolTargetC: Math.max(16, Math.min(30, v)) } }))} />
         )}
+
+        <RuleToggle testId="lg2-rules-proactive-shade" on={comfort.proactiveShadeFromTarget === true}
+          label={t('Vorausschauend ab Zieltemperatur beschatten (statt erst ab der Warnschwelle)', 'Shade proactively from the target temperature (instead of only from the warning threshold)')}
+          onToggle={(on): void => patchRules((r) => {
+            const c = { ...r.comfort };
+            if (on) c.proactiveShadeFromTarget = true; else delete c.proactiveShadeFromTarget;
+            return { ...r, comfort: c };
+          })} />
+        <p class="lg2-rules__hint">
+          {t(
+            'Standard aus. Normalerweise beginnt die Beschattung eines Fensters erst, wenn die Vorhersage die Warnschwelle (warning_c) des Raums erreicht. Ist diese Option an, startet eine sanfte, stufenweise Beschattung schon, sobald die vorhergesagte Temperatur über die Zieltemperatur (target_c) steigt — aber nur an Fenstern, auf die die Sonne wirklich direkt scheint. Wie weit geschlossen wird, richtet sich weiter nach der Warnschwelle; diese Option verschiebt nur den Zeitpunkt, ab dem der Schutz einsetzt, nach vorne. Das hält Räume näher am Optimum, kostet aber etwas Tageslicht.',
+            'Off by default. Normally a window only starts shading once the forecast reaches the room\'s warning threshold (warning_c). With this on, gentle graduated shading begins as soon as the forecast rises above the target temperature (target_c) — but only on windows the sun is actually shining on directly. How far the shutter closes is still governed by the warning threshold; this option only moves the moment protection begins earlier. It keeps rooms closer to the optimum at the cost of a little daylight.',
+          )}
+        </p>
 
         <RuleToggle testId="lg2-rules-night-inactive" on={automation.pauseBetweenSunsetAndSunrise ?? false}
           label={t('Nachts inaktiv (keine Fahrten zwischen Sonnenunter- und -aufgang; Sturm bleibt aktiv)', 'Inactive at night (no moves between sunset and sunrise; storm stays active)')}
@@ -392,7 +451,7 @@ export function LiquidGlass2Rules(_props: RoutableProps): JSX.Element {
 
         <RuleToggle testId="lg2-rules-learning-autoapply" on={draft.learning?.autoApply ?? false}
           label={t('Lern-Empfehlungen automatisch übernehmen', 'Apply learning recommendations automatically')}
-          onToggle={(on): void => setDraft((prev) => prev === null ? prev : { ...prev, learning: { ...prev.learning, autoApply: on } })} />
+          onToggle={(on): void => { touchedRef.current = true; setDraft((prev) => prev === null ? prev : { ...prev, learning: { ...prev.learning, autoApply: on } }); }} />
 
         <h3 class="lg2-rules__subhead">{t('Hitzetag-Schutz', 'Hot-day protection')}</h3>
         <RuleToggle testId="lg2-rules-hotday" on={draft.rules.hotDay?.enabled ?? true}
@@ -420,7 +479,68 @@ export function LiquidGlass2Rules(_props: RoutableProps): JSX.Element {
         ))}
       </section>
 
-      <SimulationPanel winName={winName} />
+      {/* Global light sensor + live-sky (cloud nowcast) source */}
+      {(() => {
+        const lightBinding = draft.globalSignals?.illumination?.primary;
+        const lightDeviceId =
+          lightBinding !== undefined && lightBinding.kind === 'hmip' ? lightBinding.deviceId : undefined;
+        const lights = discovery.illuminationSources.value;
+        const nowcastSrc = draft.rules.cloudNowcastSource ?? 'auto';
+        const NOWCAST_OPTS: ReadonlyArray<{ key: 'auto' | 'light' | 'pv' | 'off'; de: string; en: string }> = [
+          { key: 'auto', de: 'Automatisch', en: 'Automatic' },
+          { key: 'light', de: 'Lichtsensor', en: 'Light sensor' },
+          { key: 'pv', de: 'PV-Anlage', en: 'PV system' },
+          { key: 'off', de: 'Aus', en: 'Off' },
+        ];
+        return (
+          <section class="lg2-card lg2-rules__card" data-testid="lg2-rules-lightsensor">
+            <h2 class="lg2-card__title">{t('Lichtsensor & Live-Himmel', 'Light sensor & live sky')}</h2>
+            <p class="lg2-rules__hint">
+              {t(
+                'Ein globaler Außen-Lichtsensor (Helligkeit in Lux) wird wie die PV-Anlage hausweit genutzt: Er misst live, wie hell es gerade draußen ist, und korrigiert damit die Strahlungs-Vorhersage der nächsten Stunden (Wolken vorausschauend). Anders als die PV-Anlage hängt er nicht von der Anlagen-Ausrichtung ab und ist deshalb meist der zuverlässigere Wolken-Fühler.',
+                'A global outdoor light sensor (brightness in lux) is used house-wide like the PV system: it measures live how bright it is outside and corrects the near-term radiation forecast (clouds, proactively). Unlike the PV system it does not depend on the array orientation, so it is usually the more reliable cloud probe.',
+              )}
+            </p>
+            <label class="lg2-rules__field" data-testid="lg2-rules-lightsensor-select">
+              <span class="lg2-rules__field-label">{t('Globaler Lichtsensor', 'Global light sensor')}</span>
+              <select
+                value={lightDeviceId ?? ''}
+                onChange={(e): void => setLightSensor((e.currentTarget as HTMLSelectElement).value)}
+              >
+                <option value="">{t('— kein Lichtsensor —', '— no light sensor —')}</option>
+                {lightDeviceId !== undefined && !lights.some((d) => d.deviceId === lightDeviceId) && (
+                  <option value={lightDeviceId}>{t(`Sensor (…${lightDeviceId.slice(-4)})`, `Sensor (…${lightDeviceId.slice(-4)})`)}</option>
+                )}
+                {lights.map((d) => (<option key={d.deviceId} value={d.deviceId}>{deviceLabel(d)}</option>))}
+              </select>
+              {lights.length === 0 && (
+                <small class="lg2-rules__hint">{t('Keine Lichtsensoren gefunden. Ggf. „Geräte suchen" im Tab „Räume" ausführen.', 'No light sensors found. Run "Discover devices" in the "Rooms" tab if needed.')}</small>
+              )}
+            </label>
+
+            <span class="lg2-rules__field-label">{t('Live-Himmel-Quelle (Wolken-Korrektur)', 'Live-sky source (cloud correction)')}</span>
+            <div class="lg2-seg" role="tablist" data-testid="lg2-rules-nowcast-source">
+              {NOWCAST_OPTS.map((o) => (
+                <button key={o.key} type="button" role="tab" aria-selected={nowcastSrc === o.key}
+                  class={`lg2-seg__btn${nowcastSrc === o.key ? ' lg2-seg__btn--on' : ''}`}
+                  data-testid={`lg2-rules-nowcast-${o.key}`}
+                  onClick={(): void => patchRules((r) => ({ ...r, cloudNowcastSource: o.key }))}>
+                  {t(o.de, o.en)}
+                </button>
+              ))}
+            </div>
+            <p class="lg2-rules__hint">
+              {t(
+                'Automatisch nutzt den Lichtsensor, sobald er verfügbar ist, sonst die PV-Anlage. „Aus" verwendet nur die reine Wettervorhersage.',
+                'Automatic uses the light sensor when available, otherwise the PV system. "Off" uses the raw weather forecast only.',
+              )}
+            </p>
+          </section>
+        );
+      })()}
+
+      {/* Simulation / dry run — expert only (hidden in Basis). */}
+      {expertMode.value && <SimulationPanel winName={winName} />}
     </main>
   );
 }

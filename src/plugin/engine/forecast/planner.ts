@@ -16,7 +16,8 @@ import type { CycleSnapshot } from '../orchestrator.js';
 import { getSunPosition, circularAngleDiff, type SunPosition } from '../sun.js';
 import type { Location } from '../../../shared/types.js';
 import { detectDeviation, type DeviationResult } from './deviation.js';
-import { computeCloudNowcast, arrayAzimuthFromHint } from './nowcast.js';
+import { directBeamAvailability01 } from './facadeExposure.js';
+import { computeCloudNowcast, computeLuxCloudNowcast, arrayAzimuthFromHint } from './nowcast.js';
 import {
   selectPosition,
   planWindowSchedule,
@@ -269,13 +270,84 @@ export function runForecastPlanner(
   // sun is too low or off the array (e.g. SE array in the late-afternoon west
   // sun), where low PV is expected geometry, not clouds.
   const NOWCAST_WINDOW_MS = 3 * 3600_000;
-  const nowcast = computeCloudNowcast({
-    pvSmoothedKw: snapshot.pvSmoothedKw,
-    pvPeakKwp: config.fusionSolar.pvPeakKwp,
-    sun: memoSun(now, config.location),
-    arrayAzimuthDeg: deps.pvArrayAzimuthDeg ?? arrayAzimuthFromHint(config.fusionSolar.orientationHint),
-  });
+  // Live cloud nowcast — which LIVE signal corrects the near-term forecast
+  // radiation is USER-SELECTABLE (`rules.cloudNowcastSource`):
+  //   'auto' (default) prefer the global light sensor when readable, else PV;
+  //   'light' only the lux nowcast; 'pv' only the PV nowcast; 'off' no live
+  // correction. A horizontal lux reading is independent of the PV array
+  // orientation and so usually the more reliable brightness probe.
+  const nowcastSource = config.rules.cloudNowcastSource ?? 'auto';
+  const noNowcast = { cloudFactor01: 1, reliable: false, expectedFraction01: 0 } as const;
+  const luxNowcast =
+    nowcastSource === 'light' || nowcastSource === 'auto'
+      ? computeLuxCloudNowcast({
+          illuminanceLux: snapshot.illuminanceLux ?? null,
+          sun: memoSun(now, config.location),
+        })
+      : noNowcast;
+  const pvNowcast =
+    nowcastSource === 'pv' || nowcastSource === 'auto'
+      ? computeCloudNowcast({
+          pvSmoothedKw: snapshot.pvSmoothedKw,
+          pvPeakKwp: config.fusionSolar.pvPeakKwp,
+          sun: memoSun(now, config.location),
+          arrayAzimuthDeg: deps.pvArrayAzimuthDeg ?? arrayAzimuthFromHint(config.fusionSolar.orientationHint),
+        })
+      : noNowcast;
+  const nowcast =
+    nowcastSource === 'off'
+      ? noNowcast
+      : nowcastSource === 'light'
+        ? luxNowcast
+        : nowcastSource === 'pv'
+          ? pvNowcast
+          : // 'auto': prefer the light sensor when reliable, else PV.
+            luxNowcast.reliable
+            ? luxNowcast
+            : pvNowcast;
   const nowMs = now.getTime();
+
+  // Cool-day gate input: the day's MAX outdoor temperature over the planning
+  // horizon (forecast series, plus the bound forecast-max / current outdoor as
+  // fallbacks). If it stays below the comfort threshold the outdoor air is a
+  // heat SINK — a room cannot be pushed above comfort from outside, so
+  // predictive shading is only applied where it demonstrably lowers the peak
+  // (see positionSelector `outdoorBelowComfort`); otherwise windows stay open
+  // for daylight and ventilation clears any residual warmth.
+  const comfortMaxC = config.rules.comfort?.maxIndoorTempC ?? 25;
+  let dayMaxOutdoorC: number | null = snapshot.forecastMaxTempC ?? snapshot.outdoorTempC ?? null;
+  for (let i = 0; i < series.length; i += 1) {
+    const tMs = seriesMs[i];
+    const tempC = series[i]?.tempC;
+    if (
+      tMs !== undefined &&
+      Number.isFinite(tMs) &&
+      tMs >= nowMs - 3600_000 &&
+      tempC !== null &&
+      tempC !== undefined &&
+      Number.isFinite(tempC)
+    ) {
+      dayMaxOutdoorC = dayMaxOutdoorC === null ? tempC : Math.max(dayMaxOutdoorC, tempC);
+    }
+  }
+  const outdoorBelowComfort = dayMaxOutdoorC !== null && dayMaxOutdoorC < comfortMaxC;
+
+  // Passive-cooling OPEN (PV-Boost zum Öffnen): the indoor TARGET temperature
+  // is the optimum we aim for (default 23 °C), distinct from the comfort MAX we
+  // tolerate. When the PV array is essentially off (no solar gain to protect
+  // against) AND it is a genuinely cool day (day max below comfort) AND the
+  // outdoor air is below the target, opening every window lets the house cool
+  // toward the target by ventilation — shading would only cost daylight. Storm
+  // and manual override keep precedence (handled by the orchestrator).
+  const targetIndoorC = config.rules.comfort?.targetIndoorTempC ?? 23;
+  const PASSIVE_OPEN_PV_BELOW_KW = 0.1; // PV essentially off (~<100 W)
+  const pvLow =
+    snapshot.pvSmoothedKw === null || snapshot.pvSmoothedKw < PASSIVE_OPEN_PV_BELOW_KW;
+  const passiveCoolOpen =
+    outdoorBelowComfort &&
+    pvLow &&
+    snapshot.outdoorTempC !== null &&
+    snapshot.outdoorTempC < targetIndoorC;
 
   const sampleForecast = (
     t: Date,
@@ -467,11 +539,52 @@ export function runForecastPlanner(
         uncertaintyMarginC(baseTraj?.confidence01 ?? 0.9),
     );
 
+    // Proactive shading from the room TARGET (opt-in, default off). When on,
+    // graduated shading of a sun-lit window begins as soon as the forecast peak
+    // rises above `target_c` instead of `warning_c` (= bounds.upperC). The hard
+    // ceiling still governs how far the shutter closes; this only advances WHEN
+    // protection begins. Clamped to the comfort bound so it can never sit ABOVE
+    // the warning threshold (a target above warning would be nonsensical).
+    const proactiveThresholdC =
+      config.rules.comfort?.proactiveShadeFromTarget === true
+        ? Math.min(roomData.targets.target_c, bounds.upperC)
+        : bounds.upperC;
+
     for (const w of roomWindows) {
       // No trajectory → no plan; orchestrator falls back to the risk path.
       if (baseTraj === null) {
         continue;
       }
+
+      // Passive-cooling OPEN: cool day + PV essentially off + outdoor below the
+      // indoor target → open this window fully (0 % = open) so the room cools by
+      // ventilation. Skips all shading logic; emits a move only if not already
+      // open. (Roof windows included — no solar to admit when PV is off.)
+      if (passiveCoolOpen) {
+        const alreadyOpen = (w.currentLevel01 ?? 0) <= 1e-9;
+        const openPlan: PositionPlan = {
+          windowId: w.config.id,
+          target01: 0,
+          plannedActions: alreadyOpen
+            ? []
+            : [
+                {
+                  windowId: w.config.id,
+                  scheduledTs: now.toISOString(),
+                  targetPercent: 0,
+                  reason: 'Öffnen zur passiven Kühlung – kühl draußen, keine Sonne',
+                  state: 'scheduled',
+                },
+              ],
+          noMoveNeeded: alreadyOpen,
+        };
+        windowsPlan.set(w.config.id, openPlan);
+        for (const a of openPlan.plannedActions) {
+          plannedActions.push(a);
+        }
+        continue;
+      }
+
       const trajectoryForLevel = (level01: number): RoomTrajectory => {
         const t = forecastRoom({
           now,
@@ -556,10 +669,19 @@ export function runForecastPlanner(
           const s = memoSun(t, config.location);
           if (!s.isUp || s.elevationDeg < 3) return 0;
           const elevTerm = Math.max(0, Math.min(1, (s.elevationDeg - 3) / 40));
-          if (isRoof) return elevTerm;
+          // Direct-beam availability: `exposureAt` models how much DIRECT sun is
+          // on the facade — which is exactly what a shutter can block. A fully
+          // overcast / rainy sky has essentially no direct beam (OpenMeteo
+          // direct radiation ~0 while diffuse stays high), so shading such a
+          // facade gives no cooling benefit and only costs daylight. Damp the
+          // geometric exposure by the real cloud cover: clear skies are
+          // unchanged (cloud≈0 → factor 1), full overcast → ~0. This is what
+          // stops predictive shading on a 100%-overcast day.
+          const beam = directBeamAvailability01(sampleForecast(t).cloudCover01);
+          if (isRoof) return elevTerm * beam;
           const angle = circularAngleDiff(s.azimuthDeg, w.config.orientationDeg);
           const azTerm = Math.max(0, Math.min(1, 1 - angle / 90));
-          return Math.max(0, Math.min(1, azTerm * elevTerm));
+          return Math.max(0, Math.min(1, azTerm * elevTerm * beam));
         };
         // Strong solar/PV load at t (clear-sky, high radiation) — proxy for
         // "high PV" that allows an off-sun facade up to 70 % if comfort fails.
@@ -612,6 +734,8 @@ export function runForecastPlanner(
             solarStrongAt,
             heatCap01: heatCapForWindow(w.config),
             isRoof,
+            outdoorBelowComfort,
+            proactiveThresholdC,
             tuning: windowTuning,
             eveningOpenExposureBelow: eveningThreshold,
             pvCloseFloorAt,

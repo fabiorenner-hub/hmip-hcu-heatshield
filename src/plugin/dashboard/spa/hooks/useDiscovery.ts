@@ -42,6 +42,8 @@ export interface DiscoveryResult {
   shutterSources?: DiscoveredDevice[];
   /** Devices carrying a `windowState` feature (window/door contacts). */
   contactSources?: DiscoveredDevice[];
+  /** Devices carrying an `illumination` feature (candidate global light sensors). */
+  illuminationSources?: DiscoveredDevice[];
   /** Full per-device inventory with feature names. */
   inventory?: ReadonlyArray<{
     deviceId: string;
@@ -74,6 +76,7 @@ const histogramSig = signal<
 const temperatureSourcesSig = signal<DiscoveredDevice[]>([]);
 const shutterSourcesSig = signal<DiscoveredDevice[]>([]);
 const contactSourcesSig = signal<DiscoveredDevice[]>([]);
+const illuminationSourcesSig = signal<DiscoveredDevice[]>([]);
 const inventorySig = signal<
   ReadonlyArray<{
     deviceId: string;
@@ -112,6 +115,8 @@ export interface UseDiscoveryResult {
   shutterSources: Signal<DiscoveredDevice[]>;
   /** Devices carrying a windowState feature (window/door contacts). */
   contactSources: Signal<DiscoveredDevice[]>;
+  /** Devices carrying an illumination feature (candidate global light sensors). */
+  illuminationSources: Signal<DiscoveredDevice[]>;
   /** Full per-device inventory with feature names. */
   inventory: Signal<
     ReadonlyArray<{
@@ -160,6 +165,7 @@ export async function runDiscovery(): Promise<void> {
     temperatureSourcesSig.value = json.temperatureSources ?? [];
     shutterSourcesSig.value = json.shutterSources ?? [];
     contactSourcesSig.value = json.contactSources ?? [];
+    illuminationSourcesSig.value = json.illuminationSources ?? [];
     inventorySig.value = json.inventory ?? [];
     rawDeviceCountSig.value = json.rawDeviceCount ?? null;
     rawHistogramSig.value = json.rawDeviceTypeHistogram ?? [];
@@ -190,6 +196,7 @@ export function useDiscovery(): UseDiscoveryResult {
     temperatureSources: temperatureSourcesSig,
     shutterSources: shutterSourcesSig,
     contactSources: contactSourcesSig,
+    illuminationSources: illuminationSourcesSig,
     inventory: inventorySig,
     rawDeviceCount: rawDeviceCountSig,
     rawHistogram: rawHistogramSig,
@@ -214,6 +221,7 @@ export function __resetDiscoveryStateForTests(): void {
   temperatureSourcesSig.value = [];
   shutterSourcesSig.value = [];
   contactSourcesSig.value = [];
+  illuminationSourcesSig.value = [];
   inventorySig.value = [];
   rawDeviceCountSig.value = null;
   rawHistogramSig.value = [];

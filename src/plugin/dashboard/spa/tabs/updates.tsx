@@ -22,6 +22,23 @@ export interface ChangelogEntry {
 export function getChangelog(): ChangelogEntry[] {
   return [
   {
+    version: '2.0.29',
+    items: [
+      t(
+        'Kein unnötiges Verschatten an kühlen Tagen: liegt die prognostizierte Tages-Höchsttemperatur unter der Komfortgrenze, wird eine Fassade nur noch verschattet, wenn Schließen den Innen-Peak spürbar senkt (echte Direktsonne). Sonst bleibt sie offen — Restwärme geht per Lüften weg. Heiße Tage und klar-kühle Tage mit echter Solarlast bleiben unverändert.',
+        'No needless shading on cool days: if the forecast daily max outdoor temperature is below the comfort limit, a facade is only shaded when closing measurably lowers the indoor peak (real direct sun). Otherwise it stays open — residual warmth is cleared by ventilation. Hot days and clear-but-cool days with real solar load are unchanged.',
+      ),
+      t(
+        'Verschattung berücksichtigt jetzt die Bewölkung: an bedeckten/regnerischen Tagen mit fast keiner Direktsonne wird nicht mehr unnötig vorausschauend verschattet (v. a. NW/W). Bisher rechnete der Planer die Sonne auf der Fassade rein geometrisch, ohne Wolken — ein Rollladen blockiert aber nur den Direktstrahl, gegen Diffuslicht bringt Verschatten nichts.',
+        'Shading now accounts for cloud cover: on overcast/rainy days with almost no direct sun, windows are no longer needlessly pre-shaded (especially NW/W). The planner used to compute sun-on-facade purely geometrically, ignoring clouds — but a shutter only blocks the direct beam; shading does nothing against diffuse light.',
+      ),
+      t(
+        'Die Zeile „Bewölkung/Regen" im Prognoseverlauf zeigt jetzt die tatsächliche Bewölkung statt der oft niedrigen Regenwahrscheinlichkeit.',
+        'The "cloud/rain" row in the forecast timeline now shows actual cloud cover instead of the often-low precipitation probability.',
+      ),
+    ],
+  },
+  {
     version: '2.0.28',
     items: [
       t(

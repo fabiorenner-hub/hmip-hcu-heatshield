@@ -80,6 +80,14 @@ const DEFAULT_TARGETS: RoomTargets = {
   critical_c: 27.0,
 };
 
+/** Short human explanation for each threshold (premium UI — "was bewirkt das?"). */
+const TARGET_HINTS: Record<keyof RoomTargets, [string, string]> = {
+  target_c: ['Wohlfühlwert. Optionaler Start für vorausschauendes Beschatten.', 'Comfort value. Optional start of proactive shading.'],
+  warning_c: ['Ab dieser Prognose beginnt die eigentliche Beschattung.', 'Shading actually starts from this forecast.'],
+  strong_shade_c: ['Ab hier wird deutlich stärker geschlossen.', 'Closes noticeably harder from here.'],
+  critical_c: ['Maximaler Hitzeschutz — nahezu geschlossen.', 'Maximum heat protection — nearly closed.'],
+};
+
 /** Sentinel for the assignment dropdowns meaning "detach from any room". */
 const VIRTUAL_UNASSIGNED_ROOM_ID = '__unassigned__';
 
@@ -294,6 +302,7 @@ interface RoomCardProps {
   onChangeTarget: (key: keyof RoomTargets, value: number) => void;
   onAssignTempSensor: (deviceId: string) => void;
   onClearTempSensor: () => void;
+  onToggleThermostatTarget: (on: boolean) => void;
   onChangeQuietSchedules: (schedules: Schedule[]) => void;
   onToggleWindowBlock: (windowId: string, blocked: boolean) => void;
   onToggleActiveCooling: (on: boolean) => void;
@@ -361,10 +370,11 @@ function RoomCard(props: RoomCardProps): JSX.Element {
 
       <div class="lg2-rooms__section">
         <span class="lg2-rooms__section-label">{t('Zieltemperaturen', 'Target temperatures')}</span>
+        <p class="lg2-rooms__secdesc">{t('Vier ansteigende Innentemperatur-Schwellen. Je höher die erwartete Temperatur, desto stärker beschattet die Automatik.', 'Four rising indoor-temperature thresholds. The higher the expected temperature, the harder the automation shades.')}</p>
         <div class="lg2-rooms__targets">
           {(['target_c', 'warning_c', 'strong_shade_c', 'critical_c'] as const).map((k) => (
             <label key={k} class="lg2-rooms__target">
-              <span>{TARGET_LABELS[k]}</span>
+              <span class="lg2-rooms__target-name">{TARGET_LABELS[k]}</span>
               <span class="lg2-rooms__target-input">
                 <input
                   type="number"
@@ -378,6 +388,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
                 />
                 <em>°C</em>
               </span>
+              <small class="lg2-rooms__target-hint">{t(...TARGET_HINTS[k])}</small>
             </label>
           ))}
         </div>
@@ -385,6 +396,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
 
       <div class="lg2-rooms__section">
         <span class="lg2-rooms__section-label">{t('Innentemperatur-Sensor', 'Indoor temperature sensor')}</span>
+        <p class="lg2-rooms__secdesc">{t('Liefert die gemessene Ist-Temperatur des Raums. Ohne Sensor arbeitet die Automatik nur mit der Prognose.', 'Provides the measured room temperature. Without a sensor the automation relies on the forecast only.')}</p>
         <select
           class="lg2-rooms__wide-select"
           data-testid={`lg2-room-indoor-select-${room.id}`}
@@ -401,6 +413,21 @@ function RoomCard(props: RoomCardProps): JSX.Element {
           )}
           {props.tempSensors.map((d) => (<option key={d.deviceId} value={d.deviceId}>{deviceLabel(d)}</option>))}
         </select>
+        <label class="lg2-rooms__cooling" data-testid={`lg2-room-thermostat-target-${room.id}`}>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={room.useThermostatTarget === true}
+            class={`lg2-toggle${room.useThermostatTarget === true ? ' lg2-toggle--on' : ''}`}
+            onClick={(): void => props.onToggleThermostatTarget(!(room.useThermostatTarget === true))}
+          />
+          <span>
+            {t('Zieltemperatur vom Thermostat übernehmen', 'Use the thermostat setpoint as target')}
+            <small class="lg2-rooms__hint">
+              {t('Optional, Standard aus. Nutzt den Soll-Wert des oben gewählten Thermostats als Ziel (target_c); Warn-/Stark-/Kritisch-Schwellen ziehen mit. Wenn das Gerät keinen Soll-Wert liefert, gilt weiter der eingestellte Zielwert.', 'Optional, off by default. Uses the setpoint of the thermostat selected above as the target (target_c); the warning/strong/critical thresholds ride along. If the device reports no setpoint, the configured target stays in effect.')}
+            </small>
+          </span>
+        </label>
       </div>
 
       <div class="lg2-rooms__section">
@@ -432,6 +459,7 @@ function RoomCard(props: RoomCardProps): JSX.Element {
         <span class="lg2-rooms__section-label">
           {t('Rollläden / Fenster', 'Shutters / windows')} ({windows.length})
         </span>
+        <p class="lg2-rooms__secdesc">{t('Himmelsrichtung bestimmt, wann die Sonne auf das Fenster trifft. Fensterkontakt und „Automatik aus" steuern Ausnahmen.', 'Orientation determines when the sun hits the window. Window contact and "automation off" control exceptions.')}</p>
         {windows.length === 0 ? (
           <p class="lg2-rooms__hint">{t('Noch kein Rollladen zugewiesen — unten unter „Geräte" zuweisen.', 'No shutter assigned yet — assign one below under "Devices".')}</p>
         ) : (
@@ -528,13 +556,24 @@ export function LiquidGlass2Rooms(_props: RoutableProps): JSX.Element {
   const [draftWindows, setDraftWindows] = useState<WindowDef[]>([]);
   const [windowAssignments, setWindowAssignments] = useState<Record<string, string>>({});
   const [addForm, setAddForm] = useState<AddRoomFormState>(INITIAL_ADD_ROOM_FORM);
+  // Master-detail: which room is open in the detail pane.
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  // Devices panel (discovery + assignment) is collapsed by default to keep the
+  // page calm; it expands on demand.
+  const [devicesOpen, setDevicesOpen] = useState<boolean>(false);
 
   const hydratedRef = useRef<boolean>(false);
   const touchedRef = useRef<boolean>(false);
 
   useEffect(() => {
     const c = cfg.config.value;
-    if (c === null || hydratedRef.current) return;
+    if (c === null) return;
+    // Hydrate the local draft from the server config on first load AND re-sync
+    // whenever the config changes EXTERNALLY (e.g. thresholds edited in the
+    // Rules tab, or another browser) — but never clobber in-progress local
+    // edits on this page (`touchedRef`). This fixes the forum report where
+    // changed thresholds kept showing the old values here until a full reload.
+    if (hydratedRef.current && touchedRef.current) return;
     hydratedRef.current = true;
     setDraftRooms(c.rooms.map(migrateLegacyQuiet));
     setDraftWindows(c.windows);
@@ -548,6 +587,18 @@ export function LiquidGlass2Rooms(_props: RoutableProps): JSX.Element {
       void runDiscovery();
     }
   }, []);
+
+  // Keep the detail selection valid: default to the first room, and re-point if
+  // the selected room was deleted.
+  useEffect(() => {
+    if (draftRooms.length === 0) {
+      if (selectedRoomId !== null) setSelectedRoomId(null);
+      return;
+    }
+    if (selectedRoomId === null || !draftRooms.some((r) => r.id === selectedRoomId)) {
+      setSelectedRoomId(draftRooms[0]!.id);
+    }
+  }, [draftRooms, selectedRoomId]);
 
   const discoveredShutters = useMemo<DiscoveredDevice[]>(
     () => discovery.shutterSources.value,
@@ -604,6 +655,15 @@ export function LiquidGlass2Rooms(_props: RoutableProps): JSX.Element {
       if (r.id !== roomId) return r;
       const { indoorTemp: _omit, ...restSignals } = r.signals;
       return { ...r, signals: restSignals };
+    }));
+  };
+  const toggleThermostatTarget = (roomId: string, on: boolean): void => {
+    touchedRef.current = true;
+    setDraftRooms((prev) => prev.map((r) => {
+      if (r.id !== roomId) return r;
+      if (on) return { ...r, useThermostatTarget: true };
+      const { useThermostatTarget: _omit, ...rest } = r;
+      return rest as Room;
     }));
   };
   const assignShutterToRoom = (deviceId: string, roomId: string): void => {
@@ -741,12 +801,15 @@ export function LiquidGlass2Rooms(_props: RoutableProps): JSX.Element {
     if (JSON.stringify(next) !== JSON.stringify(current)) cfg.scheduleSave(next);
   }, [draftRooms, draftWindows, windowAssignments]);
 
+  const selectedRoom = draftRooms.find((r) => r.id === selectedRoomId) ?? null;
+  const totalWindows = draftWindows.filter((w) => windowAssignments[w.id] !== VIRTUAL_UNASSIGNED_ROOM_ID).length;
+
   return (
-    <main class="lg2-main lg2-rooms" data-testid="liquid-glass2-rooms">
+    <main class="lg2-main lg2-rooms lg2-rcfg" data-testid="liquid-glass2-rooms">
       <header class="lg2-header">
         <div>
           <h1 class="lg2-header__title">{t('Räume und Fenster', 'Rooms and windows')}</h1>
-          <p class="lg2-header__sub">{t('Geräte, Zieltemperaturen, Ruhezeiten und Ausrichtung', 'Devices, target temperatures, quiet hours and orientation')}</p>
+          <p class="lg2-header__sub">{t('Pro Raum: Zieltemperaturen, Sensor, Ruhezeiten und Rollläden — die Automatik nutzt genau diese Werte.', 'Per room: target temperatures, sensor, quiet hours and shutters — the automation uses exactly these values.')}</p>
         </div>
         <div class="lg2-rooms__actions">
           <button type="button" class="lg2-btn lg2-btn--ghost" data-testid="lg2-rooms-discover"
@@ -765,23 +828,6 @@ export function LiquidGlass2Rooms(_props: RoutableProps): JSX.Element {
           </span>
         </div>
       </header>
-
-      <section class="lg2-card lg2-rooms__discovery">
-        <DiscoveryStatus discovery={discovery} />
-        {discovery.error.value !== null && (
-          <p class="lg2-rooms__error" data-testid="lg2-rooms-discover-error">{discovery.error.value}</p>
-        )}
-        <div class="lg2-rooms__presets" data-testid="lg2-rooms-presets">
-          <span class="lg2-rooms__presets-label">{t('Schnell anlegen:', 'Quick add:')}</span>
-          {ROOM_PRESETS.map((p) => (
-            <button key={p.nameDe} type="button" class="lg2-rooms__preset-btn" data-testid={`lg2-rooms-preset-${p.nameDe}`}
-              title={t(`${p.floor} · Priorität ${p.priority}`, `${p.floor} · priority ${p.priority}`)}
-              onClick={(): void => handleAddPreset(p)}>
-              + {t(p.nameDe, p.nameEn)} <small>({p.floor})</small>
-            </button>
-          ))}
-        </div>
-      </section>
 
       {cfg.loadError.value !== null && (
         <div class="lg2-card lg2-rooms__error-card" data-testid="lg2-rooms-load-error">{cfg.loadError.value}</div>
@@ -842,43 +888,123 @@ export function LiquidGlass2Rooms(_props: RoutableProps): JSX.Element {
         </form>
       )}
 
-      <div class="lg2-rooms__list">
-        {draftRooms.length === 0 && (
-          <p class="lg2-card lg2-rooms__hint" data-testid="lg2-rooms-empty">{t('Noch keine Räume. „Raum hinzufügen" oder ein Preset oben nutzen.', 'No rooms yet. Use "Add room" or a preset above.')}</p>
-        )}
-        {draftRooms.map((room) => (
-          <RoomCard
-            key={room.id}
-            room={room}
-            windows={windowsByRoom.get(room.id) ?? []}
-            hasIssue={issuePathsByRoom.has(room.id)}
-            issueWindowIds={issuePathsByWindow}
-            shutters={discoveredShutters}
-            tempSensors={discovery.temperatureSources.value}
-            contacts={discovery.contactSources.value}
-            contactUsage={contactUsage}
-            onRename={(name): void => handleRenameRoom(room.id, name)}
-            onChangeFloor={(floor): void => handleChangeFloor(room.id, floor)}
-            onChangePriority={(p): void => handleChangePriority(room.id, p)}
-            onChangeTarget={(k, v): void => handleChangeTarget(room.id, k, v)}
-            onAssignTempSensor={(id): void => assignTempSensor(room.id, id)}
-            onClearTempSensor={(): void => clearTempSensor(room.id)}
-            onChangeQuietSchedules={(s): void => handleChangeQuietSchedules(room.id, s)}
-            onToggleWindowBlock={handleToggleWindowBlock}
-            onToggleActiveCooling={(on): void => handleToggleActiveCooling(room.id, on)}
-            onChangeBlockSchedules={handleChangeBlockSchedules}
-            onChangeOrientation={handleChangeOrientation}
-            onDelete={(): void => handleDeleteRoom(room.id)}
-            onAssignContact={assignContact}
-            onClearContact={clearContact}
-          />
-        ))}
+      <div class="lg2-rcfg__split">
+        <aside class="lg2-card lg2-rcfg__list" data-testid="lg2-rcfg-list">
+          <div class="lg2-rcfg__list-head">
+            <span class="lg2-rcfg__list-title">{t('Deine Räume', 'Your rooms')}</span>
+            <span class="lg2-rcfg__list-count">{draftRooms.length}</span>
+          </div>
+
+          {draftRooms.length === 0 ? (
+            <p class="lg2-rcfg__list-empty" data-testid="lg2-rooms-empty">
+              {t('Noch keine Räume. Lege unten schnell einen an oder nutze „Raum hinzufügen".', 'No rooms yet. Quick-add one below or use "Add room".')}
+            </p>
+          ) : (
+            <ul class="lg2-rcfg__roomlist" data-testid="lg2-rcfg-roomlist">
+              {draftRooms.map((room) => {
+                const wc = (windowsByRoom.get(room.id) ?? []).length;
+                const sel = room.id === selectedRoomId;
+                const issue = issuePathsByRoom.has(room.id);
+                return (
+                  <li key={room.id}>
+                    <button type="button"
+                      class={`lg2-rcfg__roomitem${sel ? ' lg2-rcfg__roomitem--on' : ''}${issue ? ' lg2-rcfg__roomitem--issue' : ''}`}
+                      data-testid={`lg2-rcfg-room-${room.id}`}
+                      aria-current={sel ? 'true' : undefined}
+                      onClick={(): void => setSelectedRoomId(room.id)}>
+                      <span class="lg2-rcfg__roomicon"><Icon name="haus" size={17} /></span>
+                      <span class="lg2-rcfg__roominfo">
+                        <span class="lg2-rcfg__roomname">
+                          {room.name}
+                          {issue && <span class="lg2-rcfg__issuedot" title={t('Speicherfehler in diesem Raum', 'Save error in this room')} />}
+                        </span>
+                        <span class="lg2-rcfg__roommeta">
+                          {room.floor !== undefined && room.floor !== '' ? `${room.floor} · ` : ''}
+                          {PRIORITY_LABELS[room.priority]} · {t(`${wc} Rollladen`, `${wc} shutters`)}
+                        </span>
+                      </span>
+                      <Icon name="mehr" size={15} class="lg2-rcfg__roomchev" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div class="lg2-rcfg__quickadd" data-testid="lg2-rooms-presets">
+            <span class="lg2-rcfg__quickadd-label">{t('Schnell anlegen', 'Quick add')}</span>
+            <div class="lg2-rcfg__quickadd-chips">
+              {ROOM_PRESETS.map((p) => (
+                <button key={p.nameDe} type="button" class="lg2-rcfg__preset" data-testid={`lg2-rooms-preset-${p.nameDe}`}
+                  title={t(`${p.floor} · Priorität ${PRIORITY_LABELS[p.priority]}`, `${p.floor} · priority ${PRIORITY_LABELS[p.priority]}`)}
+                  onClick={(): void => handleAddPreset(p)}>
+                  + {t(p.nameDe, p.nameEn)} <small>{p.floor}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <div class="lg2-rcfg__detailwrap" data-testid="lg2-rcfg-detail">
+          {selectedRoom === null ? (
+            <div class="lg2-card lg2-rcfg__empty" data-testid="lg2-rcfg-empty-detail">
+              <span class="lg2-rcfg__empty-icon"><Icon name="haus" size={30} /></span>
+              <h2>{draftRooms.length === 0 ? t('Lege deinen ersten Raum an', 'Create your first room') : t('Wähle einen Raum', 'Select a room')}</h2>
+              <p>{draftRooms.length === 0
+                ? t('Nutze „Schnell anlegen" oder oben „Raum hinzufügen". Danach richtest du hier alles Weitere ein.', 'Use "Quick add" or "Add room" above. Then set everything else up here.')
+                : t('Wähle links einen Raum, um Zieltemperaturen, Sensor, Ruhezeiten und Rollläden einzustellen.', 'Pick a room on the left to set target temperatures, sensor, quiet hours and shutters.')}</p>
+            </div>
+          ) : (
+            <RoomCard
+              key={selectedRoom.id}
+              room={selectedRoom}
+              windows={windowsByRoom.get(selectedRoom.id) ?? []}
+              hasIssue={issuePathsByRoom.has(selectedRoom.id)}
+              issueWindowIds={issuePathsByWindow}
+              shutters={discoveredShutters}
+              tempSensors={discovery.temperatureSources.value}
+              contacts={discovery.contactSources.value}
+              contactUsage={contactUsage}
+              onRename={(name): void => handleRenameRoom(selectedRoom.id, name)}
+              onChangeFloor={(floor): void => handleChangeFloor(selectedRoom.id, floor)}
+              onChangePriority={(p): void => handleChangePriority(selectedRoom.id, p)}
+              onChangeTarget={(k, v): void => handleChangeTarget(selectedRoom.id, k, v)}
+              onAssignTempSensor={(id): void => assignTempSensor(selectedRoom.id, id)}
+              onClearTempSensor={(): void => clearTempSensor(selectedRoom.id)}
+              onToggleThermostatTarget={(on): void => toggleThermostatTarget(selectedRoom.id, on)}
+              onChangeQuietSchedules={(s): void => handleChangeQuietSchedules(selectedRoom.id, s)}
+              onToggleWindowBlock={handleToggleWindowBlock}
+              onToggleActiveCooling={(on): void => handleToggleActiveCooling(selectedRoom.id, on)}
+              onChangeBlockSchedules={handleChangeBlockSchedules}
+              onChangeOrientation={handleChangeOrientation}
+              onDelete={(): void => handleDeleteRoom(selectedRoom.id)}
+              onAssignContact={assignContact}
+              onClearContact={clearContact}
+            />
+          )}
+        </div>
       </div>
 
-      <section class="lg2-card lg2-rooms__devices">
-        <h2 class="lg2-card__title">{t('Geräte', 'Devices')}</h2>
+      <section class={`lg2-card lg2-rcfg__devices${devicesOpen ? '' : ' lg2-rcfg__devices--collapsed'}`} data-testid="lg2-rcfg-devices">
+        <button type="button" class="lg2-rcfg__devices-toggle" aria-expanded={devicesOpen}
+          data-testid="lg2-rcfg-devices-toggle" onClick={(): void => setDevicesOpen((v) => !v)}>
+          <Icon name="mehr" size={16} class={`lg2-rcfg__devices-chev${devicesOpen ? ' lg2-rcfg__devices-chev--open' : ''}`} />
+          <span class="lg2-card__title">{t('Geräte & Erkennung', 'Devices & discovery')}</span>
+          <span class="lg2-rcfg__devices-sum">{t(`${totalWindows} zugewiesen · ${discoveredShutters.length} gefunden`, `${totalWindows} assigned · ${discoveredShutters.length} found`)}</span>
+        </button>
 
-        <h3 class="lg2-rooms__devices-head">{t('Gefundene Rollläden', 'Discovered shutters')} ({discoveredShutters.length})</h3>
+        {devicesOpen && (
+        <div class="lg2-rcfg__devices-body">
+          <p class="lg2-rcfg__secdesc">
+            {t('Ordne gefundene Rollläden einem Raum zu. Temperatur-Sensoren und Fensterkontakte weist du direkt im jeweiligen Raum zu.',
+              'Assign discovered shutters to a room. Temperature sensors and window contacts are assigned inside each room.')}
+          </p>
+          <DiscoveryStatus discovery={discovery} />
+          {discovery.error.value !== null && (
+            <p class="lg2-rooms__error" data-testid="lg2-rooms-discover-error">{discovery.error.value}</p>
+          )}
+
+          <h3 class="lg2-rooms__devices-head">{t('Gefundene Rollläden', 'Discovered shutters')} ({discoveredShutters.length})</h3>
         {discoveredShutters.length === 0 ? (
           <p class="lg2-rooms__hint" data-testid="lg2-rooms-discover-empty">
             {t('„Geräte suchen" ausführen, um HMIP-Rollläden und Beschattungsmodule (z. B. HmIP-HDM1) zu finden.', 'Run "Discover devices" to find HMIP shutters and shading modules (e.g. HmIP-HDM1).')}
@@ -941,6 +1067,8 @@ export function LiquidGlass2Rooms(_props: RoutableProps): JSX.Element {
               );
             })}
           </ul>
+        )}
+        </div>
         )}
       </section>
     </main>

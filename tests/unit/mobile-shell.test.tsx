@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 /**
- * Mobile touch-first shell.
+ * Mobile touch-first shell (v2-only reality, ui-v2-release).
  *
- * The Apple-style bottom nav is now the DEFAULT at narrow widths (phones +
- * compact tablets, < 840px) where the vertical sidebar would otherwise collapse
- * into a cramped, cut-off all-tabs bar. The `mobileUiV2` flag additionally
- * forces it on wider tablet/desktop windows (everything below full desktop),
- * but it never activates at full desktop width. The bar exposes five targets
- * (4 primary + Mehr).
+ * The Apple-style bottom nav is the DEFAULT at narrow widths (phones + compact
+ * tablets, < 840px) where the vertical v2 sidebar would otherwise collapse into
+ * a cramped, cut-off all-tabs bar. The `mobileUiV2` flag additionally forces it
+ * on wider tablet/desktop windows (everything below full desktop), but it never
+ * activates at full desktop width. The bar exposes five targets (4 primary +
+ * Mehr). In the v2 shell the root marker class is `app--mobilenav` (the v1-only
+ * `app--mobile` class is retired along with the v1 chrome).
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -34,13 +35,14 @@ afterEach(() => {
   } catch {
     /* ignore */
   }
+  document.body.classList.remove('ui-v2', 'lg2-demo-open');
   setWidth(1024);
 });
 
 describe('mobile shell (automatic at narrow widths)', () => {
   it('is ON by default at phone width and shows 5 nav targets (no flag)', () => {
     const { container } = render(<App initialUrl="/beschattung" />);
-    expect(container.querySelector('.app')!.classList.contains('app--mobile')).toBe(true);
+    expect(container.querySelector('.app')!.classList.contains('app--mobilenav')).toBe(true);
     const nav = container.querySelector('[data-testid="mobile-nav"]');
     expect(nav).not.toBeNull();
     expect(nav!.querySelectorAll('.mobile-nav__item')).toHaveLength(5);
@@ -49,14 +51,14 @@ describe('mobile shell (automatic at narrow widths)', () => {
   it('is ON by default at compact-tablet width (no flag)', () => {
     setWidth(700);
     const { container } = render(<App initialUrl="/beschattung" />);
-    expect(container.querySelector('.app')!.classList.contains('app--mobile')).toBe(true);
+    expect(container.querySelector('.app')!.classList.contains('app--mobilenav')).toBe(true);
     expect(container.querySelector('[data-testid="mobile-nav"]')).not.toBeNull();
   });
 
   it('is OFF at expanded-tablet width without the flag', () => {
     setWidth(1024);
     const { container } = render(<App initialUrl="/beschattung" />);
-    expect(container.querySelector('.app')!.classList.contains('app--mobile')).toBe(false);
+    expect(container.querySelector('.app')!.classList.contains('app--mobilenav')).toBe(false);
     expect(container.querySelector('[data-testid="mobile-nav"]')).toBeNull();
   });
 
@@ -64,7 +66,7 @@ describe('mobile shell (automatic at narrow widths)', () => {
     setFlag('mobileUiV2', true);
     setWidth(1024);
     const { container } = render(<App initialUrl="/beschattung" />);
-    expect(container.querySelector('.app')!.classList.contains('app--mobile')).toBe(true);
+    expect(container.querySelector('.app')!.classList.contains('app--mobilenav')).toBe(true);
     expect(container.querySelector('[data-testid="mobile-nav"]')).not.toBeNull();
   });
 
@@ -72,7 +74,7 @@ describe('mobile shell (automatic at narrow widths)', () => {
     setFlag('mobileUiV2', true);
     setWidth(1440);
     const { container } = render(<App initialUrl="/beschattung" />);
-    expect(container.querySelector('.app')!.classList.contains('app--mobile')).toBe(false);
+    expect(container.querySelector('.app')!.classList.contains('app--mobilenav')).toBe(false);
     expect(container.querySelector('[data-testid="mobile-nav"]')).toBeNull();
   });
 

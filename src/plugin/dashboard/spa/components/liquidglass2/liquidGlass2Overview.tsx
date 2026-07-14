@@ -232,6 +232,14 @@ function Body(props: { snap: DashboardSnapshot }): JSX.Element {
   const now = new Date();
 
   const outdoor = snap.signals?.outdoorTemp?.value ?? null;
+  // Header weather chip = AMBIENT weather (it sits next to the OpenMeteo
+  // humidity + sky condition). A façade-mounted outdoor sensor bakes in the sun
+  // and reads several °C above the real air temperature, so prefer the
+  // weather-service value here; fall back to the sensor when no service value is
+  // present. The raw sensor stays available for the engine + the labelled
+  // "Außentemperatur" expert metric below.
+  const outdoorService = snap.outdoorTempInternetC ?? null;
+  const weatherTemp = outdoorService ?? outdoor;
   const humidity01 = snap.environment?.humidity01?.value ?? null;
   const cloud = cloudPercent(snap);
   const condition: [string, string] =
@@ -276,7 +284,7 @@ function Body(props: { snap: DashboardSnapshot }): JSX.Element {
             <div>
               <div class="lg2-weather__cond">{weatherPrimary}</div>
               <div class="lg2-weather__vals">
-                {outdoor === null ? '–' : `${num1(outdoor)} °C`}
+                {weatherTemp === null ? '–' : `${num1(weatherTemp)} °C`}
                 {humidity01 !== null && ` · ${Math.round(humidity01 * 100)} % r.F.`}
               </div>
             </div>

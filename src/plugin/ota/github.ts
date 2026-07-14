@@ -14,6 +14,8 @@
 /** Owner/repo of this plugin (mirrors src/.../hooks/useUpdateCheck.ts). */
 export const GITHUB_REPO = 'fabiorenner-hub/hmip-hcu-heatshield';
 export const LATEST_RELEASE_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+/** All releases (newest first), including prereleases. Used by the experimental channel. */
+export const RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`;
 
 export type FetchLike = (
   input: string,
@@ -29,6 +31,8 @@ export interface LatestRelease {
   readonly tagName: string;
   readonly htmlUrl: string;
   readonly assets: ReleaseAsset[];
+  /** GitHub `prerelease` flag (true for experimental rolling builds). */
+  readonly prerelease: boolean;
 }
 
 export interface OtaAssetSet {
@@ -64,6 +68,7 @@ export function parseRelease(j: unknown): LatestRelease | null {
   const tagName = typeof obj['tag_name'] === 'string' ? obj['tag_name'] : null;
   if (tagName === null) return null;
   const htmlUrl = typeof obj['html_url'] === 'string' ? obj['html_url'] : `https://github.com/${GITHUB_REPO}/releases`;
+  const prerelease = obj['prerelease'] === true;
   const rawAssets = Array.isArray(obj['assets']) ? obj['assets'] : [];
   const assets: ReleaseAsset[] = [];
   for (const a of rawAssets) {
@@ -75,7 +80,38 @@ export function parseRelease(j: unknown): LatestRelease | null {
       assets.push({ name, url });
     }
   }
-  return { tagName, htmlUrl, assets };
+  return { tagName, htmlUrl, assets, prerelease };
+}
+
+/**
+ * GET the releases list (newest first) and return the newest PRERELEASE, or
+ * null when none exists / on any non-OK/parse. Used by the experimental
+ * channel; the GitHub list endpoint returns prereleases (unlike
+ * `releases/latest`, which excludes them).
+ */
+export async function fetchLatestPrerelease(fetchImpl: FetchLike): Promise<LatestRelease | null> {
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(RELEASES_API, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'heatshield-ota' },
+    });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+  let j: unknown;
+  try {
+    j = await res.json();
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(j)) return null;
+  // The API returns releases sorted newest-first; pick the first prerelease.
+  for (const item of j) {
+    const rel = parseRelease(item);
+    if (rel !== null && rel.prerelease) return rel;
+  }
+  return null;
 }
 
 /** Locate the three OTA assets in a release by filename pattern. */

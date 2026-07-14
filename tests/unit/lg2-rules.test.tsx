@@ -12,6 +12,7 @@ import { h } from 'preact';
 
 import { LiquidGlass2Rules } from '../../src/plugin/dashboard/spa/components/liquidglass2/liquidGlass2Rules.js';
 import { __resetConfigStateForTests } from '../../src/plugin/dashboard/spa/hooks/useConfig.js';
+import { setExpertMode } from '../../src/plugin/dashboard/spa/expertMode.js';
 
 function config(): Record<string, unknown> {
   return {
@@ -59,10 +60,14 @@ function installFetch(): ReturnType<typeof vi.fn> {
 beforeEach(() => {
   __resetConfigStateForTests();
   installFetch();
+  // Live preview + Simulation are expert-only (hidden in Basis); enable expert
+  // mode so these tests exercise them.
+  setExpertMode(true);
 });
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  setExpertMode(false);
 });
 
 describe('LiquidGlass2Rules', () => {
@@ -92,12 +97,12 @@ describe('LiquidGlass2Rules', () => {
     expect((await findByTestId('lg2-rules-sim-note')).textContent).toMatch(/KEIN|NO/);
   });
 
-  it('exposes all 16 v1 threshold sliders (no function loss)', async () => {
+  it('exposes all 17 threshold sliders (v1 set + indoor target temperature)', async () => {
     const { container, findByTestId } = render(<LiquidGlass2Rules />);
     await findByTestId('lg2-rules-slider-comfort.maxIndoorTempC');
     // Count only the threshold sliders (testid prefix), not other range inputs
     // like the evening-open control that share the range styling class.
     const sliders = container.querySelectorAll('input[data-testid^="lg2-rules-slider-"]');
-    expect(sliders.length).toBe(16);
+    expect(sliders.length).toBe(17);
   });
 });

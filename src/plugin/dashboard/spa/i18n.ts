@@ -166,6 +166,8 @@ const SERVER_EXACT: Record<string, string> = {
     'Strongest closure, as no hold position preserves comfort',
   'Geöffnet – aktuell keine Sonnenlast, Schließen würde nicht kühlen':
     'Opened — no solar load right now, closing would not cool',
+  'Öffnen zur passiven Kühlung – kühl draußen, keine Sonne':
+    'Opening for passive cooling — cool outside, no sun',
   // Ventilation / cooling advice headlines
   'Keine Empfehlung': 'No recommendation',
   'Fenster schließen': 'Close the window',

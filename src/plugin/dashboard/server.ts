@@ -559,6 +559,12 @@ export interface DiscoverSourcesResult {
    */
   contactSources: readonly HmipDeviceMeta[];
   /**
+   * Devices that carry an `illumination` feature — candidate GLOBAL light
+   * sensors. Surfaced so the UI can offer a global light-sensor binding
+   * (chosen like the PV source).
+   */
+  illuminationSources: readonly HmipDeviceMeta[];
+  /**
    * Full per-device inventory: every cached device with the list of
    * feature names it exposes. The discovery diagnostic renders this
    * so the user can identify which `PLUGIN_EXTERNAL` device is a room
@@ -603,6 +609,10 @@ export interface OtaStatusView {
   updateAvailable: boolean;
   requiresCore: boolean;
   mode: 'manual' | 'auto';
+  /** Active update channel. */
+  channel: 'stable' | 'experimental';
+  /** True when the resolved release is a GitHub prerelease (experimental build). */
+  experimentalBuild: boolean;
   checkIntervalHours: number;
   lastCheck: string | null;
   lastResult: string | null;
@@ -2617,6 +2627,7 @@ export class DashboardServer {
           temperatureSources: result.temperatureSources,
           shutterSources: result.shutterSources,
           contactSources: result.contactSources,
+          illuminationSources: result.illuminationSources,
           inventory: result.inventory,
           rawDeviceCount: result.rawDeviceCount,
           rawDeviceTypeHistogram: result.rawDeviceTypeHistogram,

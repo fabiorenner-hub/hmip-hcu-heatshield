@@ -9,13 +9,20 @@
  * Never logs secrets. The update source is the fixed repo in `github.ts`.
  */
 
-import { fetchLatestRelease, findOtaAssets, type FetchLike } from './github.js';
+import {
+  fetchLatestRelease,
+  fetchLatestPrerelease,
+  findOtaAssets,
+  type FetchLike,
+  type LatestRelease,
+} from './github.js';
 import { parseManifestJson, type OtaManifest } from './manifest.js';
 import { installBundle, type InstallResult } from './installer.js';
 import { readOtaState } from './state.js';
-import { isNewer, isAtLeast } from './semver.js';
+import { isNewer, isNewerWithBuild, isAtLeast } from './semver.js';
 
 export type UpdateMode = 'manual' | 'auto';
+export type UpdateChannel = 'stable' | 'experimental';
 
 export type LastResult =
   | 'installed'
@@ -34,6 +41,10 @@ export interface OtaStatus {
   updateAvailable: boolean;
   requiresCore: boolean;
   mode: UpdateMode;
+  /** Active update channel (stable = releases/latest, experimental = prerelease). */
+  channel: UpdateChannel;
+  /** True when the resolved release is a GitHub prerelease (experimental build). */
+  experimentalBuild: boolean;
   checkIntervalHours: number;
   lastCheck: string | null;
   lastResult: LastResult;
@@ -44,6 +55,8 @@ export interface OtaManagerDeps {
   readonly coreVersion: string;
   readonly getMode: () => UpdateMode;
   readonly getIntervalHours: () => number;
+  /** Active update channel. Absent → 'stable'. */
+  readonly getChannel?: () => UpdateChannel;
   readonly requestRestart: () => void;
   readonly fetchImpl?: FetchLike;
   readonly publicKeyPem?: string | undefined;
@@ -73,6 +86,7 @@ export class OtaManager {
   private cachedLatest: string | null = null;
   private cachedRequiresCore = false;
   private cachedUpdateAvailable = false;
+  private cachedExperimentalBuild = false;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   public constructor(deps: OtaManagerDeps) {
@@ -90,6 +104,24 @@ export class OtaManager {
     return process.env['HEATSHIELD_OTA_ACTIVE'] === '1';
   }
 
+  private channel(): UpdateChannel {
+    return this.deps.getChannel?.() ?? 'stable';
+  }
+
+  /**
+   * Resolve the release to consider for the active channel. `experimental`
+   * tracks the newest GitHub prerelease and falls back to the stable
+   * `releases/latest` when no prerelease exists; `stable` always uses
+   * `releases/latest` (GitHub excludes prereleases from it).
+   */
+  private async resolveRelease(): Promise<LatestRelease | null> {
+    if (this.channel() === 'experimental') {
+      const pre = await fetchLatestPrerelease(this.fetchImpl);
+      if (pre !== null) return pre;
+    }
+    return fetchLatestRelease(this.fetchImpl);
+  }
+
   public getStatus(): OtaStatus {
     return {
       coreVersion: this.deps.coreVersion,
@@ -99,6 +131,8 @@ export class OtaManager {
       updateAvailable: this.cachedUpdateAvailable,
       requiresCore: this.cachedRequiresCore,
       mode: this.deps.getMode(),
+      channel: this.channel(),
+      experimentalBuild: this.cachedExperimentalBuild,
       checkIntervalHours: this.deps.getIntervalHours(),
       lastCheck: this.lastCheck,
       lastResult: this.lastResult,
@@ -111,11 +145,12 @@ export class OtaManager {
    */
   public async check(): Promise<CheckOutcome> {
     this.lastCheck = this.now().toISOString();
-    const rel = await fetchLatestRelease(this.fetchImpl);
+    const rel = await this.resolveRelease();
     if (rel === null) {
       this.lastResult = 'offline';
       return { latest: this.cachedLatest, manifest: null, updateAvailable: false, requiresCore: false, result: 'offline' };
     }
+    this.cachedExperimentalBuild = rel.prerelease;
     const assets = findOtaAssets(rel);
     if (assets.manifest === null || assets.bundle === null) {
       // Release exists but carries no OTA payload (core-only release).
@@ -139,7 +174,13 @@ export class OtaManager {
     const state = await readOtaState(this.deps.dataDir);
     const quarantined = state.quarantined.includes(manifest.version);
     const requiresCore = !isAtLeast(this.deps.coreVersion, manifest.minCoreVersion);
-    const newer = isNewer(manifest.version, this.otaVersion());
+    // Experimental builds may share the SAME X.Y.Z as the running payload and
+    // differ only in the build stamp, so compare the build tail there. Stable
+    // uses the plain semver compare (build tails ignored).
+    const newer =
+      this.channel() === 'experimental'
+        ? isNewerWithBuild(manifest.version, this.otaVersion())
+        : isNewer(manifest.version, this.otaVersion());
     const updateAvailable = newer && !requiresCore && !quarantined;
 
     this.cachedLatest = manifest.version.replace(/^v/iu, '');
@@ -162,7 +203,7 @@ export class OtaManager {
       const reason: LastResult = outcome.result ?? 'already-current';
       return { status: this.getStatus(), result: { ok: false, reason, detail: `not eligible: ${reason}` } };
     }
-    const rel = await fetchLatestRelease(this.fetchImpl);
+    const rel = await this.resolveRelease();
     const assets = rel !== null ? findOtaAssets(rel) : { manifest: null, bundle: null, sha256: null };
     if (assets.bundle === null) {
       this.lastResult = 'offline';

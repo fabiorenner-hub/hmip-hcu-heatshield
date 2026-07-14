@@ -172,6 +172,15 @@ export const RoomSchema = z.object({
   // overrides the global `rules.shadingProfile` for every window in this room
   // (window-level override still wins). Absent = inherit global.
   shadingProfile: z.enum(['daylight', 'balanced', 'protection']).optional(),
+  // Use the room thermostat's SETPOINT as the comfort target (opt-in, default
+  // off). When on AND the room's indoor-temperature sensor is a thermostat that
+  // also reports `setPointTemperature` (Connect API §6.7.27, °C), the engine
+  // uses that live setpoint as the room's `target_c`; the warning/strong/
+  // critical offsets ride along (same band shift as the global cool target), so
+  // you set the desired temperature at the thermostat as usual and the shading
+  // follows. Degrades gracefully: if no setpoint is readable, the configured
+  // `target_c` is used unchanged. Optional → absent/false = off.
+  useThermostatTarget: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -250,6 +259,23 @@ export const ComfortRulesSchema = z
     // along, so the whole comfort band moves with the cool target. Optional —
     // absent = use each room's own configured `target_c` (unchanged behaviour).
     coolTargetC: z.number().min(16).max(30).optional(),
+    // Indoor TARGET temperature (the optimum we aim for), distinct from
+    // `maxIndoorTempC` (the max we still tolerate). Used by the passive-cooling
+    // open rule: when PV is negligible (no solar gain to protect against) and
+    // the outdoor air is below this target on a genuinely cool day, all windows
+    // open so the house cools toward the target by ventilation. Optional — the
+    // engine falls back to 23 °C when unset (so existing configs are unchanged
+    // in type but still get the sensible default in behaviour).
+    targetIndoorTempC: z.number().min(16).max(28).optional(),
+    // Proactive shading from the room TARGET (opt-in, default off). When on,
+    // the planner starts GRADUATED shading of a window as soon as the forecast
+    // rises above the room's `target_c` AND direct sun is on that window —
+    // instead of waiting for the forecast to cross `warning_c`. The hard ceiling
+    // (`warning_c`) still governs full closing; this only makes protection begin
+    // near the target rather than the warning threshold. Off = unchanged
+    // behaviour (shade from `warning_c`). Optional → engine treats absent/false
+    // as off, so existing configs are unchanged.
+    proactiveShadeFromTarget: z.boolean().optional(),
     // Pre-shading already kicks in slightly below the comfort threshold.
     preShadeTempC: z.number().default(23.5),
     // Indoor/outdoor delta required before night cooling opens shutters.
@@ -727,6 +753,14 @@ export const RulesSchema = z
     shadingProfile: z.enum(['daylight', 'balanced', 'protection']).optional(),
     eveningOpen: EveningOpenSchema.optional(),
     pvShading: PvShadingSchema.optional(),
+    // Live cloud-nowcast source: which LIVE signal corrects the near-term
+    // forecast radiation for the current sky.
+    //   'auto'  — prefer the global light sensor when readable, else PV (default)
+    //   'light' — only the global light-sensor (lux) nowcast
+    //   'pv'    — only the PV-vs-clear-sky nowcast
+    //   'off'   — no live correction (use the raw forecast)
+    // Optional → engine treats absent as 'auto' (unchanged behaviour).
+    cloudNowcastSource: z.enum(['auto', 'light', 'pv', 'off']).optional(),
     // Editable risk weights used when `profile === 'custom'`.
     customWeights: RiskWeightsSchema.optional(),
     // Pause window after detected manual operation of a shutter (7.4).
@@ -753,6 +787,12 @@ export const GlobalSignalsSchema = z.object({
   backOutdoorTemp: SignalBindingSchema.optional(),
   pvPower: SignalBindingSchema.optional(),
   radiation: SignalBindingSchema.optional(),
+  // Global outdoor light sensor (lux). Treated house-wide like the PV signal:
+  // a LIVE brightness probe used to correct the near-term forecast radiation
+  // (lux-based cloud nowcast). Preferred over the PV nowcast when present since
+  // a horizontal lux reading does not depend on the PV array orientation.
+  // Optional — absent = rely on PV/forecast only (unchanged behaviour).
+  illumination: SignalBindingSchema.optional(),
   windSpeed: SignalBindingSchema.optional(),
   forecastMaxTemp: SignalBindingSchema.optional(),
   forecastCloudCover: SignalBindingSchema.optional(),
@@ -1045,6 +1085,14 @@ export const UpdatesConfigSchema = z
     // and restart the plugin. Users can switch to 'manual' in the Updates tab.
     mode: z.enum(['manual', 'auto']).default('auto'),
     checkIntervalHours: z.number().int().min(1).max(168).default(6),
+    // Update channel. `stable` (default) tracks GitHub `releases/latest`
+    // (prereleases are excluded by GitHub, so stable users never see an
+    // experimental build). `experimental` tracks the newest GitHub PRERELEASE:
+    // a rolling test build that carries the SAME version as stable plus a build
+    // stamp (`X.Y.Z+exp.<stamp>`), gets NO changelog entry and NO version bump.
+    // Switching a single HCU to `experimental` lets the maintainer field-test a
+    // build without any stable user receiving it.
+    channel: z.enum(['stable', 'experimental']).default('stable'),
   })
   .prefault({});
 

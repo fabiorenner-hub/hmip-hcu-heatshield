@@ -308,6 +308,28 @@ export interface PhasedPlanContext {
    * → no PV boost.
    */
   readonly pvCloseFloorAt?: (t: Date) => number;
+  /**
+   * Cool-day gate: true when the day's MAX outdoor temperature stays below the
+   * comfort threshold. Then the outdoor air is a heat SINK, not a source — the
+   * room cannot be pushed above comfort from outside, and residual warmth is
+   * best cleared by ventilation. Predictive facade shading is therefore only
+   * applied if closing MEANINGFULLY lowers the forecast peak (genuine direct
+   * solar gain to block); otherwise the window stays open for daylight. Absent
+   * → false (hot-day behaviour unchanged).
+   */
+  readonly outdoorBelowComfort?: boolean;
+  /**
+   * Proactive-shading threshold (°C): the forecast open-peak above which a
+   * sun-lit window is considered worth shading. Normally equals the comfort
+   * upper bound (`bounds.upperC` = warning_c); when the opt-in
+   * proactive-shade-from-target rule is on, the planner lowers it to the room
+   * TARGET so GRADUATED shading begins near the target instead of waiting for
+   * the warning threshold. The exposure gate still applies (only when direct
+   * sun is on the window) and closing beyond the geometric cap still requires
+   * the hard comfort bound (`bounds.upperC`) to be at risk. Absent → falls back
+   * to `bounds.upperC` (unchanged behaviour).
+   */
+  readonly proactiveThresholdC?: number;
 }
 
 /**
@@ -422,6 +444,10 @@ interface SegmentDeps {
    */
   readonly eveningOpenExposureBelow: number | null;
   readonly pvCloseFloorAt: (t: Date) => number;
+  /** See PhasedPlanContext.outdoorBelowComfort. */
+  readonly outdoorBelowComfort: boolean;
+  /** See PhasedPlanContext.proactiveThresholdC. */
+  readonly proactiveThresholdC: number;
 }
 
 /** Snap a target level to the most-closed candidate that does not exceed the cap. */
@@ -471,10 +497,29 @@ function levelForSegment(
   // open? If not (winter / cool day) there is no reason to shade — keep it open
   // for daylight even though the sun is on it.
   const openPeak = peakTempC(simFrom(startT, startTempC, mostOpenOf(candidates), lookaheadHours));
-  const heatExpected = openPeak > bounds.upperC;
+  // Shade a sun-lit window once the open-peak rises above the PROACTIVE
+  // threshold. That threshold is the comfort upper bound (warning_c) by default
+  // and only drops to the room TARGET when the opt-in proactive rule is on —
+  // giving early, graduated protection between target and warning while the
+  // hard ceiling below still governs how FAR we close.
+  const heatExpected = openPeak > seg.proactiveThresholdC;
+
+  // Cool-day gate: when the day's outdoor max is below comfort, the room can
+  // only be cooled by (cooler) outdoor air — so shade ONLY if closing to the
+  // geometric cap MEANINGFULLY lowers the predicted peak (real direct solar
+  // gain to block). Where it does not (overcast/rainy, or peak is just residual
+  // warmth), fall through to the daylight branch and let ventilation cool the
+  // room. Hot days (outdoorBelowComfort=false) are unaffected.
+  const coolDaySuppresses =
+    seg.outdoorBelowComfort &&
+    exposure > seg.tuning.lowExposure &&
+    heatExpected &&
+    peakTempC(simFrom(startT, startTempC, mostOpenOf(candidates), lookaheadHours)) -
+      peakTempC(simFrom(startT, startTempC, levelAtCap(candidates, cap), lookaheadHours)) <
+      seg.tuning.shadeBenefitMinC;
 
   let chosen: number;
-  if (exposure > seg.tuning.lowExposure && heatExpected) {
+  if (exposure > seg.tuning.lowExposure && heatExpected && !coolDaySuppresses) {
     // Sun ON the window and heat expected → start from the graduated geometric
     // cap (daylight-friendly, ramps with the direct sun over the day).
     const geo = levelAtCap(candidates, cap);
@@ -580,6 +625,8 @@ export function planWindowSchedule(
     tuning: ctx.tuning ?? DEFAULT_SHADING_TUNING,
     eveningOpenExposureBelow: ctx.eveningOpenExposureBelow ?? null,
     pvCloseFloorAt: ctx.pvCloseFloorAt ?? ((): number => 0),
+    outdoorBelowComfort: ctx.outdoorBelowComfort ?? false,
+    proactiveThresholdC: ctx.proactiveThresholdC ?? bounds.upperC,
   };
 
   // Walk the horizon on a coarse segment grid for the (cheap) DECISION, but do

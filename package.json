@@ -1,6 +1,6 @@
 {
   "name": "hmip-plugin-heatshield",
-  "version": "2.0.28",
+  "version": "2.0.29",
   "description": "Heat Shield HMIP plugin (de.fr.renner.plugin.heatshield) — predictive shutter control for summer heat protection.",
   "private": true,
   "type": "module",
@@ -17,7 +17,9 @@
     "format": "prettier --write .",
     "smoke": "node scripts/smoke.mjs",
     "build:image": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-image.ps1",
-    "build:ota": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-ota.ps1"
+    "build:ota": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-ota.ps1",
+    "build:ota:exp": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-ota.ps1 -Experimental",
+    "publish:ota:exp": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish-ota-experimental.ps1"
   },
   "devDependencies": {
     "@preact/signals": "^1.3.4",

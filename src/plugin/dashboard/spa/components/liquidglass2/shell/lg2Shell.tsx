@@ -123,7 +123,7 @@ function Sidebar(props: { clock: Date; currentUrl: string; onConfig: () => void 
               aria-current={active ? 'page' : undefined}
               onClick={(): void => { if (!active) route(m.href); }}
             >
-              <Icon name={m.icon} size={18} />
+              <Icon name={m.icon} size={m.icon === 'einstellungen' ? 21 : 18} />
               <span>{t(m.label, m.labelEn)}</span>
             </button>
           );
@@ -257,6 +257,17 @@ export function Lg2Shell(props: {
     };
   }, []);
 
+  // A11y: restore the keyboard "skip to content" affordance that lived in the
+  // retired v1 chrome. The active route renders its own `<main class="lg2-main">`;
+  // tag it as the `#main-content` landmark so the skip link can target it.
+  // Re-applied on every route change.
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const main = document.querySelector('main.lg2-main');
+    if (main !== null) main.id = 'main-content';
+    return undefined;
+  }, [props.currentUrl]);
+
   // The frame lives on `.app__main` (an ANCESTOR), so its CSS vars must be set on
   // <body> to inherit down — a descendant's inline style can't reach an ancestor.
   const th0 = theme.value;
@@ -308,6 +319,9 @@ export function Lg2Shell(props: {
 
   return (
     <div class={`${cls}${expertMode.value ? ' lg2-expert-on' : ''}${preblurOn ? ' lg2-preblur' : ''}`} style={rootStyle as JSX.CSSProperties} data-testid={props.testId ?? 'liquid-glass2'}>
+      <a class="skip-link" href="#main-content" data-testid="skip-link">
+        {t('Zum Inhalt springen', 'Skip to content')}
+      </a>
       <Lg2PullToRefresh />
       <Sidebar clock={clock} currentUrl={url} onConfig={(): void => setCfgOpen(true)} />
       {props.children}

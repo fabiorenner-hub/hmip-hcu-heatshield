@@ -144,6 +144,14 @@ export interface CycleSnapshot {
   windSpeedMs: number | null;
   /** Short-wave radiation in W/m². */
   radiationWm2: number | null;
+  /**
+   * Global outdoor illuminance in lux from a dedicated light sensor (bound via
+   * `globalSignals.illumination`), or null when unbound/stale. Treated like the
+   * PV signal: a house-wide LIVE brightness probe. Unlike PV it does not depend
+   * on the array azimuth, so it is the more reliable cloud probe when present.
+   * Optional field so existing hand-written snapshots stay valid.
+   */
+  illuminanceLux?: number | null;
   /** Per-room data keyed by `Room.id`. */
   rooms: Map<
     string,

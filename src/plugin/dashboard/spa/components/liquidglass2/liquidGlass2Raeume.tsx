@@ -167,7 +167,15 @@ function RoomList(props: { rooms: RoomDetail[]; selectedId: string | null; onSel
               <span class="lg2-roomrow__body">
                 <span class="lg2-roomrow__top">
                   <span class="lg2-roomrow__name">{r.name}</span>
-                  <span class={`lg2-risk lg2-risk--${tone}`}>{t(...TONE_LABEL[tone])}</span>
+                  {/* Only surface a risk badge when there is actual risk to
+                      flag; the lowest ("Sehr niedrig") tone is hidden to keep
+                      the list calm and avoid a misleading "temperature" read. */}
+                  {tone !== 'vlow' && (
+                    <span class={`lg2-risk lg2-risk--${tone}`}
+                      title={t('Überhitzungsrisiko dieses Raums', 'This room’s overheating risk')}>
+                      {t(...TONE_LABEL[tone])}
+                    </span>
+                  )}
                 </span>
                 <span class="lg2-roomrow__temps">
                   <span class="lg2-roomrow__temp">{num1(r.indoorTempC)} <small>°C</small></span>

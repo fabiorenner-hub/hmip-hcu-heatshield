@@ -16,6 +16,7 @@ import { useDiscovery } from '../../hooks/useDiscovery.js';
 import { useUpdateCheck, GITHUB_URL, GITHUB_RELEASES_URL } from '../../hooks/useUpdateCheck.js';
 import { OtaPanel } from '../OtaPanel.js';
 import { getChangelog } from '../../tabs/updates.js';
+import { expertMode } from '../../expertMode.js';
 import { t } from '../../i18n.js';
 import { Icon } from '../icons.js';
 
@@ -92,13 +93,16 @@ export function LiquidGlass2Updates(_props: RoutableProps): JSX.Element {
         </section>
       )}
 
-      <section class="lg2-card lg2-upd-ota" data-testid="lg2-upd-ota">
-        <OtaPanel />
-      </section>
+      {/* OTA panel — expert only (hidden in Basis). */}
+      {expertMode.value && (
+        <section class="lg2-card lg2-upd-ota" data-testid="lg2-upd-ota">
+          <OtaPanel />
+        </section>
+      )}
 
       <ol class="lg2-upd-list" data-testid="lg2-upd-list">
         {getChangelog().map((e) => (
-          <li key={e.version} class="lg2-upd-entry">
+          <li key={e.version} class="lg2-card lg2-upd-entry">
             <h2 class="lg2-upd-entry__ver">v{e.version}</h2>
             <ul class="lg2-upd-entry__items">
               {e.items.map((it, i) => (

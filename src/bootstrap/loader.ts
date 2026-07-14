@@ -77,6 +77,30 @@ function isAtLeast(a: string, b: string): boolean {
   return true;
 }
 
+/** Build tail after `+` (e.g. `2.0.29+exp.2026…` → `exp.2026…`), else ''. */
+function buildTail(v: string): string {
+  const i = v.indexOf('+');
+  return i >= 0 ? v.slice(i + 1) : '';
+}
+
+/**
+ * True when the OTA payload is strictly NEWER than the running image core.
+ * Compares the core `X.Y.Z` first; when equal, an OTA build with a longer/
+ * greater build tail (experimental `X.Y.Z+exp.<stamp>`) beats the plain image
+ * core. This is what lets a freshly installed, newer core image (via HCUweb)
+ * SUPERSEDE a stale older OTA payload still sitting in `/data/ota` — without
+ * it, installing a newer core would keep booting the old OTA bundle.
+ */
+function otaNewerThanCore(otaVersion: string, coreVersion: string): boolean {
+  const pa = parseSemver(otaVersion);
+  const pb = parseSemver(coreVersion);
+  for (let i = 0; i < 3; i += 1) {
+    if (pa[i]! > pb[i]!) return true;
+    if (pa[i]! < pb[i]!) return false;
+  }
+  return buildTail(otaVersion) > buildTail(coreVersion);
+}
+
 /**
  * PURE decision: OTA vs image, and whether the active dir must be quarantined.
  * Ordering matters — an incompatible-but-valid bundle (`requires-core`) is NOT
@@ -95,6 +119,12 @@ export function decideBundle(input: DecideInput): BundleChoice {
   }
   if (!isAtLeast(input.coreVersion, input.manifest.minCoreVersion)) {
     return { kind: 'image', quarantineDir: false, reason: 'requires-core' };
+  }
+  // A freshly installed, newer (or equal) core image supersedes a stale/older
+  // OTA payload. Run the image; leave the OTA dir intact (not a failure — it is
+  // simply older, and a genuinely newer OTA can still be installed later).
+  if (!otaNewerThanCore(input.manifest.version, input.coreVersion)) {
+    return { kind: 'image', quarantineDir: false, reason: 'core-supersedes' };
   }
   if (input.bootAttempts >= input.maxBootAttempts) {
     return { kind: 'image', quarantineDir: true, reason: 'crash-loop' };

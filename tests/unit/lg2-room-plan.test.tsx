@@ -11,6 +11,7 @@ import { h } from 'preact';
 
 import { RoomPlan24h } from '../../src/plugin/dashboard/spa/components/liquidglass2/roomPlan24h.js';
 import { snapshot } from '../../src/plugin/dashboard/spa/store.js';
+import { setExpertMode } from '../../src/plugin/dashboard/spa/expertMode.js';
 import { __resetConfigStateForTests } from '../../src/plugin/dashboard/spa/hooks/useConfig.js';
 import type { DashboardSnapshot } from '../../src/plugin/dashboard/spa/types.js';
 
@@ -76,20 +77,33 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  setExpertMode(false);
   vi.restoreAllMocks();
 });
 
 describe('RoomPlan24h', () => {
-  it('renders the plan chart and the planned decisions with reasons', async () => {
+  it('renders the plan chart (expert) and the planned decisions with reasons', async () => {
+    setExpertMode(true); // the temperature/shutter chart is Expert-only now
     snapshot.value = snap();
     const { container, findByTestId } = render(<RoomPlan24h snap={snapshot.value} />);
     expect(container.querySelector('[data-testid="lg2-room-plan"]')).not.toBeNull();
-    // Chart appears once the forecast fetch resolves.
+    // Chart appears once the forecast fetch resolves (Expert view).
     await waitFor(() => {
       expect(container.querySelector('.lg2-plan__svg')).not.toBeNull();
     });
     const list = await findByTestId('lg2-plan-decisions');
     expect(list.querySelectorAll('.lg2-plan__decision').length).toBe(2);
     expect(list.textContent).toContain('50%');
+  });
+
+  it('hides the chart in the Basis view but still shows the planned decisions', async () => {
+    setExpertMode(false);
+    snapshot.value = snap();
+    const { container, findByTestId } = render(<RoomPlan24h snap={snapshot.value} />);
+    // Decisions still render (fetch-independent, from the snapshot).
+    const list = await findByTestId('lg2-plan-decisions');
+    expect(list.querySelectorAll('.lg2-plan__decision').length).toBe(2);
+    // The SVG chart is NOT rendered in Basis (compact, no-scroll view).
+    expect(container.querySelector('.lg2-plan__svg')).toBeNull();
   });
 });

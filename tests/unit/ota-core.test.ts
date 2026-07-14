@@ -119,6 +119,22 @@ describe('decideBundle', () => {
   it('quarantines on crash-loop', () => {
     expect(decideBundle(inp({ bootAttempts: 3 }))).toEqual({ kind: 'image', quarantineDir: true, reason: 'crash-loop' });
   });
+  it('runs the image (no quarantine) when the core is NEWER than the OTA payload', () => {
+    // Freshly installed core 2.1.0 supersedes an older 2.0.30 OTA payload.
+    expect(
+      decideBundle(inp({ coreVersion: '2.1.0', manifest: { version: 'v2.0.30', minCoreVersion: 'v2.0.0', sha256: 'a'.repeat(64) } })),
+    ).toEqual({ kind: 'image', quarantineDir: false, reason: 'core-supersedes' });
+  });
+  it('runs the image when core == OTA core and the OTA has no build tail', () => {
+    expect(
+      decideBundle(inp({ coreVersion: '2.1.0', manifest: { version: 'v2.1.0', minCoreVersion: 'v2.0.0', sha256: 'a'.repeat(64) } })),
+    ).toEqual({ kind: 'image', quarantineDir: false, reason: 'core-supersedes' });
+  });
+  it('runs an EXPERIMENTAL OTA (same core + build stamp) over the image', () => {
+    expect(
+      decideBundle(inp({ coreVersion: '2.1.0', manifest: { version: 'v2.1.0+exp.20260714T120000Z', minCoreVersion: 'v2.0.0', sha256: 'a'.repeat(64) } })),
+    ).toEqual({ kind: 'ota', version: 'v2.1.0+exp.20260714T120000Z' });
+  });
 });
 
 describe('installer helpers', () => {

@@ -30,7 +30,14 @@ export function OtaPanel(): JSX.Element | null {
     scheduleSave({ ...cfg, updates: { ...cfg.updates, mode } });
   };
 
+  const setChannel = (channel: 'stable' | 'experimental'): void => {
+    const cfg = config.value;
+    if (cfg === null) return;
+    scheduleSave({ ...cfg, updates: { ...cfg.updates, channel } });
+  };
+
   const mode = config.value?.updates?.mode ?? s.mode;
+  const channel = config.value?.updates?.channel ?? s.channel ?? 'stable';
 
   return (
     <article class="module-panel__card ota-card" data-testid="ota-panel">
@@ -66,6 +73,27 @@ export function OtaPanel(): JSX.Element | null {
         </div>
       </div>
 
+      <div class="ota-mode" role="group" aria-label={t('Update-Kanal', 'Update channel')}>
+        <span class="ota-mode__label">{t('Kanal', 'Channel')}</span>
+        <div class="ota-seg">
+          <button type="button" class={`ota-seg__btn${channel === 'stable' ? ' ota-seg__btn--on' : ''}`}
+            data-testid="ota-channel-stable" aria-pressed={channel === 'stable'}
+            onClick={(): void => setChannel('stable')}>{t('Stabil', 'Stable')}</button>
+          <button type="button" class={`ota-seg__btn${channel === 'experimental' ? ' ota-seg__btn--on' : ''}`}
+            data-testid="ota-channel-experimental" aria-pressed={channel === 'experimental'}
+            onClick={(): void => setChannel('experimental')}>{t('Experimentell', 'Experimental')}</button>
+        </div>
+      </div>
+      {channel === 'experimental' && (
+        <p class="ota-note" data-testid="ota-channel-note">
+          {t(
+            'Experimenteller Kanal: dieses Gerät erhält Test-Builds (GitHub-Vorabversionen) mit gleicher Versionsnummer + Build-Kennung, ohne Changelog. Andere Nutzer im Kanal „Stabil" bekommen sie nicht.',
+            'Experimental channel: this device receives test builds (GitHub prereleases) with the same version number + build tag, without a changelog. Users on the "Stable" channel do not get them.',
+          )}
+          {s.experimentalBuild ? ` ${t('Aktuell läuft ein Testbuild.', 'A test build is currently running.')}` : ''}
+        </p>
+      )}
+
       {s.requiresCore ? (
         <div class="ota-banner ota-banner--core" data-testid="ota-requires-core">
           <p>
@@ -82,9 +110,9 @@ export function OtaPanel(): JSX.Element | null {
         <div class="ota-banner ota-banner--available" data-testid="ota-available">
           <p>{t(`OTA-Update verfügbar: v${s.latest ?? ''}.`, `OTA update available: v${s.latest ?? ''}.`)}</p>
           {mode === 'manual' ? (
-            <button type="button" class="irr-btn" data-testid="ota-install" disabled={ota.busy}
-              onClick={(): void => { void ota.install(); }}>
-              {ota.busy ? t('Aktualisiere…', 'Updating…') : t('Jetzt aktualisieren', 'Update now')}
+            <button type="button" class="irr-btn" data-testid="ota-install" disabled={ota.phase !== 'idle'}
+              onClick={(): void => { ota.installTracked(); }}>
+              {ota.phase !== 'idle' ? t('Update läuft…', 'Updating…') : t('Jetzt aktualisieren', 'Update now')}
             </button>
           ) : (
             <p class="ota-note">{t('Wird automatisch installiert.', 'Will be installed automatically.')}</p>
@@ -98,8 +126,41 @@ export function OtaPanel(): JSX.Element | null {
         </p>
       )}
 
+      {ota.phase !== 'idle' && (
+        <div class={`ota-progress ota-progress--${ota.phase}`} data-testid="ota-progress" role="status" aria-live="polite">
+          <div class="ota-progress__steps">
+            {([
+              ['installing', t('Installieren', 'Installing')],
+              ['restarting', t('Neustart', 'Restarting')],
+              ['done', t('Fertig', 'Done')],
+            ] as const).map(([key, label], i) => {
+              const order: Record<string, number> = { installing: 0, restarting: 1, done: 2, error: 1 };
+              const cur = order[ota.phase] ?? 0;
+              const state = ota.phase === 'error' && i >= cur ? 'err' : i < cur ? 'past' : i === cur ? 'now' : 'todo';
+              return (
+                <span key={key} class={`ota-progress__step ota-progress__step--${state}`} data-testid={`ota-step-${key}`}>
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+          {(ota.phase === 'installing' || ota.phase === 'restarting') && (
+            <div class="ota-progress__bar" aria-hidden="true"><span /></div>
+          )}
+          <ul class="ota-progress__log" data-testid="ota-progress-log">
+            {ota.progressLog.map((line, i) => (<li key={i}>{line}</li>))}
+          </ul>
+          {ota.phase === 'error' && (
+            <button type="button" class="ota-linkbtn" data-testid="ota-progress-reload"
+              onClick={(): void => { try { globalThis.location?.reload(); } catch { /* ignore */ } }}>
+              {t('Seite neu laden', 'Reload page')}
+            </button>
+          )}
+        </div>
+      )}
+
       <div class="ota-actions">
-        <button type="button" class="ota-linkbtn" data-testid="ota-check" disabled={ota.busy}
+        <button type="button" class="ota-linkbtn" data-testid="ota-check" disabled={ota.busy || ota.phase === 'installing' || ota.phase === 'restarting'}
           onClick={(): void => { void ota.check(); }}>
           {ota.busy ? t('Prüfe…', 'Checking…') : t('Jetzt prüfen', 'Check now')}
         </button>

@@ -348,6 +348,111 @@ describe('planWindowSchedule — phased day-ahead plan', () => {
 });
 
 
+describe('planWindowSchedule — cool-day gate (outdoor max below comfort)', () => {
+  const NOWC = new Date('2026-07-14T06:00:00.000Z');
+  const CAND = [0, 0.25, 0.5, 0.75, 0.95, 1];
+  const B: ComfortBounds = { lowerC: 17, upperC: 24.5 };
+  // Residual-warmth sim: the room sits at 26 °C regardless of shutter level —
+  // shading does NOT lower the peak (overcast/cool day, no direct beam to
+  // block). Only outdoor air (ventilation) could cool it.
+  function flatWarmSim(startT: Date, _t: number, _level01: number, hoursAhead: number): RoomTrajectory {
+    const stepMin = 30;
+    const n = Math.floor((hoursAhead * 60) / stepMin) + 1;
+    const points = [];
+    for (let k = 0; k < n; k += 1) {
+      points.push({
+        ts: new Date(startT.getTime() + k * stepMin * 60000).toISOString(),
+        indoorTempC: 26,
+        heatLoad01: 0,
+      });
+    }
+    return { roomId: 'r1', points, uncertain: false, confidence01: 0.9 };
+  }
+  const baseCtx = {
+    windowId: 'w1',
+    currentLevel01: 0,
+    candidateLevels01: CAND,
+    startTempC: 26,
+    horizonHours: 4,
+    segmentHours: 2,
+    lookaheadHours: 3,
+    heatCap01: 0.95,
+    exposureAt: (): number => 0.5, // sun geometrically on the window
+  };
+
+  it('keeps the window OPEN when the day stays below comfort and shading would not cool', () => {
+    const plan = planWindowSchedule({ ...baseCtx, outdoorBelowComfort: true }, flatWarmSim, B, NOWC);
+    expect(plan.target01).toBe(0);
+  });
+
+  it('still shades (control) when the outdoor max is NOT below comfort', () => {
+    const plan = planWindowSchedule({ ...baseCtx, outdoorBelowComfort: false }, flatWarmSim, B, NOWC);
+    expect(plan.target01).toBeGreaterThan(0);
+  });
+});
+
+describe('planWindowSchedule — proactive shading from target (opt-in)', () => {
+  const NOWP = new Date('2026-07-11T06:00:00.000Z');
+  const CAND = [0, 0.25, 0.5, 0.75, 0.95, 1];
+  // Warning bound at 26 °C; the proactive threshold (= target) is 23 °C.
+  const B: ComfortBounds = { lowerC: 17, upperC: 26 };
+  // Sun on the window all horizon. An OPEN shutter peaks at 25 °C — ABOVE the
+  // 23 °C target but BELOW the 26 °C warning bound. Closing lowers the peak.
+  function sunSim(startT: Date, _t: number, level01: number, hoursAhead: number): RoomTrajectory {
+    const stepMin = 30;
+    const n = Math.floor((hoursAhead * 60) / stepMin) + 1;
+    const points = [];
+    for (let k = 0; k < n; k += 1) {
+      const t = new Date(startT.getTime() + k * stepMin * 60000);
+      points.push({
+        ts: t.toISOString(),
+        indoorTempC: 23 + (1 - level01) * 2, // open 25 → closed 23
+        heatLoad01: 1 - level01,
+      });
+    }
+    return { roomId: 'r1', points, uncertain: false, confidence01: 0.9 };
+  }
+  const baseCtx = {
+    windowId: 'w1',
+    currentLevel01: 0,
+    candidateLevels01: CAND,
+    startTempC: 23,
+    horizonHours: 4,
+    segmentHours: 2,
+    lookaheadHours: 3,
+    heatCap01: 0.95,
+    exposureAt: (): number => 0.5, // direct sun geometrically on the window
+    solarStrongAt: (): boolean => true,
+  };
+
+  it('leaves the window OPEN by default (peak below the warning bound)', () => {
+    const plan = planWindowSchedule({ ...baseCtx }, sunSim, B, NOWP);
+    expect(plan.target01).toBe(0);
+  });
+
+  it('shades earlier when proactive-from-target is on and sun is on the window', () => {
+    const plan = planWindowSchedule(
+      { ...baseCtx, proactiveThresholdC: 23 },
+      sunSim,
+      B,
+      NOWP,
+    );
+    expect(plan.target01).toBeGreaterThan(0);
+  });
+
+  it('does NOT proactively shade an off-sun window even when enabled', () => {
+    // Same warm-ish forecast but no direct sun on the glass → the exposure gate
+    // must keep the window open (proactive shading is sun-gated).
+    const plan = planWindowSchedule(
+      { ...baseCtx, proactiveThresholdC: 23, exposureAt: (): number => 0, solarStrongAt: (): boolean => false },
+      sunSim,
+      B,
+      NOWP,
+    );
+    expect(plan.target01).toBe(0);
+  });
+});
+
 describe('planWindowSchedule — movement budget (2–4 moves/day)', () => {
   const NOW3 = new Date('2026-07-11T06:00:00.000Z');
   const CAND = [0, 0.25, 0.5, 0.75, 0.95, 1];

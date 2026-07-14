@@ -243,6 +243,9 @@ function GardenBody(props: { snap: DashboardSnapshot }): JSX.Element {
 /* Watering-plan editor (day-ahead entries: add / enable / delete / reset)    */
 /* -------------------------------------------------------------------------- */
 
+/** Collapsed-state persistence for the watering plan (default: collapsed). */
+const PLAN_COLLAPSE_KEY = 'hs.garden.plan.collapsed';
+
 function PlanEditor(props: { irr: IrrigationInfo }): JSX.Element {
   const { irr } = props;
   const zones = irr.zones ?? [];
@@ -250,6 +253,18 @@ function PlanEditor(props: { irr: IrrigationInfo }): JSX.Element {
   const [zoneId, setZoneId] = useState<string>(zones[0]?.id ?? '');
   const [time, setTime] = useState<string>('06:00');
   const [dur, setDur] = useState<number>(10);
+  // Collapsible; remembers the last state per device. Default = collapsed (only
+  // 'false' — an explicit "open" — keeps it open).
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return globalThis.localStorage?.getItem(PLAN_COLLAPSE_KEY) !== 'false'; } catch { return true; }
+  });
+  const toggle = (): void => {
+    setCollapsed((c) => {
+      const next = !c;
+      try { globalThis.localStorage?.setItem(PLAN_COLLAPSE_KEY, next ? 'true' : 'false'); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const add = (): void => {
     if (zoneId === '') return;
@@ -263,13 +278,25 @@ function PlanEditor(props: { irr: IrrigationInfo }): JSX.Element {
   };
 
   return (
-    <section class="lg2-card lg2-garden__planeditor" data-testid="lg2-garden-plan-editor">
+    <section class={`lg2-card lg2-garden__planeditor${collapsed ? ' lg2-garden__planeditor--collapsed' : ''}`} data-testid="lg2-garden-plan-editor">
       <div class="lg2-garden__plan-head">
-        <h3 class="lg2-card__title">{t('Bewässerungsplan', 'Watering plan')}</h3>
-        <button type="button" class="lg2-garden__manage" onClick={(): void => { void resetPlanToAuto(); }}>
-          {t('Auf Automatik zurücksetzen', 'Reset to auto')} <Icon name="automation" size={15} />
+        <button type="button" class="lg2-garden__plan-toggle" aria-expanded={!collapsed}
+          data-testid="lg2-garden-plan-toggle" onClick={toggle}>
+          <Icon name="mehr" size={16} class={`lg2-garden__plan-chevron${collapsed ? '' : ' lg2-garden__plan-chevron--open'}`} />
+          <h3 class="lg2-card__title">{t('Bewässerungsplan', 'Watering plan')}</h3>
+          {collapsed && plan.length > 0 && (
+            <span class="lg2-garden__plan-count">{plan.length}</span>
+          )}
         </button>
+        {!collapsed && (
+          <button type="button" class="lg2-garden__manage" onClick={(): void => { void resetPlanToAuto(); }}>
+            {t('Auf Automatik zurücksetzen', 'Reset to auto')} <Icon name="automation" size={15} />
+          </button>
+        )}
       </div>
+
+      {!collapsed && (
+      <Fragment>
       <p class="lg2-settings__hint">
         {t('Feste Fahrten planen (Zone, Uhrzeit, Dauer). Einträge lassen sich deaktivieren oder löschen; „Automatik" leitet den Plan wieder aus der Prognose ab.',
           'Schedule fixed runs (zone, time, duration). Entries can be disabled or deleted; “Auto” re-derives the plan from the forecast.')}
@@ -317,6 +344,8 @@ function PlanEditor(props: { irr: IrrigationInfo }): JSX.Element {
           {t('Hinzufügen', 'Add')}
         </button>
       </div>
+      </Fragment>
+      )}
     </section>
   );
 }

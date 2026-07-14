@@ -14,33 +14,17 @@ import { signal } from '@preact/signals';
 
 export type UiVersion = 'v1' | 'v2';
 
-const STORAGE_KEY = 'heatshield.uiVersion';
-
-function load(): UiVersion {
-  try {
-    // Default to the v2 "Liquid Glass" design; only an explicit stored 'v1'
-    // opts back into the legacy 1.20 interface.
-    return localStorage.getItem(STORAGE_KEY) === 'v1' ? 'v1' : 'v2';
-  } catch {
-    return 'v2';
-  }
-}
-
 /**
- * Reactive UI-version flag. Default `v2` (the "Liquid Glass" interface); a
- * stored `v1` opts back into the stable 1.20 design. Read `uiVersion.value`
- * anywhere the design must branch; the component re-renders when it changes.
+ * The classic v1 (1.20) interface is RETIRED. There is now exactly ONE UI — the
+ * "Liquid Glass V2" design — so this flag is permanently `'v2'`. The export
+ * surface (constant signal + no-op setter + reader) is kept so existing imports
+ * and tests keep compiling; any previously stored `'v1'` choice is ignored.
  */
-export const uiVersion = signal<UiVersion>(load());
+export const uiVersion = signal<UiVersion>('v2');
 
-/** Persist + apply the UI-version choice. Applies globally to the whole app. */
-export function setUiVersion(v: UiVersion): void {
-  uiVersion.value = v;
-  try {
-    localStorage.setItem(STORAGE_KEY, v);
-  } catch {
-    /* ignore — LOCAL, best-effort persistence */
-  }
+/** No-op: v1 is retired; the UI is always v2. Kept for import compatibility. */
+export function setUiVersion(_v: UiVersion): void {
+  uiVersion.value = 'v2';
 }
 
 /**

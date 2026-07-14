@@ -172,7 +172,7 @@ const FIXTURE_CONFIG: Config = {
     disabledValveIds: [],
     zones: [],
   },
-  updates: { mode: 'manual', checkIntervalHours: 6 },
+  updates: { mode: 'manual', checkIntervalHours: 6, channel: 'stable' },
   telemetry: { enabled: true },
 };
 
@@ -694,9 +694,9 @@ describe('App auto-redirect on CONFIG_REQUIRED', () => {
       render(<App />);
     });
     await waitFor(() => {
-      // The wizard tab has a step indicator that the placeholder
-      // tabs do not declare, so finding it is a reliable signal.
-      expect(document.querySelector('[data-testid="wizard-steps"]')).not.toBeNull();
+      // The native v2 wizard renders a step-progress indicator (`lg2-wiz-progress`)
+      // that no other page declares, so finding it is a reliable redirect signal.
+      expect(document.querySelector('[data-testid="lg2-wiz-progress"]')).not.toBeNull();
     });
   });
 
@@ -710,7 +710,8 @@ describe('App auto-redirect on CONFIG_REQUIRED', () => {
     await act(async () => {
       render(<App initialUrl="/uebersicht" />);
     });
-    expect(document.querySelector('[data-testid="uebersicht-view"]')).not.toBeNull();
-    expect(document.querySelector('[data-testid="wizard-steps"]')).toBeNull();
+    // Stays on the native v2 overview; no redirect to the wizard.
+    expect(document.querySelector('[data-testid="liquid-glass2-overview"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="lg2-wiz-progress"]')).toBeNull();
   });
 });

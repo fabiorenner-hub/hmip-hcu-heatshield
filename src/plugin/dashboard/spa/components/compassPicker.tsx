@@ -1,8 +1,10 @@
 /**
  * Clickable 8-point compass for choosing a window/shutter
  * orientation. Click a direction → the orientation (in degrees,
- * 0 = N clockwise) is reported via `onChange`. The currently
- * selected direction is highlighted and labelled.
+ * 0 = N clockwise) is reported via `onChange`. The pointer follows the EXACT
+ * value (not snapped), and a precise degree field below lets the user enter any
+ * orientation 0–359° — the 8 points are only quick presets. This removes the
+ * former ±22.5° error from snapping everything to 45° (forum request).
  */
 
 import { h, type JSX } from 'preact';
@@ -47,7 +49,10 @@ export function CompassPicker(props: Props): JSX.Element {
   const size = props.size ?? 120;
   const c = size / 2;
   const r = c - 16;
-  const selected = Math.round((((props.value % 360) + 360) % 360) / 45) * 45 % 360;
+  // Exact, normalized orientation (0..359) — the pointer follows this, so free
+  // degree values render truthfully instead of jumping to the nearest 45°.
+  const actual = (((Math.round(props.value) % 360) + 360) % 360);
+  const clampDeg = (v: number): number => (((Math.round(v) % 360) + 360) % 360);
 
   return (
     <div
@@ -58,9 +63,9 @@ export function CompassPicker(props: Props): JSX.Element {
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={c} cy={c} r={r + 8} fill="var(--color-bg)" />
         <circle cx={c} cy={c} r={r + 8} fill="none" stroke="var(--color-card-border)" stroke-width="2" />
-        {/* pointer to the selected direction */}
+        {/* pointer to the EXACT current direction */}
         {(() => {
-          const rad = ((selected - 90) * Math.PI) / 180;
+          const rad = ((actual - 90) * Math.PI) / 180;
           const x = c + Math.cos(rad) * r;
           const y = c + Math.sin(rad) * r;
           return <line x1={c} y1={c} x2={x} y2={y} stroke="var(--color-accent)" stroke-width="3" />;
@@ -69,7 +74,7 @@ export function CompassPicker(props: Props): JSX.Element {
           const rad = ((p.deg - 90) * Math.PI) / 180;
           const x = c + Math.cos(rad) * r;
           const y = c + Math.sin(rad) * r;
-          const isSel = p.deg === selected;
+          const isSel = Math.abs(p.deg - actual) < 1 || Math.abs(p.deg - actual) > 359;
           return (
             <g key={p.deg}>
               <circle
@@ -103,8 +108,26 @@ export function CompassPicker(props: Props): JSX.Element {
         })}
       </svg>
       <div class="compass__readout">
-        {compassLabel(props.value)} · {selected}°
+        {compassLabel(props.value)} · {actual}°
       </div>
+      <label class="compass__degree">
+        <span>{t('Grad', 'Degrees')}</span>
+        <input
+          type="number"
+          min={0}
+          max={359}
+          step={1}
+          value={String(actual)}
+          disabled={props.disabled === true}
+          data-testid="compass-degree-input"
+          onInput={(e): void => {
+            if (props.disabled === true) return;
+            const raw = Number((e.currentTarget as HTMLInputElement).value);
+            if (Number.isFinite(raw)) props.onChange(clampDeg(raw));
+          }}
+        />
+        <span aria-hidden="true">°</span>
+      </label>
     </div>
   );
 }

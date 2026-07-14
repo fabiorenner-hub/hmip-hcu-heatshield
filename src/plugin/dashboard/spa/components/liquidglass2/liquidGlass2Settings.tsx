@@ -21,7 +21,6 @@ import { ambientEnabled, setAmbientEnabled } from '../../ambient.js';
 import { getFlag, setFlag, type FeatureFlag } from '../../featureFlags.js';
 import { useConfig } from '../../hooks/useConfig.js';
 import { snapshot } from '../../store.js';
-import { uiVersion, setUiVersion } from '../../uiVersion.js';
 import { SETTINGS_LINKS } from '../../navModel.js';
 import type { Config } from '../../../../../shared/types.js';
 import type { WeatherWarning } from '../../types.js';
@@ -89,17 +88,6 @@ export function LiquidGlass2Darstellung(_props: RoutableProps): JSX.Element {
           <p class="lg2-header__sub">{t('Design, Sprache und Hintergrund', 'Design, language and background')}</p>
         </div>
       </header>
-
-      <section class="lg2-card" data-testid="lg2-uiversion">
-        <h3 class="lg2-card__title">{t('Benutzeroberfläche', 'User interface')}</h3>
-        <p class="lg2-settings__hint">
-          {t('v2 ist die neue „Liquid Glass"-Oberfläche. v1 ist die stabile 1.20-Oberfläche. Die Auswahl gilt sofort für die gesamte App.',
-            'v2 is the new "Liquid Glass" interface. v1 is the stable 1.20 interface. The choice applies to the whole app immediately.')}
-        </p>
-        <Seg<'v1' | 'v2'> value={uiVersion.value}
-          options={[['v1', t('UI v1 (1.20)', 'UI v1 (1.20)')], ['v2', t('UI v2 (2.0)', 'UI v2 (2.0)')]]}
-          onChange={(v): void => setUiVersion(v)} />
-      </section>
 
       <section class="lg2-card">
         <h3 class="lg2-card__title">{t('Design anpassen', 'Customise design')}</h3>
